@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from datetime import date, timedelta
+import calendar
 from myrs import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
@@ -195,15 +195,77 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:  # 経過シートがなければ作成する。
 							createFormatKey = commons.formatkeyCreator(doc)	
-							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # Pythonのdateオブジェクトにするために一時的に2018/5/4の形式に変換する。
-							firstdate = date(*sheet[r, 5].getString().split("/"))  # 入院日のdateオブジェクトを取得。
-							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YY/M/D'))  # 入院日のセルの書式を戻す。							
+# 							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # Pythonのdateオブジェクトにするために一時的に2018/5/4の形式に変換する。
+# 							firstdate = date(*sheet[r, 5].getString().split("/"))  # 入院日のdateオブジェクトを取得。
+							dateserial = int(sheet[r, 5].getValue())  # 入院日の日時シリアル値を取得。
+# 							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YY/M/D'))  # 入院日のセルの書式を戻す。							
 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。
 							newsheet = sheets[newsheetname]  # 経過シートを取得。  
 							newsheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。
+							daycount = 100  # 経過シートに入力する日数。
+							celladdress = sheet["I2"].getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
+							r, c = celladdress.Row, celladdress.Column
+							endcolumn = c + daycount + 1
+							sheet[r, c:endcolumn].setDataArray(([i for i in range(dateserial, dateserial+1)],))  # 日時シリアル値を経過シートに入力。
+							sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
+							y, m, d = sheet[r, c].getString().split("/")  # 年、月、日を文字列で取得。
+							weekday, days = calendar.monthrange(y, m)
+							# 土日の色付け。
 							
-							daycount = 100
+							
+							
+							
+							
+							days = days - d + 1  # 翌月1日までの日数を取得。
+							mr = r - 1  # 月を表示する行インデックス。
+							mc = c  # 月を表示する列インデックス。
+							while True:
+								sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
+								mc += days  # 次月1日の列に進める。
+								if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
+									ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
+									y, m = ymd.split("/")[:2]  # 年と月を取得。
+									
+									
+									# 祝日一覧。
+									
+									days = calendar.monthrange(y, m)[1]  # 月の日数を取得。
+								else:
+									break
+							sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  # 経過シートの日付の書式を日だけにする。
+								
+								
+				
+							
+
+							
+							
+							
+							
+							
+							
+							
+							m = firstdate.month
+							while date(i :
+								
+								date
+								
+							
+							sheet[r-1, c].setString("{}月".format(date.month))
+														
+							
+							
+							[i for i in range(dateserial, dateserial+1)]
+							
+							sheet[r:r+2, c:c+daycount+1].setDataArray()
+							
+							
 							sheet["I2"].setFormula(firstdate.isoformat())
+							
+							
+							
+							
+							
 							sheet["I2"].setPropertyValue("NumberFormat", createFormatKey('D'))
 							
 							
