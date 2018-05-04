@@ -46,106 +46,137 @@ class DocumentEventListener(unohelper.Base, XDocumentEventListener):
 	def __init__(self, *args):
 		self.args = args
 	def documentEventOccured(self, documentevent):
-		eventname = documentevent.EventName
-		if eventname=="OnUnload":  # ドキュメントを閉じる時。リスナーを除去する。
-			tdocimport, modulefolderpath, controller, changeslistener, selectionchangelistener, activationeventlistener, enhancedmouseclickhandler, contextmenuinterceptor = self.args
-			tdocimport.remove_meta(modulefolderpath)  # modulefolderpathをメタパスから除去する。
-			documentevent.Source.removeChangesListener(changeslistener)
-			controller.removeSelectionChangeListener(selectionchangelistener)
-			controller.removeActivationEventListener(activationeventlistener)
-			controller.removeEnhancedMouseClickHandler(enhancedmouseclickhandler)
-			controller.releaseContextMenuInterceptor(contextmenuinterceptor)
+		try:
+			eventname = documentevent.EventName
+			if eventname=="OnUnload":  # ドキュメントを閉じる時。リスナーを除去する。
+				tdocimport, modulefolderpath, controller, changeslistener, selectionchangelistener, activationeventlistener, enhancedmouseclickhandler, contextmenuinterceptor = self.args
+				tdocimport.remove_meta(modulefolderpath)  # modulefolderpathをメタパスから除去する。
+				documentevent.Source.removeChangesListener(changeslistener)
+				controller.removeSelectionChangeListener(selectionchangelistener)
+				controller.removeActivationEventListener(activationeventlistener)
+				controller.removeEnhancedMouseClickHandler(enhancedmouseclickhandler)
+				controller.releaseContextMenuInterceptor(contextmenuinterceptor)
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 	def disposing(self, eventobject):  # ドキュメントを閉じるときに発火する。	
-		eventobject.Source.removeDocumentEventListener(self)
+		try:
+			eventobject.Source.removeDocumentEventListener(self)
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class ActivationEventListener(unohelper.Base, XActivationEventListener):
 	def activeSpreadsheetChanged(self, activationevent):  # アクティブシートが変化した時に発火。
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-		sheetname = sheet.getName()  # アクティブシート名を取得。
-		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-			karute.activeSpreadsheetChanged(sheet)
-		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-			pass
-		elif sheetname=="一覧":
-			ichiran.activeSpreadsheetChanged(sheet)
-		elif sheetname=="予定":
-			pass
-		elif sheetname=="退院":
-			pass
-		elif sheetname=="履歴":
-			pass
+		try:
+	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+			sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+			sheetname = sheet.getName()  # アクティブシート名を取得。
+			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+				pass
+			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+				karute.activeSpreadsheetChanged(sheet)
+			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+				pass
+			elif sheetname=="一覧":
+				ichiran.activeSpreadsheetChanged(sheet)
+			elif sheetname=="予定":
+				pass
+			elif sheetname=="退院":
+				pass
+			elif sheetname=="履歴":
+				pass
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 	def disposing(self, eventobject):
-		eventobject.Source.removeActivationEventListener(self)	
+		try:
+			eventobject.Source.removeActivationEventListener(self)	
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # このリスナーのメソッドの引数からコントローラーを取得する方法がない。
 	def __init__(self, controller, borders, systemclipboard, transliteration):
 		self.controller = controller
 		self.args = borders, systemclipboard, transliteration
 	def mousePressed(self, enhancedmouseevent):  # セルをクリックした時に発火する。固定行列の最初のクリックは同じ相対位置の固定していないセルが返ってくる(表示されている自由行の先頭行に背景色がる時のみ）。
-
 # 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-
-		target = enhancedmouseevent.Target  # ターゲットのセルを取得。
-		if target.supportsService("com.sun.star.sheet.SheetCellRange"):  # targetがチャートの時がありうる?
-			sheet = target.getSpreadsheet()
-			sheetname = sheet.getName()
-			if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-				return karute.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
-			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-				return True
-			elif sheetname=="一覧":
-				return ichiran.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
-			elif sheetname=="予定":
-				return True
-			elif sheetname=="退院":
-				return True
-			elif sheetname=="履歴":
-				return True
-		return True  # Falseを返すと右クリックメニューがでてこなくなる。		
+		try:
+			target = enhancedmouseevent.Target  # ターゲットのセルを取得。
+			if target.supportsService("com.sun.star.sheet.SheetCellRange"):  # targetがチャートの時がありうる?
+				sheet = target.getSpreadsheet()
+				sheetname = sheet.getName()
+				if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+					pass
+				elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+					return karute.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
+				elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+					return True
+				elif sheetname=="一覧":
+					return ichiran.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
+				elif sheetname=="予定":
+					return True
+				elif sheetname=="退院":
+					return True
+				elif sheetname=="履歴":
+					return True
+			return True  # Falseを返すと右クリックメニューがでてこなくなる。	
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。	
 	def mouseReleased(self, enhancedmouseevent):
 		return True  # シングルクリックでFalseを返すとセル選択範囲の決定の状態になってどうしようもなくなる。
 	def disposing(self, eventobject):  # eventobject.SourceはNone。
-		self.controller.removeEnhancedMouseClickHandler(self)	
+		try:
+			self.controller.removeEnhancedMouseClickHandler(self)	
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 	def __init__(self, borders):
 		self.args = borders
 	def selectionChanged(self, eventobject):  # マウスから呼び出した時の反応が遅い。このメソッドでエラーがでるとショートカットキーでの操作が必要。
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		controller = eventobject.Source
-		sheet = controller.getActiveSheet()
-		sheetname = sheet.getName()  # アクティブシート名を取得。		
-		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-			karute.selectionChanged(controller, sheet, self.args)
-		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-			pass
-		elif sheetname=="一覧":
-			ichiran.selectionChanged(controller, sheet, self.args)
-		elif sheetname=="予定":
-			pass
-		elif sheetname=="退院":
-			pass
-		elif sheetname=="履歴":
-			pass			
+		try:
+	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+			controller = eventobject.Source
+			sheet = controller.getActiveSheet()
+			sheetname = sheet.getName()  # アクティブシート名を取得。		
+			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+				pass
+			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+				karute.selectionChanged(controller, sheet, self.args)
+			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+				pass
+			elif sheetname=="一覧":
+				ichiran.selectionChanged(controller, sheet, self.args)
+			elif sheetname=="予定":
+				pass
+			elif sheetname=="退院":
+				pass
+			elif sheetname=="履歴":
+				pass			
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 	def disposing(self, eventobject):
-		eventobject.Source.removeSelectionChangeListener(self)		
+		try:
+			eventobject.Source.removeSelectionChangeListener(self)		
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class ChangesListener(unohelper.Base, XChangesListener):
 	def changesOccurred(self, changesevent):  # Sourceにはドキュメントが入る。
-		doc = changesevent.Source
-		controller = doc.getCurrentController()
-		sheet = controller.getActiveSheet()
-		sheetname = sheet.getName()  # アクティブシート名を取得。
-		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-			pass
-		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-			pass
-		elif sheetname=="一覧":
-			pass
-		elif sheetname=="予定":
-			pass
-		elif sheetname=="退院":
-			pass
-		elif sheetname=="履歴":
-			pass		
-		
+		try:
+			doc = changesevent.Source
+			controller = doc.getCurrentController()
+			sheet = controller.getActiveSheet()
+			sheetname = sheet.getName()  # アクティブシート名を取得。
+			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+				pass
+			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+				pass
+			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+				pass
+			elif sheetname=="一覧":
+				pass
+			elif sheetname=="予定":
+				pass
+			elif sheetname=="退院":
+				pass
+			elif sheetname=="履歴":
+				pass		
+			
 		
 		
 		
@@ -154,37 +185,43 @@ class ChangesListener(unohelper.Base, XChangesListener):
 # 			accessor = change.Accessor
 # 			if accessor=="cell-change":  # セルの内容が変化した時。
 # 				cell = change.ReplacedElement  # 変化したセルを取得。		
-				
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。				
 						
 	def disposing(self, eventobject):
-		eventobject.Source.removeChangesListener(self)			
+		try:
+			eventobject.Source.removeChangesListener(self)			
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class ContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):  # コンテクストメニューのカスタマイズ。
 	def __init__(self, ctx, smgr, doc):
 		self.args = getBaseURL(ctx, smgr, doc)  # ScriptingURLのbaseurlを取得。
 	def notifyContextMenuExecute(self, contextmenuexecuteevent):  # 右クリックで呼ばれる関数。contextmenuexecuteevent.ActionTriggerContainerを操作しないとコンテクストメニューが表示されない。
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		baseurl = self.args 
-		controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-		contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-		contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-		addMenuentry = menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-		sheet = controller.getActiveSheet()  # アクティブシートを取得。
-		sheetname = sheet.getName()  # シート名を取得。
-# 		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-# 			karute.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-# 			keika.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		elif sheetname=="一覧":
-# 			ichiran.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		elif sheetname=="予定":
-# 			yotei.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		elif sheetname=="退院":
-# 			taiin.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		elif sheetname=="履歴":
-# 			rireki.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
-# 		return EXECUTE_MODIFIED	  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-		return IGNORED
-
+		try:
+	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+			baseurl = self.args 
+			controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+			contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+			contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+			addMenuentry = menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+			sheet = controller.getActiveSheet()  # アクティブシートを取得。
+			sheetname = sheet.getName()  # シート名を取得。
+	# 		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+	# 			karute.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+	# 			keika.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		elif sheetname=="一覧":
+	# 			ichiran.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		elif sheetname=="予定":
+	# 			yotei.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		elif sheetname=="退院":
+	# 			taiin.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		elif sheetname=="履歴":
+	# 			rireki.notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname)
+	# 		return EXECUTE_MODIFIED	  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+			return IGNORED
+		except:
+			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 # ContextMenuInterceptorのnotifyContextMenuExecute()メソッドで設定したメニュー項目から呼び出される関数。関数名変更不可。動的生成も不可。
 def entry1():
 	invokeMenuEntry(1)
@@ -212,7 +249,9 @@ def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼�
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
 		sheet = selection.getSpreadsheet()  # シートを取得。
 		sheetname = sheet.getName()  # シート名を取得。
-		if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+		if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+			pass
+		elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 			karute.contextMenuEntries(selection, entrynum)
 		elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
 			keika.contextMenuEntries(selection, entrynum)

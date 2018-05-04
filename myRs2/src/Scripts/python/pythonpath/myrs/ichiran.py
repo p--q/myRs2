@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+from datetime import date, timedelta
 from myrs import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
@@ -109,6 +110,8 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 					return False  # セル編集モードにしない。
 				elif section=="B":
 					header = sheet[startrow-1, c].getString()  # 固定行の最下端のセルの文字列を取得。
+					doc = controller.getModel()
+					sheets = doc.getSheets()  # シートコレクションを取得。
 					if header=="済":
 						if txt=="未":
 							target.setString("待")
@@ -137,7 +140,6 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 								sheet[r, 6].setString("経過")  # 経過列を設定。
 								cellstringaddress = sheet[r, 5].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
 								sheet[r, 7].setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。
-								doc = controller.getModel()
 								createFormatKey = commons.formatkeyCreator(doc)							
 								sheet[r, 7].setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 	
 								transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))
@@ -153,14 +155,12 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 								msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 								msgbox.execute()	
 								return
-						sheets = controller.getModel().getSheets()  # シートコレクションを取得。
 						if ids[0] in sheets:  # すでにカルテシートが存在するときはそれをアクティブにする。
 							controller.setActiveSheet(sheets[ids[0]])
 						else:  # カルテシートがない時。					
 							sheets.copyByName("00000000", ids[0], len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
 							newsheet = sheets[ids[0]]  # カルテシートを取得。  
 							if createFormatKey is None:
-								doc = controller.getModel()
 								createFormatKey = commons.formatkeyCreator(doc)									
 							newsheet["C3"].setValue(ids[3])  # カルテシートに入院日を入力。
 							newsheet["C3"].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
@@ -185,9 +185,54 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 							pass  # カレンダーpicker
 					
 					
-					elif header=="経過":
+					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
+
+						import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 						
-						pass	# 経過シートをアクティブにする、なければ作成する。	
+						ids = list(sheet[r, 2:5].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
+						if newsheetname in sheets:  # 経過シート名がある時。
+							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
+						else:  # 経過シートがなければ作成する。
+							createFormatKey = commons.formatkeyCreator(doc)	
+							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # Pythonのdateオブジェクトにするために一時的に2018/5/4の形式に変換する。
+							firstdate = date(*sheet[r, 5].getString().split("/"))  # 入院日のdateオブジェクトを取得。
+							sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YY/M/D'))  # 入院日のセルの書式を戻す。							
+							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。
+							newsheet = sheets[newsheetname]  # 経過シートを取得。  
+							newsheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。
+							
+							daycount = 100
+							sheet["I2"].setFormula(firstdate.isoformat())
+							sheet["I2"].setPropertyValue("NumberFormat", createFormatKey('D'))
+							
+							
+							
+							
+							datevalue = int(sheet["I2"].getValue())
+							sheet["I2"]
+							[datevalue+1 for i in range(daycount)]
+								
+							
+							
+							
+							
+							firstdatevalue = sheet[r, 5].getString()  # 日付のシリアル値がfloatで返ってくるので整数に変換して取得。。
+							
+							
+							
+							year = int(functionaccess.callFunction("YEAR", (datetimevalue,)))  # シリアル値から年を取得。floatで返ってくるので整数にする。
+							month = int(functionaccess.callFunction("MONTH", (datetimevalue,)))  # シリアル値から月を取得。floatで返ってくるので整数にする。
+							day = int(functionaccess.callFunction("DAY", (datetimevalue,)))  # シリアル値から日を取得。floatで返ってくるので整数にする。
+							hospdate = date(year, month, day)  # Pythonのdateオブジェクトにする。
+							timedelta(days=1)
+							
+							hiduke = []  # (月名, 日付)のタプルを入れるリスト。
+							
+
+							
+							
+							
 					
 					return False  # セル編集モードにしない。		
 				elif section=="D":

@@ -51,10 +51,11 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 	elif len(sheet[:redrow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "H"	
 	else:
-		sectionname = "I"	
-		cellranges = sheet[:, 6].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列が入っているセルに限定して抽出。空列は不可。数値の時もありうる。
-		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 記事列の最終行インデックス+1を取得。
-		karute.rng = sheet[redrow+1:emptyrow, :startcolumn]
+		sectionname = "I"  # 記事行がないときはrngアトリビュートはない。
+		cellranges = sheet[redrow+1:, 6].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列が入っているセルに限定して抽出。空列は不可。数値の時もありうる。
+		if len(cellranges):  # 区域Iにデータ行がある時のみ。
+			emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 記事列の最終行インデックス+1を取得。
+			karute.rng = sheet[redrow+1:emptyrow, :startcolumn]
 	karute.sectionname = sectionname   # 区画名
 	return karute  
 def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動した時も発火する。
@@ -69,8 +70,8 @@ def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動し
 # 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 # 		drowBorders(controller, sheet, selection, borders)	
 def activeSpreadsheetChanged(sheet):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet["C1"].setString("リストへ")
-	sheet["E1"].setString("経過ｼｰﾄへ")
+	sheet["C1"].setString("一覧へ")
+	sheet["E1"].setString("経過へ")
 	sheet["I1"].setString("COPY")
 def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	borders, systemclipboard, transliteration = args
@@ -79,11 +80,30 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(controller, sheet, target, borders)
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-				ichiran = getSectionName(controller, sheet, target)
-				section, startrow, emptyrow, sumi_retu, dstart = ichiran.sectionname, ichiran.startrow, ichiran.emptyrow, ichiran.sumi_retu, ichiran.dstart
-				celladdress = target.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-				txt = target.getString()  # クリックしたセルの文字列を取得。		
+				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+				if sectionname=="A":
+					txt = target.getString()  # クリックしたセルの文字列を取得。	
+					doc = controller.getModel()
+					sheets = doc.getSheets()  # シートコレクションを取得。
+					if txt=="一覧へ":
+						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+					elif txt=="経過へ":
+						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
+						if newsheetname in sheets:  # 経過シート名がある時。
+							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
+						else:
+							pass
+								
+				
+				
+				
+				
+# 				ichiran = getSectionName(controller, sheet, target)
+# 				section, startrow, emptyrow, sumi_retu, dstart = ichiran.sectionname, ichiran.startrow, ichiran.emptyrow, ichiran.sumi_retu, ichiran.dstart
+# 				celladdress = target.getCellAddress()
+# 				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
+# 				
 				
 				
 				
@@ -91,41 +111,38 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 				
 	return True  # セル編集モードにする。
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	karute = getSectionName(controller, sheet, cell)
-	sectionname = karute.sectionname
-	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
-	if sectionname in ("C", "G"):
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-		
-		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		
-		
-		
-		
-		cellranges = karute.rng[:, 1:-3].queryContentCells(CellFlags.STRING)  # #列からSubjct列について文字列の入っているセル範囲コレクションを取得。
-		upper = None  # 枠線を上に引くセル。
-		p = None  # forループの一つ前のセル。
-		for i in cellranges.getCells():
-			if i.getString().startswith("#"):  # '#'から始まるセルの時。
-				if upper: # 枠線を上にセルがすでに取得出来ている時。
-					bottom = i  # 枠線を下に引くセルの一つ下の行のセルとして取得。
-					break
-				else:
-					tmp = i
-			elif i==cell:
-				upper = tmp	
-			p = i
-		else:
-			bottom = i
-		sheet[upper.getCellAddress().Row:bottom.getCellAddress().Row+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	karute = getSectionName(controller, sheet, cell)  # セル固有の定数を取得。
+	sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
+		if cell.getPropertyValue("CellBackColor") in (-1, ):  # 背景色がない時。
+			sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+			doc = controller.getModel()  # ドキュメントモデルを取得。
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+			datarange = karute.rng  # 選択セルの区画のセル範囲を取得。但し背景色のある行を除く。
+			datarows = datarange[:, 1:5].getDataArray()  # #列からSubject列までの行のタプルを取得。
+			startrow = 0  # プロブレムの開始行の相対インデックス。
+			for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
+				if "#" in "{}{}{}{}".format(*datarow):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
+					if i>startrow:  # 開始行インデックスより大きい時。
+						cellranges.addRangeAddress(datarange[startrow:i, :].getRangeAddress(), False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
+						startrow = i
+			cellranges.addRangeAddress(datarange[startrow:i+1, :].getRangeAddress(), False)  # 最後のプロブレムのセル範囲を追加。
+			for i in cellranges:  # 各セル範囲について。
+				if len(i.queryIntersection(rangeaddress)):  # 選択したセルが含むセル範囲の時。
+					cursor = sheet.createCursorByRange(i)  # セルカーサーを作成
+					cursor.expandToEntireRows()  # セル範囲を行全体に拡大。
+					cursor.setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。
+					break  # 1つのプロブレムにしか対応しない。
 	elif sectionname in ("D", "F", "H"):
 		if cell.getPropertyValue("CellBackColor") in (-1, ):  # 背景色がない時。
-			rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
+			sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 			sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
 			cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-	elif sectionname=="I":
+	elif sectionname in ("I", "E"):
 		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
 	if contextmenuname=="cell":  # セルのとき
