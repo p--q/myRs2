@@ -95,13 +95,15 @@ class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # 
 		self.controller = controller
 		self.args = borders, systemclipboard, transliteration
 	def mousePressed(self, enhancedmouseevent):  # セルをクリックした時に発火する。固定行列の最初のクリックは同じ相対位置の固定していないセルが返ってくる(表示されている自由行の先頭行に背景色がる時のみ）。
+
 # 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		
 		try:
 			target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 			if target.supportsService("com.sun.star.sheet.SheetCellRange"):  # targetがチャートの時がありうる?
 				sheet = target.getSpreadsheet()
 				sheetname = sheet.getName()
-				if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+				if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 					pass
 				elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 					return karute.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
@@ -134,7 +136,7 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 			controller = eventobject.Source
 			sheet = controller.getActiveSheet()
 			sheetname = sheet.getName()  # アクティブシート名を取得。		
-			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+			if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 				pass
 			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 				karute.selectionChanged(controller, sheet, self.args)
