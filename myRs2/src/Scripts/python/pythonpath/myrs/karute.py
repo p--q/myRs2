@@ -145,9 +145,9 @@ def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交
 		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, sheet, contextmenuname):			
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	del contextmenu[:]  # contextmenu.clear()は不可。
 	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
-		del contextmenu[:]  # contextmenu.clear()は不可。
 		karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
@@ -164,7 +164,6 @@ def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, she
 # 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。				
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-		del contextmenu[:]  # contextmenu.clear()は不可。
 		karute = getSectionName(controller, sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
@@ -187,9 +186,8 @@ def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, she
 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  # listeners.pyの関数名を指定する。
 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  # listeners.pyの関数名を指定する。		
 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
-		del contextmenu[:]  # contextmenu.clear()は不可。
+		pass
 	elif contextmenuname=="sheettab":  # シートタブの時。
-		del contextmenu[:]  # contextmenu.clear()は不可。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
