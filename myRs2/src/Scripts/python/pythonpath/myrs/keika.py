@@ -9,7 +9,7 @@ from com.sun.star.awt import MouseButton  # 定数
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
 	pass
-def getSectionName(controller, sheet, cell):  # 区画名を取得。
+def getSectionName(controller, sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -23,7 +23,7 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 	startcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
 	cellranges = sheet[:, yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
-	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[startrow:emptyrow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "D"	
 	elif len(sheet[emptyrow:, :startcolumn].queryIntersection(rangeaddress)): 
@@ -73,147 +73,36 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(controller, sheet, target, borders)
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+# 				if sectionname=="A":
+# 					txt = target.getString()  # クリックしたセルの文字列を取得。	
+# 					doc = controller.getModel()
+# 					sheets = doc.getSheets()  # シートコレクションを取得。
+# 					if txt=="一覧へ":
+# 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+# 					elif txt=="経過へ":
+# 						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
+# 						if newsheetname in sheets:  # 経過シート名がある時。
+# 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
+# 						else:
+# 							pass
+								
 				
-				pass
+				
+				
 				
 # 				ichiran = getSectionName(controller, sheet, target)
 # 				section, startrow, emptyrow, sumi_retu, dstart = ichiran.sectionname, ichiran.startrow, ichiran.emptyrow, ichiran.sumi_retu, ichiran.dstart
 # 				celladdress = target.getCellAddress()
 # 				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-# 				txt = target.getString()  # クリックしたセルの文字列を取得。		
-# 				if section=="M":
-# 					if txt=="検予を反映":
-# 						
-# 						pass  # 経過シートから本日の検予を取得。
-# 					
-# 					elif txt=="済をﾘｾｯﾄ":
-# 						containerwindow = controller.getFrame().getContainerWindow()  # コンテナウィンドウを取得。
-# 						toolkit = containerwindow.getToolkit() # ウィンドウピアオブジェクトからツールキットを取得。
-# 						msgbox = toolkit.createMessageBox(containerwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "済列の変更", "済をリセットしますか？")
-# 						if msgbox.execute()==MessageBoxResults.OK:
-# 							sheet[startrow:emptyrow, :].setPropertyValue("CharColor", commons.COLORS["black"])  # 文字色をリセット。
-# 							sheet[startrow:emptyrow, sumi_retu].setDataArray([("未",)]*(emptyrow-startrow))  # 済列をリセット。
-# 							searchdescriptor = sheet.createSearchDescriptor()
-# 							searchdescriptor.setSearchString("済")
-# 							cellranges = sheet[startrow:emptyrow, dstart:ichiran.dend].findAll(searchdescriptor)  # チェック列の「済」が入っているセル範囲コレクションを取得。
-# 							cellranges.setPropertyValue("CharColor", commons.COLORS["silver"])
-# 					elif txt=="予をﾘｾｯﾄ":
-# 						sheet[startrow:emptyrow, sumi_retu+1].clearContents(CellFlags.STRING)  # 予列をリセット。
-# 					elif txt=="入力支援":
-# 						
-# 						pass  # 入力支援odsを開く。
-# 					
-# 					return False  # セル編集モードにしない。
-# 				elif not target.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色でない時。何もしない。
-# 					return False  # セル編集モードにしない。
-# 				elif section=="B":
-# 					header = sheet[startrow-1, c].getString()  # 固定行の最下端のセルの文字列を取得。
-# 					doc = controller.getModel()
-# 					sheets = doc.getSheets()  # シートコレクションを取得。
-# 					if header=="済":
-# 						if txt=="未":
-# 							target.setString("待")
-# 							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["skyblue"])
-# 						elif txt=="待":
-# 							target.setString("済")
-# 							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["silver"])
-# 							controller.getModel().store()  # ドキュメントを保存する。
-# 						elif txt=="済":
-# 							target.setString("未")
-# 							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["black"])
-# 					elif header=="予":
-# 						if txt:
-# 							target.clearContents(CellFlags.STRING)  # 予をクリア。
-# 						else:  # セルの文字列が空の時。
-# 							target.setString("予")
-# 					elif header=="ID":
-# 						systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにIDをコピーする。
-# 					elif header=="漢字名":  # カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
-# 						ids = list(sheet[r, 2:dstart].getDataArray()[0])  # ダブルクリックした行を経過列までのタプルをリストにして取得。
-# 						ids[0] = "{:0>8}".format(int(ids[0]))  # IDは常に8桁の数字の文字列にする。全角にはここでは対応しない。数値の時はfloatで返ってくる。
-# 						createFormatKey = None
-# 						if not ids[-1]:  # 在院日数列に値がないときは未設定行と判断する。式が入っていても値がなければNoneが返る。
-# 							if all(ids[:4]):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。
-# 								sheet[r, :2].setDataArray((("未", ""),))  # 未列と予列を設定。
-# 								sheet[r, 6].setString("経過")  # 経過列を設定。
-# 								cellstringaddress = sheet[r, 5].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
-# 								sheet[r, 7].setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。
-# 								createFormatKey = commons.formatkeyCreator(doc)							
-# 								sheet[r, 7].setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 	
-# 								transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))
-# 								sheet[r, 2].setPropertyValue("NumberFormat", createFormatKey('@'))  # ID列の書式を文字列に設定。 	
-# 								ids[0] = transliteration.transliterate(ids[0], 0, len(ids[0]), [])[0]  # IDを半角に変換。
-# 								ids[2] = transliteration.transliterate(ids[2], 0, len(ids[2]), [])[0]  # ｶﾅ名の全角を半角に変換
-# 								sheet[r, 2].setString(ids[0])  # 半角にしたIDを代入。
-# 								sheet[r, 4].setString(ids[2])  # 半角にしたｶﾅ名を代入。
-# 								sheet[r, 5].setPropertyValue("NumberFormat", createFormatKey('YY/MM/DD'))
-# 							else:
-# 								msg = "ID、漢字名、カナ名、入院日\nすべてを入力してください。"
-# 								componentwindow = controller.ComponentWindow
-# 								msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 								msgbox.execute()	
-# 								return
-# 						if ids[0] in sheets:  # すでにカルテシートが存在するときはそれをアクティブにする。
-# 							controller.setActiveSheet(sheets[ids[0]])
-# 						else:  # カルテシートがない時。					
-# 							sheets.copyByName("00000000", ids[0], len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
-# 							newsheet = sheets[ids[0]]  # カルテシートを取得。  
-# 							if createFormatKey is None:
-# 								createFormatKey = commons.formatkeyCreator(doc)									
-# 							newsheet["C3"].setValue(ids[3])  # カルテシートに入院日を入力。
-# 							newsheet["C3"].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-# # 							newsheet["C3"].getColumns().setPropertyValue("OptimalWidth", True)  # 日付列の列幅を最適化する。
-# 							newsheet["G1"].setString("")  # カルテシートのコピー日時をクリア。
-# 							newsheet["G2"].setString(" ".join(ids[:3]))  # カルテシートのID名前を入力。
-# 							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
-# 					elif header=="ｶﾅ名":
-# 						ns = sheet[r, c-2:c+1].getDataArray()  # ID、漢字名、ｶﾅ名、を取得。
-# 						transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
-# 						kana = ns[0][2].replace(" ", "")  # 半角空白を除去。
-# 						zenkana = transliteration.transliterate(kana, 0, len(kana), [])[0]  # ｶﾅを全角に変換。
-# 						systemclipboard.setContents(commons.TextTransferable("".join((zenkana, ns[0][0]))), None)  # クリップボードにカナ名+IDをコピーする。	
-# 					elif header=="入院日":
-# 						if txt:  # すでに入力されている時。
-# 							return True  # セル編集モードにする。
-# 						else:
-# # 							dialog, addControl = dialogCreator(ctx, smgr, {"PositionX": 102, "PositionY": 41, "Width": 380, "Height": 380, "Title": "LibreOffice", "Name": "MyTestDialog", "Step": 0, "Moveable": True})  # "TabIndex": 0
-# 
-# 							
-# 							
-# 							pass  # カレンダーpicker
-# 					
-# 					
-# 					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-# 						ids = list(sheet[r, 2:5].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
-# 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
-# 						if newsheetname in sheets:  # 経過シートがなければ作成する。
-# 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-# 						else:  # 経過シートがなければ作成する。
-# 							dateserial = int(sheet[r, 5].getValue())  # 入院日の日時シリアル値を取得。		
-# 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
-# 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-# 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
-# 							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
-# 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
-# 					return False  # セル編集モードにしない。		
-# 				elif section=="D":
-# 					header = sheet[ichiran.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
-# 					if header=="4F":
-# 						pass
-# 					elif header=="血液":
-# 						pass						
-# 
-# 
-# 
-# 					return False  # セル編集モードにしない。
-# 				elif section=="A":
-# 					if sheet[startrow-1, c].getString()=="ｶﾅ名":  # 固定行の最下端のセルの文字列を取得。
-# 						
-# 						pass  # 漢字名からｶﾅを取得する。
-
+# 				
+				
+				
+				
+				
+				
 	return True  # セル編集モードにする。
-		
-		
 def setDates(doc, sheet, cell, dateserial):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。。
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
@@ -260,26 +149,23 @@ def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindex
 	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
-	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
 	keika = getSectionName(controller, sheet, cell)
 	sectionname = keika.sectionname
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
+	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	if sectionname in ("A", "E", "F"):  # 線を消すだけ。
+		return
 	if sectionname in ("D",):  # 縦横線を引く。
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
-		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
 	elif sectionname in ("B",):  # 縦線のみ引く。
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。				
-		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-	elif sectionname in ("C",):  # 横線のみ引く。
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。		
+	elif sectionname in ("C",):  # 横線のみ引く。		
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-	elif sectionname in ("E", "F"):  # 線を消すだけ。
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。	
+	cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+
 
 
 

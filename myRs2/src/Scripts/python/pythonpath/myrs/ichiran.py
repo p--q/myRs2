@@ -12,7 +12,7 @@ from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 class Ichiran():  # シート固有の定数設定。
 	pass
-def getSectionName(controller, sheet, cell):  # 区画名を取得。
+def getSectionName(controller, sheet, target):  # 区画名を取得。
 	"""
 	M  |
 	---
@@ -30,25 +30,22 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 	E: スクロールする部分のうちヘッダが結合セルである列より右の部分。
 	A: ID列の最初の空行から下の部分。
 	"""
-	
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	
 	menurow  = 0  # メニュー行インデックス。
 	idcolumn = 2  # ID列インデックス。
 	startrow = controller[0].getVisibleRange().EndRow + 1  # スクロールする枠の最初の行インデックス。
 	emptycellranges = sheet[startrow-1, :].queryEmptyCells()  # 上枠の最下行の空セルのセル範囲コレクションを取得。
 	mergedheaders = emptycellranges[0].getRangeAddress()  # ヘッダの結合セルの範囲を取得。
-	dstart, dend = mergedheaders.StartColumn+1, mergedheaders.EndColumn+1  # ヘッダ結合セルの左端列インデックスと右端列インデックス+1の取得。
-	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	dstart, dend = mergedheaders.StartColumn, mergedheaders.EndColumn+1  # ヘッダ結合セルの左端列インデックスと右端列インデックス+1の取得。
+	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	cellranges = sheet[:, idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-	if len(sheet[menurow, :dstart-1].queryIntersection(rangeaddress)):  # メニューセルの時。
+	if len(sheet[menurow, :dstart].queryIntersection(rangeaddress)):  # メニューセルの時。
 		sectionname = "M"
 	elif len(sheet[startrow:emptyrow, :dstart].queryIntersection(rangeaddress)):  # Dの左。
 		sectionname = "B"	
 	elif len(sheet[startrow:emptyrow, dstart:dend].queryIntersection(rangeaddress)):  # チェック列の時。
 		sectionname = "D"		
-	elif len(sheet[startrow:emptyrow, dstart:].queryIntersection(rangeaddress)):  # Dの右。
+	elif len(sheet[startrow:emptyrow, dend:].queryIntersection(rangeaddress)):  # Dの右。
 		sectionname = "E"		
 	elif len(sheet[emptyrow:, :].queryIntersection(rangeaddress)):  # まだデータのない行の時。
 		sectionname = "A"	
@@ -219,21 +216,23 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 
 	return True  # セル編集モードにする。
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
-	
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	ichiran = getSectionName(controller, sheet, cell)
-	sectionname = ichiran.sectionname
-	if sectionname in ("A", "B", "D", "E"):
-		noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
-		sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-		if cell.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色の時。
-			rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
-			if sectionname=="D":
-				sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
+	sectionname = ichiran.sectionname	
+	if sectionname in ("M", ):
+		return	
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
+	if cell.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色の時。
+		if sectionname in ("A", "B", "E"):
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
+		elif sectionname in ("D", ):
+			sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-			cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+		elif sectionname in ("C", ):		
+			sheet[1:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。				
+		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):  # 右クリックメニュー。			
 	if contextmenuname=="cell":  # セルのとき
 		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
