@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 # import calendar
-from myrs import commons
+from myrs import commons, keika
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
@@ -30,6 +30,9 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 	E: スクロールする部分のうちヘッダが結合セルである列より右の部分。
 	A: ID列の最初の空行から下の部分。
 	"""
+	
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	
 	menurow  = 0  # メニュー行インデックス。
 	idcolumn = 2  # ID列インデックス。
 	startrow = controller[0].getVisibleRange().EndRow + 1  # スクロールする枠の最初の行インデックス。
@@ -37,9 +40,8 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 	mergedheaders = emptycellranges[0].getRangeAddress()  # ヘッダの結合セルの範囲を取得。
 	dstart, dend = mergedheaders.StartColumn+1, mergedheaders.EndColumn+1  # ヘッダ結合セルの左端列インデックスと右端列インデックス+1の取得。
 	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	cellranges = sheet[:, idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。空列は不可。数値の時もありうる。
+	cellranges = sheet[:, idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-	sectionname = "C"  
 	if len(sheet[menurow, :dstart-1].queryIntersection(rangeaddress)):  # メニューセルの時。
 		sectionname = "M"
 	elif len(sheet[startrow:emptyrow, :dstart].queryIntersection(rangeaddress)):  # Dの左。
@@ -50,6 +52,8 @@ def getSectionName(controller, sheet, cell):  # 区画名を取得。
 		sectionname = "E"		
 	elif len(sheet[emptyrow:, :].queryIntersection(rangeaddress)):  # まだデータのない行の時。
 		sectionname = "A"	
+	else:
+		sectionname = "C"  
 	ichiran = Ichiran()  # クラスをインスタンス化。	
 	ichiran.sectionname = sectionname   # 区画名
 	ichiran.menurow = menurow  # メニュー行インデックス。
@@ -186,66 +190,17 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 					
 					
 					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-
-						import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-						
-						
-
 						ids = list(sheet[r, 2:5].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
 						if newsheetname in sheets:  # 経過シートがなければ作成する。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:  # 経過シートがなければ作成する。
 							dateserial = int(sheet[r, 5].getValue())  # 入院日の日時シリアル値を取得。		
-							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。							
-							newsheet = commons.createKeikaSheet(doc, sheets[newsheetname], ids, dateserial)
-							controller.setActiveSheet(newsheet)  # 経過シートをアクティブにする。
-							
-							
-# 							createFormatKey = commons.formatkeyCreator(doc)	
-# 							newsheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。
-# 							daycount = 100  # 経過シートに入力する日数。
-# 							celladdress = newsheet["I2"].getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-# 							r, c = celladdress.Row, celladdress.Column
-# 							sheet[:r+1, c:].clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA+CellFlags.HARDATTR+CellFlags.STYLES)  # セルの内容を削除。
-# 							endcolumn = c + daycount + 1
-# 							sheet[r, c:endcolumn].setDataArray(([i for i in range(dateserial, dateserial+1)],))  # 日時シリアル値を経過シートに入力。
-# 							sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
-# 							y, m, d = sheet[r, c].getString().split("/")  # 年、月、日を文字列で取得。
-# 							weekday, days = calendar.monthrange(y, m)  # 日曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
-# 							weekday = (weekday+(d-1)%7)%7  # dの曜日番号を取得。1日からの7の余りと1日の余りを加えた7の余りがdの曜日番号。
-# 							n = 0  # 日曜日の曜日番号。
-# 							sundayranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # 日曜日のセル範囲コレクション。
-# 							[sundayranges.addRangeAddress(sheet[r, i].getRangeAddress()) for i in range(c+(n-weekday)%7, endcolumn, 7)]  # 曜日番号nの列番号だけについて。
-# 							n = 6  # 土曜日の曜日番号。
-# 							saturdayranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # 土曜日のセル範囲コレクション。
-# 							[saturdayranges.addRangeAddress(sheet[r, i].getRangeAddress()) for i in range(c+(n-weekday)%7, endcolumn, 7)]  # 曜日番号nの列番号だけについて。
-# 							holidayranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # 祝日のセル範囲コレクション。
-# 							holidays = commons.HOLIDAYS  # 祝日の辞書を取得。
-# 							days = days - d + 1  # 翌月1日までの日数を取得。
-# 							mr = r - 1  # 月を代入する行のインデックス。
-# 							mc = c  # 1日を表示する列のインデックス。
-# 							if y in holidays:  # 祝日一覧のキーがある時。
-# 								[holidayranges.addRangeAddress(sheet[r, mc+i-1].getRangeAddress()) for i in holidays[y][m] if not i<d]
-# 							while True:
-# 								sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
-# 								mc += days  # 次月1日の列に進める。
-# 								if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
-# 									ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
-# 									y, m = ymd.split("/")[:2]  # 年と月を取得。
-# 									if y in holidays:  # 祝日一覧のキーがある時。。
-# 										[holidayranges.addRangeAddress(sheet[r, mc+i-1].getRangeAddress()) for i in holidays[y][m] if mc+i-1<endcolumn]
-# 									weekday, days = calendar.monthrange(y, m)  # 1日の曜日と月の日数を取得。
-# 								else:
-# 									break
-# 							sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  # 経過シートの日付の書式を日だけにする。
-# 							colors = commons.COLORS
-# 							holidayranges.setPropertyValue("CellBackColor", colors["red3"])  # 祝日の背景色を変更。
-# 							sundayranges.setPropertyValue("CharColor", colors["red3"])  # 日曜日の文字色を変更。
-# 							saturdayranges.setPropertyValue("CharColor", colors["skyblue"])  # 土曜日の文字色を変更。	
-# 							controller.setActiveSheet(newsheet)  # 経過シートをアクティブにする。
-							
-							
+							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
+							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
+							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
+							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 					return False  # セル編集モードにしない。		
 				elif section=="D":
 					header = sheet[ichiran.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
@@ -264,6 +219,9 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 
 	return True  # セル編集モードにする。
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
+	
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	ichiran = getSectionName(controller, sheet, cell)
 	sectionname = ichiran.sectionname

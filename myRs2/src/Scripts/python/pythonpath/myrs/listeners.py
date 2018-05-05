@@ -65,16 +65,17 @@ class DocumentEventListener(unohelper.Base, XDocumentEventListener):
 			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
 class ActivationEventListener(unohelper.Base, XActivationEventListener):
 	def activeSpreadsheetChanged(self, activationevent):  # アクティブシートが変化した時に発火。
+# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 		try:
-	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 			sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 			sheetname = sheet.getName()  # アクティブシート名を取得。
-			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+			if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 				pass
 			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 				karute.activeSpreadsheetChanged(sheet)
 			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-				pass
+				controller = activationevent.Source
+				keika.activeSpreadsheetChanged(controller, sheet)
 			elif sheetname=="一覧":
 				ichiran.activeSpreadsheetChanged(sheet)
 			elif sheetname=="予定":
@@ -108,7 +109,7 @@ class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # 
 				elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 					return karute.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
 				elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-					return True
+					return keika.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
 				elif sheetname=="一覧":
 					return ichiran.mousePressed(enhancedmouseevent, self.controller, sheet, target, self.args)
 				elif sheetname=="予定":
@@ -141,7 +142,7 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 				karute.selectionChanged(controller, sheet, self.args)
 			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-				pass
+				keika.selectionChanged(controller, sheet, self.args)
 			elif sheetname=="一覧":
 				ichiran.selectionChanged(controller, sheet, self.args)
 			elif sheetname=="予定":
@@ -164,7 +165,7 @@ class ChangesListener(unohelper.Base, XChangesListener):
 			controller = doc.getCurrentController()
 			sheet = controller.getActiveSheet()
 			sheetname = sheet.getName()  # アクティブシート名を取得。
-			if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+			if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 				pass
 			elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 				pass
@@ -251,7 +252,7 @@ def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼�
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
 		sheet = selection.getSpreadsheet()  # シートを取得。
 		sheetname = sheet.getName()  # シート名を取得。
-		if sheetname.startswoth("00000000"):  # テンプレートの時は何もしない。
+		if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 			pass
 		elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 			karute.contextMenuEntries(selection, entrynum)
