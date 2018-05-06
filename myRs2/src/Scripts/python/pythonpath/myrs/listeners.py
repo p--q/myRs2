@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # embeddedmacro.pyから呼び出した関数ではXSCRIPTCONTEXTは使えない。デコレーターも使えない。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)でブレークする。
 import unohelper  # オートメーションには必須(必須なのはuno)。
-import os
+# import os
 from com.sun.star.awt import XEnhancedMouseClickHandler
 from com.sun.star.document import XDocumentEventListener
 from com.sun.star.sheet import XActivationEventListener
@@ -13,60 +13,64 @@ from com.sun.star.ui import XContextMenuInterceptor
 from com.sun.star.ui.ContextMenuInterceptorAction import IGNORED  # enum
 from com.sun.star.util import XChangesListener
 from com.sun.star.view import XSelectionChangeListener
-from myrs import commons, ichiran, karute, keika, rireki, taiin, yotei  # 相対インポートは不可。
+from myrs import commons  # 相対インポートは不可。
 def myRs(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-	controller = doc.getCurrentController()  # コントローラの取得。
-# 	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-# 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。半角カタカナへの変換に利用。
-# 	borders = createBorders()  # 枠線の作成。
-	changeslistener = ChangesListener(xscriptcontext)  # ChangesListener。セルの変化の感知に利用。列の挿入も感知。
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	try:
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	# 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	# 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+		controller = doc.getCurrentController()  # コントローラの取得。
+	# 	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+	# 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。半角カタカナへの変換に利用。
+	# 	borders = createBorders()  # 枠線の作成。
+		changeslistener = ChangesListener(xscriptcontext)  # ChangesListener。セルの変化の感知に利用。列の挿入も感知。
+		
+	# 	selectionchangelistener = SelectionChangeListener(xscriptcontext, borders)  # SelectionChangeListener。選択範囲の変更の感知に利用。
+		selectionchangelistener = SelectionChangeListener(xscriptcontext)  # SelectionChangeListener。選択範囲の変更の感知に利用。
 	
-# 	selectionchangelistener = SelectionChangeListener(xscriptcontext, borders)  # SelectionChangeListener。選択範囲の変更の感知に利用。
-	selectionchangelistener = SelectionChangeListener(xscriptcontext)  # SelectionChangeListener。選択範囲の変更の感知に利用。
-
-	activationeventlistener = ActivationEventListener(xscriptcontext)  # ActivationEventListener。シートの切替の感知に利用。
-# 	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext, controller, borders, systemclipboard, transliteration)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
-
-# 	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext, borders)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
-	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
-
-# 	contextmenuinterceptor = ContextMenuInterceptor(xscriptcontext, ctx, smgr, doc)  # ContextMenuInterceptor。右クリックメニューの変更に利用。
-	contextmenuinterceptor = ContextMenuInterceptor(xscriptcontext)  # ContextMenuInterceptor。右クリックメニューの変更に利用。
+		activationeventlistener = ActivationEventListener(xscriptcontext)  # ActivationEventListener。シートの切替の感知に利用。
+	# 	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext, controller, borders, systemclipboard, transliteration)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
 	
-	doc.addChangesListener(changeslistener)
-	controller.addSelectionChangeListener(selectionchangelistener)
-	controller.addActivationEventListener(activationeventlistener)
-	controller.addEnhancedMouseClickHandler(enhancedmouseclickhandler)
-	controller.registerContextMenuInterceptor(contextmenuinterceptor)
-	listeners = changeslistener, selectionchangelistener, activationeventlistener, enhancedmouseclickhandler, contextmenuinterceptor
-	doc.addDocumentEventListener(DocumentEventListener(tdocimport, modulefolderpath, controller, *listeners))  # DocumentEventListener。ドキュメントとコントローラに追加したリスナーの除去に利用。
-def getModule(sheetname):
-	if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
-		pass
-	elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
-		return karute
-	elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-		return keika
-	elif sheetname=="一覧":
-		return ichiran
-	elif sheetname=="予定":
-		return yotei
-	elif sheetname=="退院":
-		return taiin
-	elif sheetname=="履歴":
-		return rireki
-	return None
-# def createBorders():# 枠線の作成。
-# 	noneline = BorderLine2(LineStyle=BorderLineStyle.NONE)
-# 	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=commons.COLORS["violet"])
-# 	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=commons.COLORS["magenta3"])	
-# 	tableborder2 = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=True, IsRightLineValid=True)
-# 	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
-# 	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
-# 	return noneline, tableborder2, topbottomtableborder, leftrighttableborder  # 作成した枠線をまとめたタプル。
+	# 	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext, borders)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
+		enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
+	
+	# 	contextmenuinterceptor = ContextMenuInterceptor(xscriptcontext, ctx, smgr, doc)  # ContextMenuInterceptor。右クリックメニューの変更に利用。
+		contextmenuinterceptor = ContextMenuInterceptor(xscriptcontext)  # ContextMenuInterceptor。右クリックメニューの変更に利用。
+		
+		doc.addChangesListener(changeslistener)
+		controller.addSelectionChangeListener(selectionchangelistener)
+		controller.addActivationEventListener(activationeventlistener)
+		controller.addEnhancedMouseClickHandler(enhancedmouseclickhandler)
+		controller.registerContextMenuInterceptor(contextmenuinterceptor)
+		listeners = changeslistener, selectionchangelistener, activationeventlistener, enhancedmouseclickhandler, contextmenuinterceptor
+		doc.addDocumentEventListener(DocumentEventListener(tdocimport, modulefolderpath, controller, *listeners))  # DocumentEventListener。ドキュメントとコントローラに追加したリスナーの除去に利用。
+	# def getModule(sheetname):
+	# 	if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
+	# 		pass
+	# 	elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+	# 		return karute
+	# 	elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+	# 		return keika
+	# 	elif sheetname=="一覧":
+	# 		return ichiran
+	# 	elif sheetname=="予定":
+	# 		return yotei
+	# 	elif sheetname=="退院":
+	# 		return taiin
+	# 	elif sheetname=="履歴":
+	# 		return rireki
+	# 	return None
+	# def createBorders():# 枠線の作成。
+	# 	noneline = BorderLine2(LineStyle=BorderLineStyle.NONE)
+	# 	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=commons.COLORS["violet"])
+	# 	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=commons.COLORS["magenta3"])	
+	# 	tableborder2 = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=True, IsRightLineValid=True)
+	# 	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
+	# 	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
+	# 	return noneline, tableborder2, topbottomtableborder, leftrighttableborder  # 作成した枠線をまとめたタプル。
+	except:
+		import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。	
 class DocumentEventListener(unohelper.Base, XDocumentEventListener):
 	def __init__(self, *args):
 		self.args = args
@@ -94,7 +98,7 @@ class ActivationEventListener(unohelper.Base, XActivationEventListener):
 	def activeSpreadsheetChanged(self, activationevent):  # アクティブシートが変化した時に発火。
 # 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 		try:
-			m = getModule(activationevent.ActiveSheet.getName())
+			m = commons.getModule(activationevent.ActiveSheet.getName())
 			if hasattr(m, "activeSpreadsheetChanged"):
 				getattr(m, "activeSpreadsheetChanged")(activationevent, self.xscriptcontext)
 			
@@ -138,7 +142,7 @@ class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # 
 		try:
 			target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 			if target.supportsService("com.sun.star.sheet.SheetCellRange"):  # targetがチャートの時がありうる?
-				m = getModule(enhancedmouseevent.getSpreadsheet().getName())
+				m = commons.getModule(target.getSpreadsheet().getName())
 				if hasattr(m, "mousePressed"):
 					return getattr(m, "mousePressed")(enhancedmouseevent, self.xscriptcontext)			
 			return True
@@ -178,7 +182,7 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 	def selectionChanged(self, eventobject):  # マウスから呼び出した時の反応が遅い。このメソッドでエラーがでるとショートカットキーでの操作が必要。
 	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 		try:
-			m = getModule(eventobject.Source.getActiveSheet().getName())
+			m = commons.getModule(eventobject.Source.getActiveSheet().getName())
 			if hasattr(m, "selectionChanged"):
 				getattr(m, "selectionChanged")(eventobject, self.xscriptcontext)			
 			
@@ -213,7 +217,7 @@ class ChangesListener(unohelper.Base, XChangesListener):
 		self.xscriptcontext = xscriptcontext
 	def changesOccurred(self, changesevent):  # Sourceにはドキュメントが入る。
 		try:
-			m = getModule(changesevent.Source.getCurrentController().getActiveSheet().getName())
+			m = commons.getModule(changesevent.Source.getCurrentController().getActiveSheet().getName())
 			if hasattr(m, "changesOccurred"):
 				getattr(m, "changesOccurred")(changesevent, self.xscriptcontext)
 			
@@ -256,7 +260,7 @@ class ContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):  # コン
 	def notifyContextMenuExecute(self, contextmenuexecuteevent):  # 右クリックで呼ばれる関数。contextmenuexecuteevent.ActionTriggerContainerを操作しないとコンテクストメニューが表示されない。
 	# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 		try:
-			m = getModule(contextmenuexecuteevent.Selection.getActiveSheet().getName())
+			m = commons.getModule(contextmenuexecuteevent.Selection.getActiveSheet().getName())
 			if hasattr(m, "notifyContextMenuExecute"):
 				return getattr(m, "notifyContextMenuExecute")(contextmenuexecuteevent, self.xscriptcontext)			
 			return IGNORED  # コンテクストメニューのカスタマイズをしない。
@@ -290,34 +294,34 @@ class ContextMenuInterceptor(unohelper.Base, XContextMenuInterceptor):  # コン
 # 			return IGNORED  # コンテクストメニューのカスタマイズをしない。
 		except:
 			import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
-# ContextMenuInterceptorのnotifyContextMenuExecute()メソッドで設定したメニュー項目から呼び出される関数。関数名変更不可。動的生成も不可。
-def entry1():
-	invokeMenuEntry(1)
-def entry2():
-	invokeMenuEntry(2)	
-def entry3():
-	invokeMenuEntry(3)	
-def entry4():
-	invokeMenuEntry(4)
-def entry5():
-	invokeMenuEntry(5)
-def entry6():
-	invokeMenuEntry(6)
-def entry7():
-	invokeMenuEntry(7)
-def entry8():
-	invokeMenuEntry(8)
-def entry9():
-	invokeMenuEntry(9)	
-
-
-def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼び出された処理をシートごとに振り分ける。コンテクストメニューから呼び出しているこの関数ではXSCRIPTCONTEXTが使える。
-	doc = XSCRIPTCONTEXT.getDocument()  # ドキュメントのモデルを取得。 
-	selection = doc.getCurrentSelection()  # セル(セル範囲)またはセル範囲、セル範囲コレクションが入るはず。
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
-		m = getModule(doc.getCurrentController().getActiveSheet().getName())
-		if hasattr(m, "contextMenuEntries"):
-			getattr(m, "contextMenuEntries")(entrynum, XSCRIPTCONTEXT)	
+# # ContextMenuInterceptorのnotifyContextMenuExecute()メソッドで設定したメニュー項目から呼び出される関数。関数名変更不可。動的生成も不可。
+# def entry1():
+# 	invokeMenuEntry(1)
+# def entry2():
+# 	invokeMenuEntry(2)	
+# def entry3():
+# 	invokeMenuEntry(3)	
+# def entry4():
+# 	invokeMenuEntry(4)
+# def entry5():
+# 	invokeMenuEntry(5)
+# def entry6():
+# 	invokeMenuEntry(6)
+# def entry7():
+# 	invokeMenuEntry(7)
+# def entry8():
+# 	invokeMenuEntry(8)
+# def entry9():
+# 	invokeMenuEntry(9)	
+# 
+# 
+# def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼び出された処理をシートごとに振り分ける。コンテクストメニューから呼び出しているこの関数ではXSCRIPTCONTEXTが使える。
+# 	doc = XSCRIPTCONTEXT.getDocument()  # ドキュメントのモデルを取得。 
+# 	selection = doc.getCurrentSelection()  # セル(セル範囲)またはセル範囲、セル範囲コレクションが入るはず。
+# 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
+# 		m = commons.getModule(doc.getCurrentController().getActiveSheet().getName())
+# 		if hasattr(m, "contextMenuEntries"):
+# 			getattr(m, "contextMenuEntries")(entrynum, XSCRIPTCONTEXT)	
 		
 		
 # 		sheet = selection.getSpreadsheet()  # シートを取得。
