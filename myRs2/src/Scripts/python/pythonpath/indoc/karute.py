@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from myrs import commons
+from indoc import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
@@ -59,8 +59,6 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	karute.skybluerow = skybluerow  # スカイブルー行インデックス。
 	karute.redrow = redrow  # 赤3行インデックス。
 	return karute  
-def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	pass
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["C1"].setString("一覧へ")
@@ -80,7 +78,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
 				if sectionname=="A":
 					txt = target.getString()  # クリックしたセルの文字列を取得。	
-					doc = controller.getModel()
 					sheets = doc.getSheets()  # シートコレクションを取得。
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
@@ -106,43 +103,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				
 				
 	return True  # セル編集モードにする。
-def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
-	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	karute = getSectionName(controller, sheet, cell)  # セル固有の定数を取得。
-	sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
-	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
-		return
-	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
-		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
-		doc = controller.getModel()  # ドキュメントモデルを取得。
-		rstartrow = 0 # プロブレムの開始行の相対インデックス。
-		datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
-		ranges = []  # プロブレムリストのセル範囲のリスト。
-		for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
-			if "#" in "{}{}{}{}".format(*datarow[:4]):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
-				if i>rstartrow:  # 開始行インデックスより大きい時。
-					ranges.append(datarange[rstartrow:i, :])
-					rstartrow = i
-		if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
-			ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
-			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
-			for i in cellranges:  # 各セル範囲について。
-				if len(i.queryIntersection(rangeaddress)):  # 選択したセルが含むセル範囲の時。
-					cursor = sheet.createCursorByRange(i)  # セルカーサーを作成
-					cursor.expandToEntireRows()  # セル範囲を行全体に拡大。
-					cursor.setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。
-					break  # 1つのプロブレムしか枠線を引かない。
-	elif sectionname in ("D", "F", "H"):
-		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
-		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-# def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, sheet, contextmenuname):	
-def notifycontextmenuexecute(contextmenuexecuteevent, xscriptcontext):		
+def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
+	pass
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -195,7 +158,6 @@ def notifycontextmenuexecute(contextmenuexecuteevent, xscriptcontext):
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# def contextMenuEntries(xscriptcontext, target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。	
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	# 行ヘッダー
@@ -213,3 +175,38 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 
 	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ
 		pass
+def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
+	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
+	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	karute = getSectionName(controller, sheet, cell)  # セル固有の定数を取得。
+	sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
+		return
+	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
+		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
+		doc = controller.getModel()  # ドキュメントモデルを取得。
+		rstartrow = 0 # プロブレムの開始行の相対インデックス。
+		datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
+		ranges = []  # プロブレムリストのセル範囲のリスト。
+		for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
+			if "#" in "{}{}{}{}".format(*datarow[:4]):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
+				if i>rstartrow:  # 開始行インデックスより大きい時。
+					ranges.append(datarange[rstartrow:i, :])
+					rstartrow = i
+		if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
+			ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
+			for i in cellranges:  # 各セル範囲について。
+				if len(i.queryIntersection(rangeaddress)):  # 選択したセルが含むセル範囲の時。
+					cursor = sheet.createCursorByRange(i)  # セルカーサーを作成
+					cursor.expandToEntireRows()  # セル範囲を行全体に拡大。
+					cursor.setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。
+					break  # 1つのプロブレムしか枠線を引かない。
+	elif sectionname in ("D", "F", "H"):
+		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
+		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	

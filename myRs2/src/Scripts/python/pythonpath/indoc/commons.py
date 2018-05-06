@@ -1,7 +1,6 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import unohelper
-# import calendar
 import os
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
@@ -9,9 +8,7 @@ from com.sun.star.datatransfer import UnsupportedFlavorException
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
-# from com.sun.star.sheet import CellFlags  # 定数
-# from com.sun.star.table.CellHoriJustify import CENTER  # enum
-from myrs import ichiran, karute, keika, rireki, taiin, yotei  # 相対インポートは不可。
+from indoc import ichiran, karute, keika, rireki, taiin, yotei  # 相対インポートは不可。
 COLORS = {\
 # 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -36,15 +33,15 @@ HOLIDAYS = {\
 		2028:((1,2,3,10),(11,),(20,),(29,),(3,4,5),(),(17,),(11,),(18,22),(9,),(3,23),(23,28,29,30,31)),\
 		2029:((1,2,3,8),(11,12),(20,),(29,30),(3,4,5),(),(16,),(11,),(17,23,24),(8,),(3,23),(23,24,28,29,30,31)),\
 		2030:((1,2,3,14),(11,),(20,),(29,),(3,4,5,6),(),(15,),(11,12),(16,23),(14,),(3,4,23),(23,28,29,30,31))}  # 祝日JSON。HOLIDAYS[年][月-1]で祝日の日のタプルが返る。日曜日の祝日も含まれる。
-def getModule(sheetname):
+def getModule(sheetname):  # シート名に応じてモジュールを振り分ける関数。
 	if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 		pass
 	elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 		return karute
-# 	elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-# 		return keika
-# 	elif sheetname=="一覧":
-# 		return ichiran
+	elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+		return keika
+	elif sheetname=="一覧":
+		return ichiran
 # 	elif sheetname=="予定":
 # 		return yotei
 # 	elif sheetname=="退院":
@@ -104,6 +101,13 @@ def getBaseURL(xscriptcontext):	 # 埋め込みマクロのScriptingURLのbaseur
 	location = "document"  # マクロの場所。	
 	relpath = os.path.relpath(filepath, start=macrofolder)  # マクロフォルダからの相対パスを取得。パス区切りがOS依存で返ってくる。
 	return "vnd.sun.star.script:{}${}?language=Python&location={}".format(relpath.replace(os.sep, "|"), "{}", location)  # ScriptingURLのbaseurlを取得。Windowsのためにos.sepでパス区切りを置換。	
+def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼び出された処理をシートごとに振り分ける。コンテクストメニューから呼び出しているこの関数ではXSCRIPTCONTEXTが使える。
+	doc = XSCRIPTCONTEXT.getDocument()  # ドキュメントのモデルを取得。 
+	selection = doc.getCurrentSelection()  # セル(セル範囲)またはセル範囲、セル範囲コレクションが入るはず。
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
+		m = getModule(doc.getCurrentController().getActiveSheet().getName())
+		if hasattr(m, "contextMenuEntries"):
+			getattr(m, "contextMenuEntries")(entrynum, XSCRIPTCONTEXT)	
 # ContextMenuInterceptorのnotifyContextMenuExecute()メソッドで設定したメニュー項目から呼び出される関数。関数名変更不可。動的生成も不可。
 def entry1():
 	invokeMenuEntry(1)
@@ -123,13 +127,3 @@ def entry8():
 	invokeMenuEntry(8)
 def entry9():
 	invokeMenuEntry(9)	
-
-
-def invokeMenuEntry(entrynum):  # コンテクストメニュー項目から呼び出された処理をシートごとに振り分ける。コンテクストメニューから呼び出しているこの関数ではXSCRIPTCONTEXTが使える。
-	doc = XSCRIPTCONTEXT.getDocument()  # ドキュメントのモデルを取得。 
-	selection = doc.getCurrentSelection()  # セル(セル範囲)またはセル範囲、セル範囲コレクションが入るはず。
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル範囲コレクション以外の時。
-		m = getModule(doc.getCurrentController().getActiveSheet().getName())
-		if hasattr(m, "contextMenuEntries"):
-			getattr(m, "contextMenuEntries")(entrynum, XSCRIPTCONTEXT)	
-

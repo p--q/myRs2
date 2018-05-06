@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import calendar
 from datetime import date
-from myrs import commons
+from indoc import commons
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER  # enum
 from com.sun.star.awt import MouseButton  # 定数
@@ -39,22 +39,13 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	keika = Keika()  # クラスをインスタンス化。	
 	keika.sectionname = sectionname  # 区画名
 	return keika  
-def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動した時も発火する。
-	borders = args	
-	selection = controller.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
-		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
-		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
-				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
-			return  # すでに枠線が書いてあったら何もしない。
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		drowBorders(controller, sheet, selection, borders)	
-def activeSpreadsheetChanged(controller, sheet):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
+def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3"].setString("薬品整理")
 	sheet["F4"].setString("薬品名抽出")
 	cell = sheet["I2"]  # 日付の開始セルを取得。
-	doc = controller.getModel()
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	createFormatKey = commons.formatkeyCreator(doc)	
 	cell.setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
 	ymd = map(int, cell.getString().split("/"))  # 年、月、日を整数型で取得。
@@ -66,12 +57,15 @@ def activeSpreadsheetChanged(controller, sheet):  # シートがアクティブ�
 	mc = c + timedelta.days  # 今日の列インデックスを取得。
 	if mc<1024:
 		sheet[r-1, mc].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # r-1行目の今日の背景色を設定。
-def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	borders, systemclipboard, transliteration = args
+def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
+	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	sheet = target.getSpreadsheet()
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(controller, sheet, target, borders)
+				drowBorders(controller, sheet, target, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
@@ -103,6 +97,60 @@ def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウ
 				
 				
 	return True  # セル編集モードにする。
+def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
+# def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動した時も発火する。
+# 	borders = args	
+	controller = eventobject.Source
+	sheet = controller.getActiveSheet()
+	selection = controller.getSelection()
+	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
+		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
+		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
+				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
+			return  # すでに枠線が書いてあったら何もしない。
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+# 		drowBorders(controller, sheet, selection, borders)	
+		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。	
+		
+	if contextmenuname=="cell":  # セルのとき
+		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+# 		del contextmenu[:]  # contextmenu.clear()は不可。
+# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# 		karute.rng	addMenuentry("ActionTrigger", {"Text": "To blue", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
+# 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。
+# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+# 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
+# 		del contextmenu[:]  # contextmenu.clear()は不可。
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
+# 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
+# 		pass  # contextmenuを操作しないとすべての項目が表示されない。
+# 	elif contextmenuname=="sheettab":  # シートタブの時。
+# 		del contextmenu[:]  # contextmenu.clear()は不可。
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
+	colors = commons.COLORS
+	if entrynum==1:
+		target.setPropertyValue("CellBackColor", colors["blue3"])  # 背景を青色にする。
+	elif entrynum==2:
+		target.setPropertyValue("CellBackColor", colors["red3"]) 		
+		
+		
 def setDates(doc, sheet, cell, dateserial):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。。
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
