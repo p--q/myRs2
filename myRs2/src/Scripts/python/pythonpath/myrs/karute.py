@@ -34,49 +34,47 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[:startrow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"
-		rng = sheet[:startrow, :startcolumn]
 	elif len(sheet[:startrow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "B"
-		rng = sheet[:startrow, startcolumn:]
 	elif len(sheet[:bluerow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "C"
-		rng = sheet[startrow:bluerow, :startcolumn]
 	elif len(sheet[:bluerow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "D"
-		rng = sheet[startrow:bluerow, startcolumn:]
 	elif len(sheet[:skybluerow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "E"
-		rng = sheet[bluerow:skybluerow, :startcolumn]
 	elif len(sheet[:skybluerow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "F"	
-		rng = sheet[bluerow:skybluerow, startcolumn:]
 	elif len(sheet[:redrow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "G"
-		rng = sheet[skybluerow:redrow, :startcolumn]
 	elif len(sheet[:redrow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "H"	
-		rng = sheet[skybluerow:redrow, startcolumn:]
 	elif len(sheet[redrow:, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "I"  
-		rng = sheet[redrow:, :startcolumn]
 	else:
 		sectionname = "J" 
-		rng = sheet[redrow:, startcolumn:]	
-	karute.sectionname = sectionname   # 区画名
-	karute.rng = rng		
+	karute.sectionname = sectionname   # 区画名	
+	karute.startrow = startrow  # スクロール枠の開始行インデックス。
+	karute.startcolumn = startcolumn  # スクロール枠の開始列インデックス。
+	karute.bluerow = bluerow  # 青3行インデックス。
+	karute.skybluerow = skybluerow  # スカイブルー行インデックス。
+	karute.redrow = redrow  # 赤3行インデックス。
 	return karute  
-def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動した時も発火する。
+def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	pass
-def activeSpreadsheetChanged(sheet):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["C1"].setString("一覧へ")
 	sheet["E1"].setString("経過へ")
 	sheet["I1"].setString("COPY")
-def mousePressed(enhancedmouseevent, controller, sheet, target, args):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	borders, systemclipboard, transliteration = args
+def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
+	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	sheet = target.getSpreadsheet()
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(controller, sheet, target, borders)
+				drowBorders(controller, sheet, target, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
@@ -119,18 +117,18 @@ def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交
 	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
 		return
 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
-		datarange = karute.rng  # 選択セルの区画のセル範囲を取得。
+		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
 		doc = controller.getModel()  # ドキュメントモデルを取得。
-		startrow = 1 if sectionname in ("G",) else 0 # プロブレムの開始行の相対インデックス。タイトル行を除く。
-		datarows = datarange[startrow:, 1:5].getDataArray()  # #列からSubject列までの行のタプルを取得。
+		rstartrow = 0 # プロブレムの開始行の相対インデックス。
+		datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
 		ranges = []  # プロブレムリストのセル範囲のリスト。
-		for i, datarow in enumerate(datarows, startrow):  # 相対インデックスと行のタプルを列挙。
-			if "#" in "{}{}{}{}".format(*datarow):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
-				if i>startrow:  # 開始行インデックスより大きい時。
-					ranges.append(datarange[startrow:i, :])
-					startrow = i
+		for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
+			if "#" in "{}{}{}{}".format(*datarow[:4]):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
+				if i>rstartrow:  # 開始行インデックスより大きい時。
+					ranges.append(datarange[rstartrow:i, :])
+					rstartrow = i
 		if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
-			ranges.append(datarange[startrow:, :])  # 最後のプロブレムのセル範囲を追加。
+			ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
 			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
 			for i in cellranges:  # 各セル範囲について。
@@ -143,8 +141,15 @@ def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
 		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, sheet, contextmenuname):			
+# def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, sheet, contextmenuname):	
+def notifycontextmenuexecute(contextmenuexecuteevent, xscriptcontext):		
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
@@ -190,7 +195,9 @@ def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, she
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
+# def contextMenuEntries(xscriptcontext, target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。	
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	# 行ヘッダー
 	if entrynum==1:  # 最下行へ
 		pass

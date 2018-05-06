@@ -43,6 +43,7 @@ def main():
 		print("\nThe LibreOffice has been terminated.")  # 未保存のドキュメントがなくうまく終了出来た時。
 	else:
 		print("\nThe LibreOffice is still running. Someone else prevents termination.\nListener changes will not be reflected unless LibreOffice has been terminated.")  # 未保存のドキュメントがあってキャンセルボタンが押された時。
+	sys.exit()  # デバッグサーバーを起動したままのときはこれがないとsooffice.binが終わらない。
 def getVndSunStarPkgUrl(ctx, smgr, doc_fileurl):  # pkgurlの取得。
 	urireferencefactory = smgr.createInstanceWithContext("com.sun.star.uri.UriReferenceFactory", ctx)  # UriReferenceFactory
 	urireference = urireferencefactory.parse(doc_fileurl)  # ドキュメントのUriReferenceを取得。

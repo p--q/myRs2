@@ -2,10 +2,13 @@
 # -*- coding: utf-8 -*-
 import unohelper
 # import calendar
+import os
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
 from com.sun.star.datatransfer import UnsupportedFlavorException
 from com.sun.star.lang import Locale  # Struct
+from com.sun.star.table import BorderLine2, TableBorder2 # Struct
+from com.sun.star.table import BorderLineStyle  # 定数
 # from com.sun.star.sheet import CellFlags  # 定数
 # from com.sun.star.table.CellHoriJustify import CENTER  # enum
 COLORS = {\
@@ -53,3 +56,34 @@ def formatkeyCreator(doc):  # ドキュメントを引数にする。
 			formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。 
 		return formatkey
 	return createFormatKey
+def createBorders():# 枠線の作成。
+	noneline = BorderLine2(LineStyle=BorderLineStyle.NONE)
+	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["violet"])
+	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["magenta3"])	
+	tableborder2 = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=True, IsRightLineValid=True)
+	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
+	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
+	return noneline, tableborder2, topbottomtableborder, leftrighttableborder  # 作成した枠線をまとめたタプル。
+def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	i = 0  # インデックスを初期化する。
+	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。
+		nonlocal i
+		menuentry = menucontainer.createInstance("com.sun.star.ui.{}".format(menutype))  # ActionTriggerContainerからインスタンス化する。
+		[menuentry.setPropertyValue(key, val) for key, val in props.items()]  #setPropertyValuesでは設定できない。エラーも出ない。
+		menucontainer.insertByIndex(i, menuentry)  # submenucontainer[i]やsubmenucontainer[i:i]は不可。挿入以降のメニューコンテナの項目のインデックスは1増える。
+		i += 1  # インデックスを増やす。
+	return addMenuentry
+def getBaseURL(xscriptcontext):	 # 埋め込みマクロのScriptingURLのbaseurlを返す。__file__はvnd.sun.star.tdoc:/4/Scripts/python/filename.pyというように返ってくる。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	modulepath = __file__  # ScriptingURLにするマクロがあるモジュールのパスを取得。ファイルのパスで場合分け。sys.path[0]は__main__の位置が返るので不可。
+	ucp = "vnd.sun.star.tdoc:"  # 埋め込みマクロのucp。
+	filepath = modulepath.replace(ucp, "")  #  ucpを除去。
+	transientdocumentsdocumentcontentfactory = smgr.createInstanceWithContext("com.sun.star.frame.TransientDocumentsDocumentContentFactory", ctx)
+	transientdocumentsdocumentcontent = transientdocumentsdocumentcontentfactory.createDocumentContent(doc)
+	contentidentifierstring = transientdocumentsdocumentcontent.getIdentifier().getContentIdentifier()  # __file__の数値部分に該当。
+	macrofolder = "{}/Scripts/python".format(contentidentifierstring.replace(ucp, ""))  #埋め込みマクロフォルダへのパス。	
+	location = "document"  # マクロの場所。	
+	relpath = os.path.relpath(filepath, start=macrofolder)  # マクロフォルダからの相対パスを取得。パス区切りがOS依存で返ってくる。
+	return "vnd.sun.star.script:{}${}?language=Python&location={}".format(relpath.replace(os.sep, "|"), "{}", location)  # ScriptingURLのbaseurlを取得。Windowsのためにos.sepでパス区切りを置換。	
