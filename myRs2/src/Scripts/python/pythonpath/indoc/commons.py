@@ -8,7 +8,7 @@ from com.sun.star.datatransfer import UnsupportedFlavorException
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
-from indoc import ichiran, karute, keika, rireki, taiin, yotei  # 相対インポートは不可。
+from indoc import ichiran, karute, keika, rireki, taiin, yotei, documentevent  # 相対インポートは不可。
 COLORS = {\
 # 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -34,7 +34,9 @@ HOLIDAYS = {\
 		2029:((1,2,3,8),(11,12),(20,),(29,30),(3,4,5),(),(16,),(11,),(17,23,24),(8,),(3,23),(23,24,28,29,30,31)),\
 		2030:((1,2,3,14),(11,),(20,),(29,),(3,4,5,6),(),(15,),(11,12),(16,23),(14,),(3,4,23),(23,28,29,30,31))}  # 祝日JSON。HOLIDAYS[年][月-1]で祝日の日のタプルが返る。日曜日の祝日も含まれる。
 def getModule(sheetname):  # シート名に応じてモジュールを振り分ける関数。
-	if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
+	if sheetname is None:  # シート名でNoneが返ってきた時はドキュメントイベントとする。
+		return documentevent
+	elif sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 		pass
 	elif sheetname.isdigit():  # シート名が数字のみの時カルテシート。
 		return karute
@@ -48,7 +50,7 @@ def getModule(sheetname):  # シート名に応じてモジュールを振り分
 # 		return taiin
 # 	elif sheetname=="履歴":
 # 		return rireki
-	return None
+	return None  # モジュールが見つからなかった時はNoneを返す。
 class TextTransferable(unohelper.Base, XTransferable):
 	def __init__(self, txt):  # クリップボードに渡す文字列を受け取る。
 		self.txt = txt

@@ -6,6 +6,8 @@ from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
+from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
+from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 class Karute():  # シート固有の定数設定。
 	pass
 def getSectionName(controller, sheet, target):  # 区画名を取得。
@@ -128,9 +130,9 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
 # 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
+# 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
 # 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。				
+# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
 		karute = getSectionName(controller, sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
@@ -145,35 +147,52 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
 		if sectionname in ("C",):
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
+			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})  
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。
-			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")})  # listeners.pyの関数名を指定する。
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")})  
 		elif sectionname in ("G",):
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  # listeners.pyの関数名を指定する。
-			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  # listeners.pyの関数名を指定する。		
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  
 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
 		pass
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。	
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	# 行ヘッダー
-	if entrynum==1:  # 最下行へ
-		pass
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	selection = controller.getSelection()
+	karute = getSectionName(controller, sheet, selection[0, 0])
+	sourcerangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
 
-	elif entrynum==2:  # 過去ﾘｽﾄへ移動
+	
+	
+	
+	# 行ヘッダー
+	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。
+		
+
+		sheet.insertCells(cellrangeaddress, insert_rows)  # 空セルを挿入して、そこにあった行を全体を下にずらす。
+# 		sheet.copyRange(  ,  )  
+		sheet.moveRange(  ,  )
+		sheet.removeRange(  , delete_rows)
+		
+
+
+	elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。
 		pass
 	
-	elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ
+	elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
 		pass
 
-	elif entrynum==4:  # 現ﾘｽﾄへ移動
+	elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
 		pass
 
-	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ
+	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
 		pass
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
