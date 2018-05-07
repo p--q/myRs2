@@ -166,8 +166,13 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
-	karute = getSectionName(controller, sheet, selection[0, 0])
-	sourcerangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
+	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
+		karute = getSectionName(controller, sheet, selection[0, 0])
+	
+		sourcerangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
+	
+	
+	
 
 	
 	
