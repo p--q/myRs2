@@ -172,7 +172,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	
 	
 	
-	# 行ヘッダー
+	# 行ヘッダー。
 	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。
 		
 
