@@ -167,38 +167,46 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
+
+# 		cellranges = getCellRanges(doc, datarange)
 		karute = getSectionName(controller, sheet, selection[0, 0])
-	
 		sourcerangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
-	
-	
-	
+
 
 	
-	
-	
-	# 行ヘッダー。
-	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。
+		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
+			datarange = sheet[karute.startrow:karute.bluerow, 1:7]
+			cellranges = getCellRanges(doc, datarange)
+			for i in cellranges:  # 各セル範囲について。
+				cellranges
+				if len(i.queryIntersection(sourcerangeaddress)):  # 選択したセルが含むセル範囲の時。	
+							
+			
+			
+# 			subcontollerrange = controller[0].getVisibleRange()
+# 			startrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
+# 			startcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
 		
 
-		sheet.insertCells(cellrangeaddress, insert_rows)  # 空セルを挿入して、そこにあった行を全体を下にずらす。
-# 		sheet.copyRange(  ,  )  
-		sheet.moveRange(  ,  )
-		sheet.removeRange(  , delete_rows)
+
+# 		sheet.insertCells(cellrangeaddress, insert_rows)  # 空セルを挿入して、そこにあった行を全体を下にずらす。
+# # 		sheet.copyRange(  ,  )  
+# 		sheet.moveRange(  ,  )
+# 		sheet.removeRange(  , delete_rows)
 		
 
 
-	elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。
-		pass
+		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。
+			pass
+		
+		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
+			pass
 	
-	elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
-		pass
-
-	elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
-		pass
-
-	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
-		pass
+		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
+			pass
+	
+		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
+			pass
 def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
@@ -212,25 +220,30 @@ def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交
 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
 		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
 		doc = controller.getModel()  # ドキュメントモデルを取得。
-		rstartrow = 0 # プロブレムの開始行の相対インデックス。
-		datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
-		ranges = []  # プロブレムリストのセル範囲のリスト。
-		for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
-			if "#" in "{}{}{}{}".format(*datarow[:4]):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
-				if i>rstartrow:  # 開始行インデックスより大きい時。
-					ranges.append(datarange[rstartrow:i, :])
-					rstartrow = i
-		if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
-			ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
-			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
-			for i in cellranges:  # 各セル範囲について。
-				if len(i.queryIntersection(rangeaddress)):  # 選択したセルが含むセル範囲の時。
-					cursor = sheet.createCursorByRange(i)  # セルカーサーを作成
-					cursor.expandToEntireRows()  # セル範囲を行全体に拡大。
-					cursor.setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。
-					break  # 1つのプロブレムしか枠線を引かない。
+		cellranges = getCellRanges(doc, datarange)
+		for i in cellranges:  # 各セル範囲について。
+			if len(i.queryIntersection(rangeaddress)):  # 選択したセルが含むセル範囲の時。
+				cursor = sheet.createCursorByRange(i)  # セルカーサーを作成
+				cursor.expandToEntireRows()  # セル範囲を行全体に拡大。
+				cursor.setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。
+				break  # 1つのプロブレムしか枠線を引かない。
 	elif sectionname in ("D", "F", "H"):
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
 		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+def getCellRanges(doc, datarange):
+	datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
+	ranges = []  # プロブレムリストのセル範囲のリスト。
+	rstartrow = 0  # プロブレム開始行の相対インデックス。
+	for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
+		if "#" in "{}{}{}{}".format(*datarow[:4]):  # #列からSubject列まで結合して#がある時。。日付は数値なので文字列への変換が必要なのでjoin()は使えない。
+			if i>rstartrow:  # 開始行相対インデックスより大きい時。
+				ranges.append(datarange[rstartrow:i, :])
+				rstartrow = i
+	if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
+		ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
+	return cellranges
+
+
