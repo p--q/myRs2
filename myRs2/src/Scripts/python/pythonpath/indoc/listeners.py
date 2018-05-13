@@ -10,6 +10,7 @@ from com.sun.star.ui import XContextMenuInterceptor
 from com.sun.star.ui.ContextMenuInterceptorAction import IGNORED  # enum
 from com.sun.star.util import XChangesListener
 from com.sun.star.view import XSelectionChangeListener
+SELECTIONRANGEADDRESS = None  # selectionChanged()メソッドが何回も無駄に発火するので選択範囲アドレスのStructをキャッシュして比較する。
 def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジュールを振り分けてそのモジュールのmethodnameのメソッドを引数argsで呼び出す。
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)  # ここでブレークするとすべてのイベントでブレークすることになる。
 	try:
@@ -77,7 +78,11 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 	def __init__(self, xscriptcontext):
 		self.xscriptcontext = xscriptcontext
 	def selectionChanged(self, eventobject):  # マウスから呼び出した時の反応が遅い。このメソッドでエラーがでるとショートカットキーでの操作が必要。
-		invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)		
+		global SELECTIONRANGEADDRESS  # 選択範囲のキャッシュ。
+		selectionrangeaddress = eventobject.Source.getSelection().getRangeAddress()
+		if selectionrangeaddress != SELECTIONRANGEADDRESS:  # キャッシュのセル範囲アドレスと一致しない時のみ。Structで比較。セル範囲では比較できない。
+			SELECTIONRANGEADDRESS = selectionrangeaddress  # キャッシュを更新。
+			invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)		
 	def disposing(self, eventobject):
 		eventobject.Source.removeSelectionChangeListener(self)		
 class ChangesListener(unohelper.Base, XChangesListener):

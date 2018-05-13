@@ -98,8 +98,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				
 	return True  # セル編集モードにする。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-# def selectionChanged(controller, sheet, args):  # 矢印キーでセル移動した時も発火する。
-# 	borders = args	
 	controller = eventobject.Source
 	sheet = controller.getActiveSheet()
 	selection = controller.getSelection()
@@ -109,7 +107,6 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-# 		drowBorders(controller, sheet, selection, borders)	
 		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。

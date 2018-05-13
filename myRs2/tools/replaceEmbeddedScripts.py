@@ -38,12 +38,14 @@ def main():
 		doc.close(True)  # ドキュメントを閉じる。
 	simplefileaccess.copy(source_fileurl, python_pkgurl)  # 埋め込みマクロフォルダにコピーする。開いているドキュメントでは書き込みが反映されない時があるので閉じたドキュメントにする。
 	print("Replaced the embedded macro folder in {} with {}.".format(ods, source_path))
+	prop = PropertyValue(Name="Hidden",Value=True)
+	desktop.loadComponentFromURL("private:factory/swriter", "_blank", 0, (prop,))  # バックグラウンドでWriterのドキュメントを開く。そうでないとsoffice.binが終了しないときがある。
 	terminated = desktop.terminate()  # LibreOfficeを終了しないとリスナーの変更が反映されない。
 	if terminated:
 		print("\nThe LibreOffice has been terminated.")  # 未保存のドキュメントがなくうまく終了出来た時。
 	else:
 		print("\nThe LibreOffice is still running. Someone else prevents termination.\nListener changes will not be reflected unless LibreOffice has been terminated.")  # 未保存のドキュメントがあってキャンセルボタンが押された時。
-	sys.exit()  # デバッグサーバーを起動したままのときはこれがないとsooffice.binが終わらない。
+# 	sys.exit()  # デバッグサーバーを起動したままのときはこれがないとsooffice.binが終わらない。
 def getVndSunStarPkgUrl(ctx, smgr, doc_fileurl):  # pkgurlの取得。
 	urireferencefactory = smgr.createInstanceWithContext("com.sun.star.uri.UriReferenceFactory", ctx)  # UriReferenceFactory
 	urireference = urireferencefactory.parse(doc_fileurl)  # ドキュメントのUriReferenceを取得。
