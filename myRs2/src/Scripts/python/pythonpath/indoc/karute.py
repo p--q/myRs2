@@ -66,6 +66,10 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["C1"].setString("一覧へ")
 	sheet["E1"].setString("経過へ")
 	sheet["I1"].setString("COPY")
+	
+	# 水平スクロールをリセットする。
+	
+	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
@@ -109,17 +113,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				
 	return True  # セル編集モードにする。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	
 	controller = eventobject.Source
 	selection = controller.getSelection()
 	sheet = controller.getActiveSheet()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている時。
 		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
-	
-	
-	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
@@ -174,91 +172,54 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-	
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-
-# 		cellranges = getCellRanges(doc, datarange)
 		karute = getSectionName(controller, sheet, selection[0, 0])
-# 		sourcerangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
-
-
-	
 		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
-			pass
-# 			datarange = sheet[karute.startrow:karute.bluerow, 1:7]
-# 			cellranges = getCellRanges(doc, datarange)
-# 			
-# 			problemranges = set(i for i in cellranges if len(i.queryIntersection(selection.getRangeAddress())))  # 選択したセル範囲と交差するプロブレムのセル範囲を集合で取得。
-# 			
-# # 			problems = set()
-# # 			for i in cellranges:  # 各セル範囲について。
-# # 				if len(i.queryIntersection(sourcerangeaddress)):  # 選択したセル範囲と交差するプロブレムの範囲を取得。
-# # 					problems.append(i)
-# 			problemranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-# # 			problemranges.addRangeAddresses([i.getRangeAddress() for i in cellranges if len(i.queryIntersection(selection.getRangeAddress()))], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。	
-# 			problemranges.addRangeAddresses([i.getRangeAddress() for i in problemranges], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。			
-# 			for i in problemranges:  # 各セル範囲について。
-# 				dest_start_ridx = karute.skybluerow + 1
-# 				dest_endbelow_ridx = dest_start_ridx + len(i.getRows())
-# 				sheet.insertCells(sheet[dest_start_ridx:dest_endbelow_ridx, 0].getRangeAddress(), insert_rows)  # スカイブルー行の下に空行を挿入。	
-# 				cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
-# 				cursor.expandToEntireRows()  # セル範囲を行全体に拡大。				
-# 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), cursor.getRangeAddress())  # 行の内容を移動。
-# 				sheet.removeRange(i.getRangeAddress(), delete_rows)  # 移動した問題リストの行を削除。
-			
-			
-# 			subcontollerrange = controller[0].getVisibleRange()
-# 			startrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
-# 			startcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
-		
-
-
-# 		sheet.insertCells(cellrangeaddress, insert_rows)  # 空セルを挿入して、そこにあった行を全体を下にずらす。
-# # 		sheet.copyRange(  ,  )  
-# 		sheet.moveRange(  ,  )
-# 		sheet.removeRange(  , delete_rows)
-		
-
-
-		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。
-			datarange = sheet[karute.startrow:karute.bluerow, 1:7]
-			cellranges = getCellRanges(doc, datarange)
-			
-			problemranges = set(i for i in cellranges if len(i.queryIntersection(selection.getRangeAddress())))  # 選択したセル範囲と交差するプロブレムのセル範囲を集合で取得。
-			
-# 			problems = set()
-# 			for i in cellranges:  # 各セル範囲について。
-# 				if len(i.queryIntersection(sourcerangeaddress)):  # 選択したセル範囲と交差するプロブレムの範囲を取得。
-# 					problems.append(i)
-# 			problemranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-# 			problemranges.addRangeAddresses([i.getRangeAddress() for i in cellranges if len(i.queryIntersection(selection.getRangeAddress()))], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。	
-			problemranges.addRangeAddresses([i.getRangeAddress() for i in problemranges], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。			
-			for i in problemranges:  # 各セル範囲について。
-				dest_start_ridx = karute.skybluerow + 1
-				dest_endbelow_ridx = dest_start_ridx + len(i.getRows())
-				sheet.insertCells(sheet[dest_start_ridx:dest_endbelow_ridx, 0].getRangeAddress(), insert_rows)  # スカイブルー行の下に空行を挿入。	
-				cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
-				cursor.expandToEntireRows()  # セル範囲を行全体に拡大。				
-				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), cursor.getRangeAddress())  # 行の内容を移動。
-				sheet.removeRange(i.getRangeAddress(), delete_rows)  # 移動した問題リストの行を削除。
-
-		
+			dest_start_ridx = karute.bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
+			dest_start_ridx = karute.skybluerow + 1  # 移動先開始行インデックス。
+			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
 		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
-			pass
-	
+			dest_start_ridx = karute.skybluerow + 1  # 移動先開始行インデックス。
+			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
-			pass
-	
+			dest_start_ridx = karute.bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[karute.skybluerow+1:karute.redrow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
 		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
-			pass
+			dest_start_ridx = karute.bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[karute.skybluerow+1:karute.redrow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
+	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
+	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, 0].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+	sheet.insertCells(dest_rangeaddress, insert_rows)  # スカイブルー行の下に空行を挿入。	
+	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+	cursor = sheet.createCursorByRange(problemrange)  # セルカーサーを作成		
+	cursor.expandToEntireRows()  # セル範囲を行全体に拡大。		
+	return cursor.getRangeAddress()  # 移動前に移動元の問題リストのセル範囲アドレスを取得しておく。
 def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点とする行列全体の外枠線を描く。
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
@@ -270,19 +231,21 @@ def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点と
 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
 		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
 		doc = controller.getModel()  # ドキュメントモデルを取得。
-		cellranges = getCellRanges(doc, datarange)  # プロブレムリストごとのセル範囲コレクションを取得。列はdatarangeと同じ。
-		ranges = set(i for i in cellranges if len(i.queryIntersection(cellrange.getRangeAddress())))  # 選択したセル範囲と交差するプロブレムのセル範囲を集合で取得。
-		if ranges:
-			problemranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-			problemranges.addRangeAddresses([i.getRangeAddress() for i in ranges], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。		
-			for i in problemranges:
-				cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
-				cursor.expandToEntireRows()  # セル範囲を行全体に拡大。	
-				cursor.setPropertyValue("TableBorder2", topbottomtableborder) # プロブレムの上下に枠線を引く。
+		problemranges = getProblemRanges(doc, datarange, cellrange)  # 問題ごとのセル範囲コレクションを取得。
+		for i in problemranges:
+			cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
+			cursor.expandToEntireRows()  # セル範囲を行全体に拡大。	
+			cursor.setPropertyValue("TableBorder2", topbottomtableborder) # プロブレムの上下に枠線を引く。
 	elif sectionname in ("D", "F", "H"):
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
 		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+def getProblemRanges(doc, datarange, selection):  # datarangeは問題リストの#を検索するセル範囲。
+	cellranges = getCellRanges(doc, datarange)  # 問題リストの各セル範囲を取得。
+	ranges = set(i for i in cellranges if len(i.queryIntersection(selection.getRangeAddress())))  # 選択したセル範囲と交差するプロブレムのセル範囲を集合で取得。
+	problemranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+	problemranges.addRangeAddresses([i.getRangeAddress() for i in ranges], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。rangesの要素がなくてもエラーにならない。		
+	return problemranges  # 問題ごとのセル範囲コレクションを返す。		
 def getCellRanges(doc, datarange):  # 各プロブレムの行をまとめたセル範囲コレクションを返す。列はdatarangeと同じ。
 	cellranges = []
 	datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
@@ -298,5 +261,3 @@ def getCellRanges(doc, datarange):  # 各プロブレムの行をまとめたセ
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
 	return cellranges
-
-
