@@ -66,10 +66,9 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["C1"].setString("一覧へ")
 	sheet["E1"].setString("経過へ")
 	sheet["I1"].setString("COPY")
-	
-	# 水平スクロールをリセットする。
-	
-	
+	controller = activationevent.Source
+	controller[3].setFirstVisibleRow(0)  # 縦スクロールをリセット。controller[0].getVisibleRange()ではなぜか列インデックスが正しく取得できない。EndRowが0、EndColumnが9になる。
+	controller[3].setFirstVisibleColumn(0)  # 横スクロールをリセット。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
@@ -95,9 +94,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						if newsheetname in sheets:  # 経過シート名がある時。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:
+							# 経過シートの作成。
+							
 							pass
-								
-				
+				elif sectionname=="B":			
+					if txt=="COPY":
+						pass
 				
 				
 				
