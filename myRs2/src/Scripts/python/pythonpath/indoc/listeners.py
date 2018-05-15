@@ -77,6 +77,7 @@ class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # 
 class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 	def __init__(self, xscriptcontext):
 		self.xscriptcontext = xscriptcontext
+		
 	def selectionChanged(self, eventobject):  # マウスから呼び出した時の反応が遅い。このメソッドでエラーがでるとショートカットキーでの操作が必要。
 		global SELECTIONRANGEADDRESS  # 選択範囲のキャッシュ。
 		selectionrangeaddress = eventobject.Source.getSelection().getRangeAddress()
