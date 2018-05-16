@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+from datetime import date
 from indoc import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
@@ -69,6 +70,24 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	controller = activationevent.Source
 	controller[3].setFirstVisibleRow(0)  # 縦スクロールをリセット。controller[0].getVisibleRange()ではなぜか列インデックスが正しく取得できない。EndRowが0、EndColumnが9になる。
 	controller[3].setFirstVisibleColumn(0)  # 横スクロールをリセット。
+	target = controller[1].getReferredCells()[0, 0]  # 左下枠のS履歴列のセルを取得。列インデックスは0から7までならなんでもいいはず。
+	karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+	todaystring = date.today().isoformat()  # 2018-05-15の形式で今日の日付文字列を取得。
+	todaycell = sheet[karute.bluerow, 5]  # 今日の日付文字列のあるセル。青行の列インデックス5のセル。
+	if todaycell.getString()!=todaystring:  # 青行の列インデックス5の文字列が今日の日付でない時。
+		datarows = sheet[karute.bluerow+1:karute.skybluerow, 1:7].getDataArray()  # 本日の記事欄のセルをすべて取得。
+		txt = "".join("".join(map(str, i)) for i in datarows)  # 本日の記事欄を文字列にしてすべて結合。
+		if txt:  # 記事の文字列があるときのみ。
+			stringlength = 254  # 1セルあたりの文字数。
+			newdatarows = [(txt[i:i+stringlength],) for i in range(0, len(txt), stringlength)]  # 過去記事欄へ代入するデータ。
+			dest_start_ridx = karute.redrow + 1
+			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)
+			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, 0].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
+			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+			sheet[dest_start_ridx:dest_endbelow_ridx, 6].setDataArray(newdatarows)  # 行の操作後はセル範囲は取得し直さないといけない。	
+			sheet[karute.bluerow+1:karute.skybluerow, :].clearContents(511)	 # 本日の記事欄をクリア。
+		todaycell.setString(todaystring)  # 今日のセルに今日の日付文字列を代入。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()

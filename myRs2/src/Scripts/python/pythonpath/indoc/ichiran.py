@@ -154,7 +154,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								msgbox.execute()	
 								return
 						if ids[0] in sheets:  # すでにカルテシートが存在するときはそれをアクティブにする。
-							controller.setActiveSheet(sheets[ids[0]])  # シートを切り替えるとまた戻ってきた時にreturn Falseの途中の状態になってしまう。
+							controller.setActiveSheet(sheets[ids[0]])
 						else:  # カルテシートがない時。					
 							sheets.copyByName("00000000", ids[0], len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
 							newsheet = sheets[ids[0]]  # カルテシートを取得。  
