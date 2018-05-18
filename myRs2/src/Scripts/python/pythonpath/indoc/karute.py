@@ -131,6 +131,20 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							pass
 				elif sectionname=="B":			
 					if txt=="COPY":
+						datarange = sheet[karute.startrow:karute.bluerow, 1:7]
+						cellranges = getCellRanges(doc, datarange)
+						datarows = datarange[:, -1].getDataArray() 
+						for cellrange in reversed(cellranges):
+							rangeaddress = cellrange.getRangeAddress()
+							article = "".join(chain.from_iterable(datarows[rangeaddress.StartRow:rangeaddress.EndRow+1])) 
+							
+							
+							rowcount = len(cellrange.getRows())
+							
+						
+						
+						
+						
 						startrow, bluerow, skybluerow = karute.startrow, karute.bluerow, karute.skybluerow
 						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
