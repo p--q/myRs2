@@ -28,9 +28,9 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	"""
 	datecolumn = 2  # Date列インデックス。
 	subcontollerrange = controller[0].getVisibleRange()
-	startrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
+	splittedrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
 	startcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
-	cellranges = sheet[startrow:, datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
+	cellranges = sheet[splittedrow:, datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
 	backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 	gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
 	bluerow = next(gene)
@@ -38,9 +38,9 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	redrow = next(gene)
 	karute = Karute()  # クラスをインスタンス化。	
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	if len(sheet[:startrow, :startcolumn].queryIntersection(rangeaddress)): 
+	if len(sheet[:splittedrow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"
-	elif len(sheet[:startrow, startcolumn:].queryIntersection(rangeaddress)): 
+	elif len(sheet[:splittedrow, startcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "B"
 	elif len(sheet[:bluerow, :startcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "C"
@@ -59,7 +59,7 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	else:
 		sectionname = "J" 
 	karute.sectionname = sectionname   # 区画名	
-	karute.startrow = startrow  # スクロール枠の開始行インデックス。
+	karute.splittedrow = splittedrow  # スクロール枠の開始行インデックス。
 	karute.startcolumn = startcolumn  # スクロール枠の開始列インデックス。
 	karute.bluerow = bluerow  # 青3行インデックス。
 	karute.skybluerow = skybluerow  # スカイブルー行インデックス。
@@ -129,134 +129,87 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							# 経過シートの作成。
 							
 							pass
+					return False  # セルを編集モードにしない。
 				elif sectionname=="B":			
 					if txt=="COPY":
-						datarange = sheet[karute.startrow:karute.bluerow, 1:7]
-						cellranges = getCellRanges(doc, datarange)
-						datarows = datarange[:, -1].getDataArray() 
-						for cellrange in reversed(cellranges):
-							rangeaddress = cellrange.getRangeAddress()
-							article = "".join(chain.from_iterable(datarows[rangeaddress.StartRow:rangeaddress.EndRow+1])) 
-							
-							
-							rowcount = len(cellrange.getRows())
-							
-						
-						
-						
-						
-						startrow, bluerow, skybluerow = karute.startrow, karute.bluerow, karute.skybluerow
+						splittedrow, bluerow, skybluerow = karute.splittedrow, karute.bluerow, karute.skybluerow
 						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+						fullwidth_halfwidth = createTransliteration(ctx, smgr)	# 全角を半角に変換する関数を取得。
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
-						datarows = sheet[bluerow:skybluerow, 1:7].getDataArray()  # 本日の記事領域の行のタプルを取得。
-						newdatarows2 = [(datarows[0][-1],)]  # 青行の日付を取得。
-						lines = []  # 取得行のリスト。
-						for datarow in datarows[1:]:  # 青行の下の行から開始。
-							rowtxt = getRowTxt(functionaccess, datarow)  # 行のデータを結合した文字列を取得。				
-							if rowtxt:														
-								if rowtxt.startswith("#"):  # 行頭が#の時。
-									if lines:  # 行がすでに取得出来ている時。
-										articlerows = getArticleRows(lines)
-										if ":" in articlerows[0][0]:
-											articlerows[0][0] = articlerows[0][0].split(":")[-1]
-										elif "#" in articlerows[0][0]:
-											articlerows[0][0] = articlerows[0][0][1:]
-										
-						
-										
-										newdatarows2.extend(articlerows)  # 文字数制限をして新しいデータ行に追加。
-									lines = [rowtxt]  # 取得行をリセットする。
-								else:
-									lines.append(rowtxt)	
-						else:
-							if lines:  # まだ取得行が残っている時。
-								newdatarows2.extend(getArticleRows(lines))  # 文字数制限をして新しいデータ行に追加。
-								diff = len(newdatarows2[1:]) - (skybluerow - bluerow - 1)
-								if diff>0:  # 行が増えた時行を追加する。
-									newrange = sheet[skybluerow:skybluerow+diff, :]
-									sheet.insertCells(newrange.getRangeAddress(), insert_rows)  # 空行を挿入。
-						pstartrow = bluerow + 1
-						newrange = sheet[pstartrow:pstartrow+len(newdatarows2[1:]), :]			
-						newrange.clearContents(511)												
-						newrange[:, 6].setDataArray(newdatarows2[1:])
-						datarows = sheet[startrow:bluerow, 1:7].getDataArray()  # 問題リスト領域について。日付列はLibreOfficeのシリアル値で返ってくる。
-						lines = []
-						newdatarows1 = []
-						
-# 						import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-						
-						for i, datarow in enumerate(reversed(datarows)):  # 下行からいく。
-							rowtxt = getRowTxt(functionaccess, datarow)			
-							if rowtxt:
-								lines.append(rowtxt)  # 逆順に行を取得する。
-								if rowtxt.startswith("#"):  # プロブレム初行の時。このときはすでにプロブレムの全行が取得されているはず。
-									articlerows = getArticleRows(reversed(lines))  # 正順でセルあたりの文字数を制限。
-									newdatarows1.extend(reversed(articlerows))  # 新しいデータ行に逆順に追加。
-									if len(articlerows)>len(lines):  # 行が増えた時行を追加する。
-										pstartrow = bluerow - 1 - i  # プロブレム行の開始行インデックス。
-										newrange = sheet[pstartrow+len(lines):pstartrow+len(articlerows), :]
-										sheet.insertCells(newrange.getRangeAddress(), insert_rows)  # 空行をプロブレムごとに挿入。	
-										newrange.clearContents(511)
-									lines = []  # 取得行をリセット。
-						newrange = sheet[startrow:startrow+len(newdatarows1), 6]
-						newrange.clearContents(511)	
-						newdatarows1.reverse()  # 行を正順に戻す。
-						newrange.setDataArray(newdatarows1)
-						newdatarows1.extend(newdatarows2)
-						newrange = sheet[startrow:startrow+len(newdatarows1), 6]
-						newrange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
-						newrange.getRows().setPropertyValue("OptimalHeight", True)						
-						newdatarows = [("****ｻﾏﾘ****",)]
-						newdatarows.extend(newdatarows1)
-						copysheet = doc.getSheets()["ｺﾋﾟｰ用"]
+						c = formatArticleColumn(doc, sheet, fullwidth_halfwidth, sheet[bluerow+1:skybluerow, 1:7])  # 本日の記事欄の記事列を整形。追加した行数が返る。
+						datarows = sheet[bluerow:skybluerow+c, 1:7].getDataArray()  # 文字数制限後の行のタプルを取得。
+						copydatarows = [(datarows[0][5],)]  # 本日の記事の日付を取得。
+						deletedrowcount = getCopyDataRows(functionaccess, sheet, copydatarows, datarows[1:], bluerow+1)
+						if deletedrowcount>0:  # 削除した行があるとき。
+							startrow = skybluerow - deletedrowcount
+							newrangeaddress = sheet[startrow:startrow+deletedrowcount, :].getRangeAddress()
+							sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
+							sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。
+						c = formatArticleColumn(doc, sheet, fullwidth_halfwidth, sheet[splittedrow:bluerow, 1:7])  # プロブレム欄の記事列を整形。追加した行数が返る。
+						datarows = sheet[splittedrow:bluerow+c, 1:7].getDataArray()  # 文字数制限後の行のタプルを取得。
+						newdatarows = [("****ｻﾏﾘ****",)]  # タイトルを取得。
+						getCopyDataRows(functionaccess, sheet, newdatarows, datarows, splittedrow)
+						for i in (4, 6):  # Subject列と記事列について。
+							newrange = sheet[splittedrow:, i]
+							newrange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
+							newrange.getRows().setPropertyValue("OptimalHeight", True)  # 行の高さを調整。	
+						newdatarows.extend(copydatarows)  # 本日の記事欄を追加。
+						sheetname = "ｺﾋﾟｰ用"
+						sheets = doc.getSheets()
+						if not sheetname in sheets:  # コピー用シートがない時。
+							sheets.insertNewByName(sheetname, len(sheets))  # コピー用シートを挿入。
+						copysheet = doc.getSheets()[sheetname]  # コピー用シートを取得。
 						copysheet.clearContents(511)  # シート内容をクリア。
-						pasterange = copysheet[:len(newdatarows), :len(newdatarows[0])]
-						pasterange.setDataArray(newdatarows)
-						pasterange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
-						pasterange.getRows().setPropertyValue("OptimalHeight", True)
+						pasterange = copysheet[:len(newdatarows), :len(newdatarows[0])]  # コピー用シートにペーストするセル範囲を取得。。
+						pasterange.setDataArray(newdatarows)  # コピー用シートにペーストする。
+						pasterange.getColumns().setPropertyValue("Width", sheet[0, 6].getColumns().getPropertyValue("Width"))  # 単位は1/100mm
+						pasterange.setPropertyValue("IsTextWrapped", True)  # ペーストしたセルの内容を折り返す。	
+						pasterange.getRows().setPropertyValue("OptimalHeight", True)  # ペーストした行の高さを調整。
 						dispatcher = ctx.getServiceManager().createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-						controller.select(pasterange)  # シートが切り替わってしまう。
-						dispatcher.executeDispatch(controller.getFrame(), ".uno:Copy", "", 0, ())
-						controller.setActiveSheet(sheet)  # 元のシートに戻る。
-						return False  # セルを編集モードにしない。
-
-						
-
-# 						fullwidth_halfwidth = createTransliteration(ctx, smgr)
-# 						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-# 						datarange = sheet[karute.startrow:karute.bluerow, 1:7]  # タイトル行を除く記事範囲を取得。
-# 						newdatarows = [map(fullwidth_halfwidth, i) for i in datarange.getDataArray()]
-# 						datarange.setDateArray(newdatarows)
-# 						cellranges = getCellRanges(doc, datarange)  # 問題リストの各セル範囲を取得。
-# 						for cellrange in cellranges:
-# 							datarows = cellrange[:, -1].getDataArray()
-# 							kijitxt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
-# 							stringlength = 254  # 1セルあたりの文字数。
-# 							newdatarows = [(kijitxt[i:i+stringlength],) for i in range(0, len(kijitxt), stringlength)]  # 記事欄へ代入するデータ。
-# 							diff = len(newdatarows) - len(cellrange)
-# 							if diff>0:
-# 								rangeaddress = cellrange.getRangeAddress()
-# 								endrow = rangeaddress.EndRow + diff + 1
-# 								diffrange = sheet[rangeaddress.EndRow+1:endrow, :]
-# 								sheet.insertCells(diffrange.getRangeAddress(), insert_rows)  
-# 								diffrange.clearContents(511) 
-# 								sheet[rangeaddress.StartRow:endrow, 6].setDataArray(newdatarows)
-# 						cellranges = controller.getModel().createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-# 						cellranges.addRangeAddresses([datarange[:, i].getRangeAddress() for i in (2,4,6)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
-# 						cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
-						
-				
-	
-				
-				
-				
-				
+						controller.select(pasterange)  # ペーストしたセル範囲を取得。シートが切り替わってしまう。
+						dispatcher.executeDispatch(controller.getFrame(), ".uno:Copy", "", 0, ())  # ペーストしたセルをコピー。
+						controller.setActiveSheet(sheet)  # カルテシートに戻る。
+					return False  # セルを編集モードにしない。
 	return True  # セル編集モードにする。
-def getArticleRows(lines):
+def getCopyDataRows(functionaccess, sheet, copydatarows, datarows, startrow):  # コピー用シートにコピーする行のリストを取得。
+	deletedrowcount = 0  # 空行の数。
+	ranges = []  # 空行のセル範囲のリスト。
+	for i, datarow in enumerate(datarows):
+		rowtxt = getRowTxt(functionaccess, datarow)  # #列、日付列、Subject列、記事列を結合した文字列を取得。
+		if rowtxt:  # 空行でない時。
+			copydatarows.append((rowtxt,))  # ｺﾋﾟｰ用シートにコピーする行のリストに取得。
+		else:  # 空行の時。
+			ranges.append(sheet[startrow+i, :])  # 削除行のセル範囲を取得。アドレスで取得するときは下から削除する必要がある。
+			deletedrowcount += 1
+	[sheet.removeRange(i.getRangeAddress(), delete_rows) for i in ranges]  # rangesにあるセル範囲の行を削除する。
+	return deletedrowcount  # 削除した空行数を返す。
+def formatArticleColumn(doc, sheet, fullwidth_halfwidth, datarange):
 	stringlength = 125  # 1セルあたりの文字数。
-	ptxt = "".join(lines)  # 取得した行をすべて結合。	
-	return [(ptxt[i:i+stringlength],) for i in range(0, len(ptxt), stringlength)]  # 文字列をセルあたりの文字数で分割。
+	c = 0  # 合計追加行数。	
+	datarows = datarange.getDataArray()  # 行のタプルを取得。
+	datarange.setDataArray([fullwidth_halfwidth(j) for j in i] for i in datarows)  # 半角にして代入し直す。						
+	cellranges = getCellRanges(doc, datarange)  # #ごとのセル範囲コレクションを取得。
+	for cellrange in cellranges:  # #ごとのセル範囲について。
+		articlerange = cellrange[:, 5]  # 記事列のセル範囲を取得。
+		datarows = articlerange.getDataArray()  # 記事列の行のタプルを取得。
+		articlerange.clearContents(CellFlags.VALUE+CellFlags.STRING)  # 記事列の文字と数値をクリア。
+		articletxt = "".join(filter(str, chain.from_iterable(datarows)))  # データ行を文字列にして全結合。
+		if articletxt:  # 文字列が取得出来た時。
+			newdatarows = [(articletxt[i:i+stringlength],) for i in range(0, len(articletxt), stringlength)]  # 文字列をセルあたりの文字数で分割。
+			diff = len(newdatarows) - len(datarows)  # 追加行数を取得。
+			diff = 0 if diff<0 else diff  # 負の数の時は0にする。
+			c += diff  # 合計追加行数に追加。
+			rangeaddress = cellrange.getRangeAddress()  # #ごとのセル範囲アドレスを取得。
+			startrow = rangeaddress.StartRow  # #ごとの開始行インデックス。
+			endrowbelow = rangeaddress.EndRow + 1  # #ごとの終了行下の行インデックス。
+			newendrowbelow = endrowbelow + diff  # 文字数制限後の終了行下の行インデックス。
+			if diff>0:  # 追加行がある時。
+				newrangeaddress = sheet[endrowbelow:newendrowbelow, :].getRangeAddress()  # 追加する行のセル範囲アドレス。
+				sheet.insertCells(newrangeaddress, insert_rows)  # 空行をプロブレムごとに挿入。	
+				sheet.queryIntersection(newrangeaddress).clearContents(511)
+			sheet[startrow:startrow+len(newdatarows), 6].setDataArray(newdatarows)  # 記事行に代入。
+	return c  # 追加した行数を返す。
 def getRowTxt(functionaccess, datarow):
 	sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[3], datarow[5]  # #列、日付列、Subject列、記事列を取得。
 	if datecol and isinstance(datecol, float):  # 日付列がfloat型のとき。
@@ -268,9 +221,9 @@ def createTransliteration(ctx, smgr):
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
 	def fullwidth_halfwidth(txt):
-		if isinstance(txt, str):  # 文字列の時。
+		if txt and isinstance(txt, str):  # 空文字でなくかつ文字列の時。
 			return transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-		else:  # 文字列でないときはそのまま返す。
+		else:  # 空文字または文字列でないときはそのまま返す。
 			return txt
 	return fullwidth_halfwidth
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
@@ -341,21 +294,21 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		karute = getSectionName(controller, sheet, selection[0, 0])
 		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
 			dest_start_ridx = karute.bluerow  # 移動先開始行インデックス。	
-			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。
+			problemranges = getProblemRanges(doc, sheet[karute.splittedrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。
 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
 		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
 			dest_start_ridx = karute.skybluerow + 1  # 移動先開始行インデックス。
-			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			problemranges = getProblemRanges(doc, sheet[karute.splittedrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
 		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
 			dest_start_ridx = karute.skybluerow + 1  # 移動先開始行インデックス。
-			problemranges = getProblemRanges(doc, sheet[karute.startrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			problemranges = getProblemRanges(doc, sheet[karute.splittedrow:karute.bluerow, 1:7], selection)  # 問題ごとのセル範囲コレクションを取得。		
 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
 				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
@@ -374,7 +327,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
-	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, 0].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
 	sheet.insertCells(dest_rangeaddress, insert_rows)  # スカイブルー行の下に空行を挿入。	
 	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
 	cursor = sheet.createCursorByRange(problemrange)  # セルカーサーを作成		
@@ -390,7 +343,7 @@ def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点と
 	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
 		return
 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
-		datarange = sheet[karute.startrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
+		datarange = sheet[karute.splittedrow:karute.bluerow, 1:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, 1:7]  # タイトル行を除く。
 		doc = controller.getModel()  # ドキュメントモデルを取得。
 		problemranges = getProblemRanges(doc, datarange, cellrange)  # 問題ごとのセル範囲コレクションを取得。
 		for i in problemranges:
@@ -417,8 +370,9 @@ def getCellRanges(doc, datarange):  # 各プロブレムの行をまとめたセ
 			if i>rstartrow:  # 開始行相対インデックスより大きい時。
 				ranges.append(datarange[rstartrow:i, :])  # プロブレムリストの開始行から終了行までのセル範囲を取得。
 				rstartrow = i
-	if ranges:  # すでにプロブレムがあるときのみ。一つも取得できていないときは一つもプロブレムがないので取得しない。
+	else:
 		ranges.append(datarange[rstartrow:, :])  # 最後のプロブレムのセル範囲を追加。
+	if ranges:
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲は結合しない。
 	return cellranges  # 列はdatarangeと同じ。
