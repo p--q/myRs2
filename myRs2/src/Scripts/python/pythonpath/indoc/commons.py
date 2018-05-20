@@ -10,7 +10,7 @@ from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
 from indoc import ichiran, karute, keika, rireki, taiin, yotei, documentevent  # 相対インポートは不可。
 COLORS = {\
-# 		"lime": 0x00FF00,\
+		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
 		"black": 0x000000,\
 		"blue3": 0x0000FF,\
