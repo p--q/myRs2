@@ -73,7 +73,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["I1"].setString("COPY")
 	sheet["J1"].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
 	
-	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	
 	txt = sheet["G1"].getString()
 	if txt:
@@ -155,6 +155,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
 							sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。
 						newdatarows = formatProblemList(formatArticleColumn, getCopyDataRows, sheet, splittedrow, bluerow, "****ｻﾏﾘ****")  # プロブレム欄を整形。
+
 						for i in (4, 6):  # Subject列と記事列について。
 							newrange = sheet[splittedrow:, i]
 							newrange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
@@ -235,7 +236,7 @@ def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返
 		datarange.setDataArray(datarows)  # datarangeに代入し直す。
 		articlecells = [str(i[5]) for i in datarows]  # 記事列の行を文字列にして1次元リストで取得。
 		newarticlerows = []  # 記事列代入するための行のリスト。
-		cellranges = getCellRanges(doc, datarange)  # #ごとのセル範囲コレクションを取得。
+		cellranges = getCellRanges(doc, datarange, datarows)  # #ごとのセル範囲コレクションを取得。
 		for cellrange in cellranges:  # #ごとのセル範囲について。
 			rangeaddress = cellrange.getRangeAddress()  # cellrangeのセル範囲アドレスを取得。
 			articletxts = articlecells[rangeaddress.StartRow-datarangestartrow-c:rangeaddress.EndRow-datarangestartrow+1-c]  # セル範囲の記事列のセルの文字列をリストで取得。
@@ -390,9 +391,10 @@ def getProblemRanges(doc, datarange, selection):  # datarangeは問題リスト�
 	problemranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 	problemranges.addRangeAddresses([i.getRangeAddress() for i in ranges], True)  # セル範囲コレクションにプロブレムのセル範囲を追加する。セル範囲を結合する。rangesの要素がなくてもエラーにならない。		
 	return problemranges  # 問題ごとのセル範囲コレクションを返す。		
-def getCellRanges(doc, datarange):  # 各プロブレムの行をまとめたセル範囲コレクションを返す。列はdatarangeと同じ。
+def getCellRanges(doc, datarange, datarows=None):  # 各プロブレムの行をまとめたセル範囲コレクションを返す。列はdatarangeと同じ。
 	cellranges = []
-	datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
+	if datarows is None:
+		datarows = datarange.getDataArray()  # #列からSubject列までの行のタプルを取得。
 	ranges = []  # プロブレムリストのセル範囲のリスト。
 	rstartrow = 0  # プロブレム開始行の相対インデックス。
 	for i, datarow in enumerate(datarows):  # 相対インデックスと行のタプルを列挙。
