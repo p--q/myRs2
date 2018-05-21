@@ -15,7 +15,15 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 	try:
 		m = getModule(name)  # モジュールを取得。
 		if hasattr(m, methodname):  # モジュールにmethodnameの関数が存在する時。	
-			return getattr(m, methodname)(*args)  # その関数を実行。
+# 			xscriptcontext = args[-1]
+# 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+# 			doc.lockControllers()  # コントローラーをロックする。
+# 			doc.addActionLock()
+			rvalue = getattr(m, methodname)(*args)  # その関数を実行。
+# 			doc.removeActionLock() 
+			
+# 			doc.unlockControllers()  # コントローラーのロックを解除する。
+			return rvalue
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
 	except:
 		import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。		
