@@ -145,9 +145,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
 					if txt=="COPY":
-						
-						
-						
 						splittedrow, bluerow, skybluerow = karute.splittedrow, karute.bluerow, karute.skybluerow
 						getCopyDataRows, formatArticleColumn, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
 						c = formatArticleColumn(sheet[bluerow+1:skybluerow, karute.sharpcolumn:7])  # 本日の記事欄の記事列を整形。追加した行数が返る。
@@ -172,9 +169,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						copyCells(controller, copieddatecell, newdatarows)
 						copieddatecell.setString(datetime.now().strftime("%Y/%m/%d %H:%M:%S Copied"))  # コピーボタンを押した日付を入力。
 						copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
-						
-						
-						
 					elif txt=="退院ｻﾏﾘ":
 						dummy, dummy, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
 						newdatarows = formatProblemList(karute.splittedrow, karute.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
