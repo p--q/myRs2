@@ -72,12 +72,12 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	cellrange = sheet["C1:J1"]  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	datarow = list(cellrange.getDataArray()[0])
+	datarow = list(cellrange.getDataArray()[0])  # 行をリストで取得。
 	datarow[0] = "一覧へ"
 	datarow[2] = "経過へ"
 	datarow[6] = "COPY"
 	datarow[7] = "退院ｻﾏﾘ"
-	cellrange.setDataArray((datarow,))
+	cellrange.setDataArray((datarow,))  # 行をシートに戻す。
 	sheet["J1"].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
 	controller = activationevent.Source
 	if len(controller)>3:  # シートが4分割されている時。
@@ -85,9 +85,12 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		controller[3].setFirstVisibleColumn(0)  # 横スクロールをリセット。
 	target = controller[1].getReferredCells()[0, 0]  # 左下枠のS履歴列のセルを取得。列インデックスは0から7までならなんでもいいはず。
 	karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+	
+	
+	# 本日の記事を過去の記事に移動させる。
 	dateformat = "****%Y年%m月%d日(%a)****"
-	daterange = sheet[karute.bluerow, karute.kijicolumn]
-	articledatetxt = daterange.getString()
+	daterange = sheet[karute.bluerow, karute.kijicolumn]  # 本日の記事の日付セルを取得。
+	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	articledate = datetime().strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	if articledate!=todaydate:  # 今日の日付でない時。
@@ -111,10 +114,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
 		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (2,4,6)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
-		
-		
-		
-		
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
