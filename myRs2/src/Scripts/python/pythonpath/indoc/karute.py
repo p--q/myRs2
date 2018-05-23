@@ -17,8 +17,10 @@ class Karute():  # シート固有の定数設定。
 	def __init__(self):
 		self.sharpcolumn = 1  # #列インデックス。
 		self.datecolumn = 2  # Date列インデックス。
+		self.subjectcolumn = 4  # Subject列インデックス。
 		self.kijicolumn = 6  # Article列インデックス。
 		self.stringlength = 125  # 1セルあたりの文字数。
+		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
 def getSectionName(controller, sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
@@ -85,13 +87,21 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		controller[3].setFirstVisibleColumn(0)  # 横スクロールをリセット。
 	target = controller[1].getReferredCells()[0, 0]  # 左下枠のS履歴列のセルを取得。列インデックスは0から7までならなんでもいいはず。
 	karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
-	
-	
+	# コピー日時セルの色を設定。
+	copieddatecell = sheet[0, karute.kijicolumn]  # コピー日時セルを取得。
+	copieddatetxt = copieddatecell.getString()  # コピー日時セルの文字列を取得。
+	if copieddatetxt:
+		copieddatetime = datetime.strptime(copieddatetxt, karute.dateformat)  # コピーした日時を取得。
+		now = datetime.now()  # 現在の日時を取得。
+		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
+			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
+		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
+			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
 	dateformat = "****%Y年%m月%d日(%a)****"
 	daterange = sheet[karute.bluerow, karute.kijicolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
-	articledate = datetime().strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
+	articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	if articledate!=todaydate:  # 今日の日付でない時。
 		todayarticle = sheet[karute.bluerow+1:karute.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
@@ -112,7 +122,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
 			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
 		daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
-		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (2,4,6)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
+		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (karute.datecolumn, karute.subjectcolumn, karute.kijicolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -145,9 +155,10 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
 					if txt=="COPY":
 						splittedrow, bluerow, skybluerow = karute.splittedrow, karute.bluerow, karute.skybluerow
+						sharpcolumn, kijicolumn, subjectcolumn = karute.sharpcolumn, karute.kijicolumn, karute.subjectcolumn
 						getCopyDataRows, formatArticleColumn, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
-						c = formatArticleColumn(sheet[bluerow+1:skybluerow, karute.sharpcolumn:7])  # 本日の記事欄の記事列を整形。追加した行数が返る。
-						datarows = sheet[bluerow:skybluerow+c, karute.sharpcolumn:7].getDataArray()  # 文字数制限後の行のタプルを取得。
+						c = formatArticleColumn(sheet[bluerow+1:skybluerow, sharpcolumn:kijicolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
+						datarows = sheet[bluerow:skybluerow+c, sharpcolumn:kijicolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 						copydatarows = [(datarows[0][5],)]  # 本日の記事の日付を取得。
 						deletedrowcount = getCopyDataRows(copydatarows, datarows[1:], bluerow+1)  # 削除された行数。
 						if deletedrowcount>0:  # 削除した行があるとき。
@@ -156,22 +167,22 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
 							sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。セル範囲アドレスから取得しないと行挿入後のセル範囲が異なってしまう。
 						newdatarows = formatProblemList(splittedrow, bluerow, "****ｻﾏﾘ****")  # プロブレム欄を整形。
-						for i in (4, 6):  # Subject列と記事列について。
+						for i in (subjectcolumn, kijicolumn):  # Subject列と記事列について。
 							newrange = sheet[splittedrow:, i]
 							newrange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。
 							newrange.getRows().setPropertyValue("OptimalHeight", True)  # 内容を折り返した後の行の高さを調整。
 						cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges") 
-						cellranges.addRangeAddresses([i.getRangeAddress() for i in (sheet[splittedrow:bluerow, 1:5], sheet[bluerow+1:skybluerow, 1:5])], False)  # プロブレム欄、本日の記事欄をセル範囲を取得。
+						cellranges.addRangeAddresses([i.getRangeAddress() for i in (sheet[splittedrow:bluerow, sharpcolumn:subjectcolumn+1], sheet[bluerow+1:skybluerow, sharpcolumn:subjectcolumn+1])], False)  # プロブレム欄、本日の記事欄をセル範囲を取得。
 						cellranges.setPropertyValue("VertJustify", CellVertJustify2.CENTER)  # 縦位置を中央にする。
 						newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
-						copieddatecell = sheet[0, 6]  # コピー日時セルを取得。	
+						copieddatecell = sheet[0, kijicolumn]  # コピー日時セルを取得。	
 						copyCells(controller, copieddatecell, newdatarows)
-						copieddatecell.setString(datetime.now().strftime("%Y/%m/%d %H:%M:%S Copied"))  # コピーボタンを押した日付を入力。
+						copieddatecell.setString(datetime.now().strftime(karute.dateformat))  # コピーボタンを押した日付を入力。
 						copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 					elif txt=="退院ｻﾏﾘ":
 						dummy, dummy, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
 						newdatarows = formatProblemList(karute.splittedrow, karute.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
-						copieddatecell = sheet[0, 6]  # コピー日時セルを取得。	
+						copieddatecell = sheet[0, karute.kijicolumn]  # コピー日時セルを取得。	
 						copyCells(controller, copieddatecell, newdatarows)
 						target.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
 					return False  # セルを編集モードにしない。
