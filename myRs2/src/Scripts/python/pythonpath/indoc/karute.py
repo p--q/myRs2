@@ -13,6 +13,7 @@ from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import CellVertJustify2  # 定数
+from com.sun.star.table.CellHoriJustify import LEFT, RIGHT  # enum
 class Karute():  # シート固有の定数設定。
 	def __init__(self):
 		self.sharpcolumn = 1  # #列インデックス。
@@ -134,6 +135,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(controller, sheet, target, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
 				txt = target.getString()  # クリックしたセルの文字列を取得。	
@@ -150,9 +153,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							
 							pass
 					return False  # セルを編集モードにしない。
-				elif sectionname=="B":	
-					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
+				elif sectionname=="B":						
 					if txt=="COPY":
 						splittedrow, bluerow, skybluerow = karute.splittedrow, karute.bluerow, karute.skybluerow
 						sharpcolumn, kijicolumn, subjectcolumn = karute.sharpcolumn, karute.kijicolumn, karute.subjectcolumn
@@ -186,6 +187,49 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						copyCells(controller, copieddatecell, newdatarows)
 						target.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
 					return False  # セルを編集モードにしない。
+				elif sectionname=="C":	
+					functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
+					celladdress = target.getCellAddress()
+					r, c = celladdress.Row, celladdress.Column  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
+					if c==karute.sharpcolumn:  # #列の時。
+						if txt:
+							target.clearContents(CellFlags.STRING)
+						else:
+							target.setString("#")
+						return False  # セルを編集モードにしない。
+					elif c==karute.datecolumn:  # Date列の時。
+						if not txt:  # 空文字の時。
+							sheet[r, c:c+2].setDataArray((("#", ""),))  # Date列と日付列に値を代入。
+							target.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
+							return False  # セルを編集モードにしない。
+						elif txt=="#":
+							datevalue = int(functionaccess.callFunction("DATEVALUE", (date.today().isoformat(),)))  # 今日のシリアル値を整数で取得。floatで返る。						
+							sheet[r, c:c+2].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
+							createFormatKey = commons.formatkeyCreator(doc)	
+							target.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+							sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
+							return False  # セルを編集モードにしない。
+					elif c==karute.datecolumn+1:  # 日付列の時。
+						datevalue = int(functionaccess.callFunction("DATEVALUE", (date.today().isoformat(),)))  # 今日のシリアル値を整数で取得。floatで返る。
+						if txt:  # 日付列は日付シリアル値しか入っていないはず。
+							celldatevalue = int(target.getValue())  # セルに入っているシリアル値を整数で取得。
+							if celldatevalue>datevalue-2:  # 2日前までは1日遡る。
+								datevalue = celldatevalue - 1	
+							else:
+								datevalue = ""
+						sheet[r, c-1:c+1].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
+						createFormatKey = commons.formatkeyCreator(doc)	
+						sheet[r, c-1].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+						target.setPropertyValue("CharColor", commons.COLORS["white"])					
+						return False  # セルを編集モードにしない。
+					elif c==karute.subjectcolumn:  # Subject列の時。
+						if not txt:  # 空文字の時。
+							target.setString("#")
+							target.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
+							return False  # セルを編集モードにしない。		
+						elif txt=="#":
+							target.setString("")
+							target.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 	return True  # セル編集モードにする。
 def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返す関数。
 	karute = Karute()  # クラスをインスタンス化。	
