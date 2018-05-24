@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from itertools import chain
 from indoc import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
@@ -230,6 +230,57 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						elif txt=="#":
 							target.setString("")
 							target.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
+					elif c==karute.kijicolumn+1:  # 記事列の時。 
+						dateformat = "%Y/%-m/%-d"
+						kijirange = sheet[r, karute.kijicolumn:karute.kijicolumn+2]
+						articletxt, datetxt = kijirange.getDataArray()[0]
+						if not datetxt:
+							
+						
+						
+						
+						
+						if articletxt.endswith(datetxt):
+							articletxt = articletxt[:-len(datetxt)]
+							articledate = datetime.strptime(datetxt, dateformat).date()  # 日時を取得。
+							if articledate>date.today():
+								
+						
+						
+						
+						kijicell = sheet[r, karute.kijicolumn]
+						dateformat = "%Y/%-m/%-d"
+						todaydate = date.today()
+						todaytxt = todaydate.strftime(dateformat)
+						kijitxt = kijicell.getString()
+						kijitxt += todaytxt
+						
+						sheet[r, karute.kijicolumn:karute.kijicolumn+2].setDataArray(((kijitxt, todaytxt),))
+						target.setPropertyValue("CharColor", commons.COLORS["white"])
+# 						kijicell.setString(kijitxt)						
+						
+						
+						
+						yesterday = date.today() - timedelta(days=1)
+						twodaysago =  date.today() - timedelta(days=2)
+						
+						
+						
+						if kijitxt.startswith(datetxt):
+							
+						
+						
+
+						
+						
+						
+						
+						
+						
+						
+					
+					
+					
 	return True  # セル編集モードにする。
 def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返す関数。
 	karute = Karute()  # クラスをインスタンス化。	
