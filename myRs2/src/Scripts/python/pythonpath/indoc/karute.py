@@ -15,18 +15,22 @@ from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import CellVertJustify2  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT, RIGHT  # enum
 class Karute():  # シート固有の定数設定。
-	def __init__(self):
+	def __init__(self, sheet):
 		self.sharpcolumn = 1  # #列インデックス。
 		self.datecolumn = 2  # Date列インデックス。
 		self.subjectcolumn = 4  # Subject列インデックス。
 		self.articlecolumn = 6  # Article列インデックス。
-		
-		
-		
-		
+		self.splittedrow = 2  # 分割行インデックス。
+		self.splittedcolumn = 10  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
-def getSectionName(controller, sheet, target):  # 区画名を取得。
+		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
+		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
+		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
+		self.bluerow = next(gene)  # 青3行インデックス。
+		self.skybluerow = next(gene)  # スカイブルー行インデックス。
+		self.redrow = next(gene)  # 赤3行インデックス。		
+def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -38,16 +42,12 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	-----------  # Date列の文字列があるセルの背景色が赤3の行。
 	I  ||  J
 	"""
-	karute = Karute()  # クラスをインスタンス化。	
-	subcontollerrange = controller[0].getVisibleRange()
-	splittedrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
-	splittedcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
-	cellranges = sheet[splittedrow:, karute.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
-	backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
-	gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
-	bluerow = next(gene)
-	skybluerow = next(gene)
-	redrow = next(gene)
+	karute = Karute(sheet)  # クラスをインスタンス化。	
+	splittedrow = karute.splittedrow
+	splittedcolumn = karute.splittedcolumn
+	bluerow = karute.bluerow
+	skybluerow = karute.skybluerow
+	redrow = karute.redrow
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"
@@ -70,24 +70,14 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	else:
 		sectionname = "J" 
 	karute.sectionname = sectionname   # 区画名	
-	karute.splittedrow = splittedrow  # スクロール枠の開始行インデックス。
-	karute.splittedcolumn = splittedcolumn  # スクロール枠の開始列インデックス。
-	karute.bluerow = bluerow  # 青3行インデックス。
-	karute.skybluerow = skybluerow  # スカイブルー行インデックス。
-	karute.redrow = redrow  # 赤3行インデックス。
 	return karute  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 
-	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	
-	
+	doc = xscriptcontext.getDocument()
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	controller = activationevent.Source
-	if len(controller)>3:  # シートが4分割されている時。
-		controller[3].setFirstVisibleRow(0)  # 縦スクロールをリセット。controller[0].getVisibleRange()ではなぜか列インデックスが正しく取得できない。EndRowが0、EndColumnが9になる。
-		controller[3].setFirstVisibleColumn(0)  # 横スクロールをリセット。
-	target = controller[1].getReferredCells()[0, 0]  # 左下枠のS履歴列のセルを取得。列インデックスは0から7までならなんでもいいはず。
-	karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。	
+	karute = Karute(sheet)  # クラスをインスタンス化。	
 	cellrange = sheet["A1:M1"]  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	datarow = list(cellrange.getDataArray()[0])  # 行をリストで取得。
 	datarow[karute.datecolumn] = "一覧へ"
@@ -116,7 +106,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		todayarticle = sheet[karute.bluerow+1:karute.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
 		datarows = todayarticle[:, karute.sharpcolumn:karute.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
 		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
-		cellranges = controller.getModel().createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		if txt:  # 記事の文字列があるときのみ。
 			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
 			stringlength = karute.stringlength  # 1セルあたりの文字数。
@@ -145,7 +135,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+				karute = getSectionName(sheet, target)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
 				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname in ("A",):
@@ -211,14 +201,10 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
 								newdatarows = [] 
 								emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-								datarange = sheet[karute.redrow:emptyrow, karute.articlecolumn]
+								datarange = sheet[karute.redrow+1:emptyrow, karute.articlecolumn]
 								datarows = datarange.getDataArray()
-								datarange.clearContents(CellFlags.STRING)
-								sharpcell = ""
-								datecell = ""
-								subjectcell = ""
-								articletxts = []  # Article列の文字列のリスト。
 								stringlength = karute.stringlength  # 1セルあたりの文字数。
+								sharpcell, datecell, subjectcell, articletxts = "", "", "", []
 								for datatxt in map(str, chain.from_iterable(datarows)):
 									if not datatxt:  # 空文字の時。
 										continue  # 次のループへ。
@@ -227,32 +213,33 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 										if not datatxt.startswith("****"):
 											articletxts.append(datatxt)  # Article列の文字列のリストに追加。
 										continue  # 次のループへ。
+									if articletxts:  # すでに取得したArticle列がの行がある時。
+										addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows)	
+										sharpcell, datecell, subjectcell, articletxts = "", "", "", []						
 									sharpcell = "#"	# #を取得。
 									if not ":" in datatxt:  # コロンがない時。
 										articletxts.append(datatxt[1:])  # #を除いてArticle列の文字列のリストに取得。
 									ds, articletxt = datatxt[1:].split(":", 1)  # 最初のコロンで1回分割。
 									articletxt and articletxts.append(articletxt)  # コロンの後ろがある時articletxtsに追加。
-									datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
+									if " " in ds:  # スペースがある時。
+										datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
+									else:  # スペースがない時とりあえず日付として処理する。
+										datetxt = ds
 									if datetxt[:4].isdigit():  # 最初の4文字がすべて数値の時。年月から始まっていると判断する。
-										datecell = datetime.strptime(datetxt, "%Y{0}%m{0}%d".format(datetxt[4])).date().isoformat()
+										datecell = int(functionaccess.callFunction("DATEVALUE", (datetxt.replace(datetxt[4], "/"),)))  # 今日のシリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
 									else:
 										subjectcell = ds  # スペースで分割した時の最初の要素が年月でない時はすべてSubject。
-									articlecells = ((datatxt[i:i+stringlength],) for i in range(0, len(datatxt), stringlength))  # 文字列を制限したArticle列のジェネレーター。
-									datarow = sharpcell, datecell, "", subjectcell, "", articlecells[0]
-									newdatarows.append(datarow)
-									if len(articlecells)>1:
-										for articlecell in articlecells[1:]:
-											datarow = "", "", "", "", "", articlecell
-											newdatarows.append(datarow)
+								addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows)  # 最後のプロブレムを処理。
 								problemrange = sheet[karute.splittedrow:karute.bluerow, karute.sharpcolumn:karute.articlecolumn+1]
 								cellranges = problemrange.queryContentCells(CellFlags.STRING)
-								emptyrow = karute.splittedrow
-								if len(cellranges):
-									emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1 
-								rowcount = len(newdatarows)	
-								sheet.insertCells(sheet[emptyrow:emptyrow+rowcount, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
-								sheet[emptyrow:emptyrow+rowcount, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。		
-								sheet[emptyrow:emptyrow+rowcount, karute.sharpcolumn:karute.articlecolumn+1].setDataArray(newdatarows)
+								emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else karute.splittedrow
+								endrowbelow = emptyrow + len(newdatarows)	
+								sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
+								sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
+								sheet[emptyrow:endrowbelow, karute.sharpcolumn:karute.sharpcolumn+len(newdatarows[0])].setDataArray(newdatarows)
+								createFormatKey = commons.formatkeyCreator(doc)	
+								sheet[emptyrow:endrowbelow, karute.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+								datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。
 						return False  # セルを編集モードにしない。
 					elif c==karute.sharpcolumn:  # #列の時。
 						if txt:
@@ -334,8 +321,15 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						sheet[r, karute.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
 						return False  # セルを編集モードにしない。
 	return True  # セル編集モードにする。
+def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows):
+	articletxt = "".join(articletxts).lstrip()
+	articlecells = [articletxt[i:i+stringlength] for i in range(0, len(articletxt), stringlength)]  # 文字列を制限したArticle列のジェネレーター。
+	datarow = sharpcell, datecell, "", subjectcell.strip(), "", articlecells[0]  # プロブレムの1行目を取得。
+	newdatarows.append(datarow)  # プロブレムの1行目を追加。
+	if len(articlecells)>1:  # 複数行ある時。
+		newdatarows.extend(("", "", "", "", "", i) for i in articlecells[1:])	 # 2行目以降について処理。
 def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返す関数。
-	karute = Karute()  # クラスをインスタンス化。	
+	karute = Karute(sheet)  # クラスをインスタンス化。	
 	stringlength = karute.stringlength  # 1セルあたりの文字数。
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
@@ -435,7 +429,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
-		karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
+		karute = getSectionName(sheet, target)  # セル固有の定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
 			return EXECUTE_MODIFIED
@@ -451,7 +445,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 # 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-		karute = getSectionName(controller, sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
+		karute = getSectionName(sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
 			return EXECUTE_MODIFIED
@@ -483,7 +477,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-		karute = getSectionName(controller, sheet, selection[0, 0])
+		karute = getSectionName(sheet, selection[0, 0])
 		splittedrow = karute.splittedrow
 		bluerow = karute.bluerow
 		skybluerow = karute.skybluerow
@@ -535,7 +529,7 @@ def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点と
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	karute = getSectionName(controller, sheet, cell)  # セル固有の定数を取得。
+	karute = getSectionName(sheet, cell)  # セル固有の定数を取得。
 	sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
