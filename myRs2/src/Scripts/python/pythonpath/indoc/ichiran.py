@@ -1,7 +1,6 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-# import calendar
 from indoc import commons, keika
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
@@ -11,6 +10,9 @@ from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FUL
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 class Ichiran():  # シート固有の定数設定。
+	
+	
+	
 	pass
 def getSectionName(controller, sheet, target):  # 区画名を取得。
 	"""

@@ -108,6 +108,10 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
+
+def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
+	pass
+		
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
