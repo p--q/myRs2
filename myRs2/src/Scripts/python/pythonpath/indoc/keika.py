@@ -1,15 +1,21 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import calendar
-from datetime import date
 from indoc import commons
+from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER  # enum
 from com.sun.star.awt import MouseButton  # 定数
+from com.sun.star.table.CellHoriJustify import LEFT  # enum
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
-	pass
-def getSectionName(controller, sheet, target):  # 区画名を取得。
+	def __init__(self):
+		self.daterow = 1  # 日付行インデックス。
+		self.splittedrow = 4  # 分割行インデックス。
+		self.yakucolumn = 5  # 薬名列インデックス。
+		self.splittedcolumn = 8  # 分割列インデックス。
+def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -17,65 +23,67 @@ def getSectionName(controller, sheet, target):  # 区画名を取得。
 	-----------  # 薬品列の最下行の一つ下の行。
 	E  ||  F
 	"""
-	yakucolumn = 5  # 薬名列インデックス。
-	subcontollerrange = controller[0].getVisibleRange()
-	startrow = subcontollerrange.EndRow + 1  # スクロールする枠の最初の行インデックス。
-	startcolumn = subcontollerrange.EndColumn + 1  # スクロールする枠の最初の列インデックス。
-	cellranges = sheet[:, yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
+	keika = Keika()  # クラスをインスタンス化。	
+	splittedrow = keika.splittedrow
+	splittedcolumn = keika.splittedcolumn
+	cellranges = sheet[:, keika.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	if len(sheet[startrow:emptyrow, startcolumn:].queryIntersection(rangeaddress)): 
+	if len(sheet[splittedrow:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "D"	
-	elif len(sheet[emptyrow:, :startcolumn].queryIntersection(rangeaddress)): 
+	elif len(sheet[emptyrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "E"			
-	elif len(sheet[:startrow, :startcolumn].queryIntersection(rangeaddress)): 
+	elif len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"			
-	elif len(sheet[startrow:emptyrow, :startcolumn].queryIntersection(rangeaddress)): 
+	elif len(sheet[splittedrow:emptyrow, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "C"	
-	elif len(sheet[:startrow, startcolumn:].queryIntersection(rangeaddress)): 
+	elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "B"			
 	else:
 		sectionname = "F"	
-	keika = Keika()  # クラスをインスタンス化。	
 	keika.sectionname = sectionname  # 区画名
 	return keika  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet["F3"].setString("薬品整理")
-	sheet["F4"].setString("薬品名抽出")
-	cell = sheet["I2"]  # 日付の開始セルを取得。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	createFormatKey = commons.formatkeyCreator(doc)	
-	cell.setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
-	ymd = map(int, cell.getString().split("/"))  # 年、月、日を整数型で取得。
-	cell.setPropertyValue("NumberFormat", createFormatKey('D'))  # 日付形式を戻す。
-	celladdress = cell.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-	r, c = celladdress.Row, celladdress.Column
-	sheet[r-1, c:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
-	timedelta = date.today()-date(*ymd)  # 今日から開始日の差を取得。
-	mc = c + timedelta.days  # 今日の列インデックスを取得。
-	if mc<1024:
-		sheet[r-1, mc].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # r-1行目の今日の背景色を設定。
+	sheet["F3:F4"].setDataArray((("薬品整理",), ("薬品名抽出",)))
+	keika = Keika()
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
+	daterow = keika.daterow
+	splittedcolumn = keika.splittedcolumn
+	startdatevalue = int(sheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
+	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
+	sheet[daterow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
+	c = splittedcolumn + (todayvalue - startdatevalue)  # 今日の日付の列インデックスを取得。
+	if c<1024:
+		sheet[daterow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
+	sheet[daterow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(controller, sheet, target, commons.createBorders())  # 枠線の作成。
+				drowBorders(sheet, target, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-				karute = getSectionName(controller, sheet, target)  # セル固有の定数を取得。
-				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
-# 				if sectionname=="A":
-# 					txt = target.getString()  # クリックしたセルの文字列を取得。	
-# 					doc = controller.getModel()
-# 					sheets = doc.getSheets()  # シートコレクションを取得。
-# 					if txt=="一覧へ":
-# 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
-# 					elif txt=="経過へ":
+				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+				controller = doc.getCurrentController()  # コントローラの取得。
+				keika = getSectionName(sheet, target)  # セル固有の定数を取得。
+				sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
+				if sectionname=="A":
+					txt = target.getString()  # クリックしたセルの文字列を取得。	
+					sheets = doc.getSheets()  # シートコレクションを取得。
+					if txt=="一覧へ":
+						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+					elif txt=="ｶﾙﾃへ":
+						pass
+						
+						
+						
+						
+						
 # 						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
 # 						if newsheetname in sheets:  # 経過シート名がある時。
 # 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
@@ -107,8 +115,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
-
+		drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
 	pass
 		
@@ -118,10 +125,23 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。	
-		
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	target = controller.getSelection()  # 現在選択しているセル範囲を取得。	
 	if contextmenuname=="cell":  # セルのとき
-		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+		keika = getSectionName(sheet, target)  # セル固有の定数を取得。
+		sectionname = keika.sectionname  # クリックしたセルの区画名を取得。			
+		if sectionname in ("A",):  # 固定行より上の時はコンテクストメニューを表示しない。
+			return EXECUTE_MODIFIED
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})		
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})			
+		
+		
 # 		del contextmenu[:]  # contextmenu.clear()は不可。
 # 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
 # 		karute.rng	addMenuentry("ActionTrigger", {"Text": "To blue", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
@@ -197,9 +217,9 @@ def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindex
 	sheetcellranges.addRangeAddresses([sheet[r, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。
 	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
-def drowBorders(controller, sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
+def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	keika = getSectionName(controller, sheet, cell)
+	keika = getSectionName(sheet, cell)
 	sectionname = keika.sectionname
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
 	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。

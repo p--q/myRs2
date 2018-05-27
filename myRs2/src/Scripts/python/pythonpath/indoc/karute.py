@@ -16,11 +16,11 @@ from com.sun.star.table import CellVertJustify2  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT, RIGHT  # enum
 class Karute():  # シート固有の定数設定。
 	def __init__(self, sheet):
+		self.splittedrow = 2  # 分割行インデックス。
 		self.sharpcolumn = 1  # #列インデックス。
 		self.datecolumn = 2  # Date列インデックス。
 		self.subjectcolumn = 4  # Subject列インデックス。
 		self.articlecolumn = 6  # Article列インデックス。
-		self.splittedrow = 2  # 分割行インデックス。
 		self.splittedcolumn = 10  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
@@ -344,7 +344,7 @@ def handleDS(functionaccess, ds, datecell, subjectcell):
 	else:  # スペースがない時とりあえず日付として処理する。
 		datetxt = ds
 	if len(datetxt)>4 and datetxt[:4].isdigit():  # 最初の4文字がすべて数値の時。年月から始まっていると判断する。
-		datecell = int(functionaccess.callFunction("DATEVALUE", (datetxt.replace(datetxt[4], "/"),)))  # 今日のシリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
+		datecell = int(functionaccess.callFunction("DATEVALUE", (datetxt.replace(datetxt[4], "/"),)))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
 	else:
 		subjectcell = ds  # スペースで分割した時の最初の要素が年月でない時はすべてSubject。
 	return datecell, subjectcell
