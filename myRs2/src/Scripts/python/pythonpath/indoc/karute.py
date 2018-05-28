@@ -349,7 +349,7 @@ def handleDS(functionaccess, ds, datecell, subjectcell):
 		subjectcell = ds  # スペースで分割した時の最初の要素が年月でない時はすべてSubject。
 	return datecell, subjectcell
 def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows):
-	articletxt = "".join(articletxts).lstrip()
+	articletxt = "".join(articletxts).lstrip().replace("\n", "")  # 先頭の空白とセル内の改行文字も除去する。
 	articlecells = [articletxt[i:i+stringlength] for i in range(0, len(articletxt), stringlength)]  # 文字列を制限したArticle列のジェネレーター。
 	datarow = sharpcell, datecell, "", subjectcell.strip(), "", articlecells[0]  # プロブレムの1行目を取得。
 	newdatarows.append(datarow)  # プロブレムの1行目を追加。

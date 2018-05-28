@@ -207,30 +207,27 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							newsheet["G1:G2"].setDataArray(("",), (" ".join(datarow[ichiran.idcolumn:ichiran.kanacolumn+1]),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
 					elif header=="ｶﾅ名":
-						ns = sheet[r, c-2:c+1].getDataArray()  # ID、漢字名、ｶﾅ名、を取得。
+						datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
 						transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 						transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
-						kana = ns[0][2].replace(" ", "")  # 半角空白を除去。
+						kana = datarow[2].replace(" ", "")  # 半角空白を除去してカナ名を取得。
 						zenkana = transliteration.transliterate(kana, 0, len(kana), [])[0]  # ｶﾅを全角に変換。
-						systemclipboard.setContents(commons.TextTransferable("".join((zenkana, ns[0][0]))), None)  # クリップボードにカナ名+IDをコピーする。	
+						systemclipboard.setContents(commons.TextTransferable("".join((zenkana, datarow[0]))), None)  # クリップボードにカナ名+IDをコピーする。	
 					elif header=="入院日":
 						if txt:  # すでに入力されている時。
 							return True  # セル編集モードにする。
-						else:
-# 							dialog, addControl = dialogCreator(ctx, smgr, {"PositionX": 102, "PositionY": 41, "Width": 380, "Height": 380, "Title": "LibreOffice", "Name": "MyTestDialog", "Step": 0, "Moveable": True})  # "TabIndex": 0
-
-							
-							
-							pass  # カレンダーpicker
-					
-					
+						else:  # まだ空欄の時。
+							functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+							todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
+							target.setValue(todayvalue)
+							target.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
 					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-						ids = list(sheet[r, 2:5].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
+						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
 						if newsheetname in sheets:  # 経過シートがなければ作成する。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:  # 経過シートがなければ作成する。
-							dateserial = int(sheet[r, 5].getValue())  # 入院日の日時シリアル値を取得。		
+							dateserial = int(sheet[r, ichiran.datecolumn].getValue())  # 入院日の日時シリアル値を取得。		
 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
