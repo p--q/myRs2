@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from indoc import commons, keika
-from itertools import chain
+from itertools import chain, combinations
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
@@ -235,16 +235,35 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 					return False  # セル編集モードにしない。		
 				elif sectionname=="D":
+					dic = {\
+						"4F": ["", "待", "○", "包"],\
+						"ｴ結": ["", "ｴ", "済"],\
+						"読影": ["", "読", "済", "無"],\
+						"退処": ["", "済", "△", "待"],\
+						"血液": ["", "尿", "○", "済"],\
+						"ECG": ["", "E", "済"],\
+						"糖尿": ["", "糖"],\
+						"熱発": ["", "熱"],\
+						"計書": ["", "済", "未"],\
+						"面談": ["", "面"],\
+						"便指": ["", "済", "少", "無"]\
+					}
 					header = sheet[ichiran.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
-					if header=="4F":
-						
-						
-						pass
-					elif header=="血液":
-						pass						
-
-
-
+					newtxt = txt
+					if header in dic:	
+						items = dic[header]	 # 順繰りのリストを取得。			
+						if txt in items:  # セルの内容にある時。
+							items.append(items[0])  # 最初の要素を最後の要素に追加する。
+							dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
+							newtxt = dic[txt]  # 次の要素を代入する。
+					else:
+						if txt.endswith("済"):
+							newtxt = txt.rstrip("済")
+						elif txt:
+							newtxt = "{}済".format(txt)
+					target.setString(newtxt)
+					color = commons.COLORS["silver"] if "済" in newtxt else -1
+					target.setPropertyValue("CharColor", color)			
 					return False  # セル編集モードにしない。
 				elif sectionname=="A":
 					if sheet[splittedrow-1, c].getString()=="ｶﾅ名":  # 固定行の最下端のセルの文字列を取得。
