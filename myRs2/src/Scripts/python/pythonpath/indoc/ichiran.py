@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import commons, keika
+from indoc import commons, keika, karute
 from itertools import chain, combinations
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
@@ -89,9 +89,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol\
 							= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-						keikains = keika.Keika()  # 経過シートの定数を取得。
-						daterow = keikains.daterow  # 経過シートの日付行インデックスを取得。
-						splittedcolumn = keikains.splittedcolumn  # 日付列の最初の列インデックスを取得。
+						keikaconsts = keika.Keika()  # 経過シートの定数を取得。
+						daterow = keikaconsts.daterow  # 経過シートの日付行インデックスを取得。
+						splittedcolumn = keikaconsts.splittedcolumn  # 日付列の最初の列インデックスを取得。
 						todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 						c = splittedcolumn + todayvalue  # 分割列と今日の日付のシリアル値の和。
 						if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
@@ -201,10 +201,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
 							newsheet = sheets[idtxt]  # カルテシートを取得。  
 							if createFormatKey is None:
-								createFormatKey = commons.formatkeyCreator(doc)									
-							newsheet["C3"].setValue(datarow[ichiran.datecolumn])  # カルテシートに入院日を入力。
-							newsheet["C3"].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-							newsheet["G1:G2"].setDataArray(("",), (" ".join(datarow[ichiran.idcolumn:ichiran.kanacolumn+1]),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+								createFormatKey = commons.formatkeyCreator(doc)	
+							karuteconsts = karute.Karute(newsheet)	
+							karutesplittedrow = karuteconsts.splittedrow
+							newsheet[karutesplittedrow, karuteconsts.datecolumn].setValue(datarow[ichiran.datecolumn])  # カルテシートに入院日を入力。
+							newsheet[karutesplittedrow, karuteconsts.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+							newsheet[:karutesplittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join(datarow[ichiran.idcolumn:ichiran.kanacolumn+1]),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
 					elif header=="ｶﾅ名":
 						datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
@@ -232,7 +234,21 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
 							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
-							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
+							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
+						
+						
+						
+# 						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
+# 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
+# 						if newsheetname in sheets:  # 経過シートがなければ作成する。
+# 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
+# 						else:  # 経過シートがなければ作成する。
+# 							dateserial = int(sheet[r, ichiran.datecolumn].getValue())  # 入院日の日時シリアル値を取得。		
+# 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
+# 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+# 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
+# 							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
+# 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 					return False  # セル編集モードにしない。		
 				elif sectionname=="D":
 					dic = {\
@@ -314,7 +330,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。	
-		
 	if contextmenuname=="cell":  # セルのとき
 		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 # 		del contextmenu[:]  # contextmenu.clear()は不可。
