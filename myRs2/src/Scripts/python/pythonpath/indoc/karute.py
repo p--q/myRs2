@@ -446,7 +446,6 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている時。
 		drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from indoc import commons, keika, karute
-from itertools import chain, combinations
+from itertools import chain
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
@@ -10,16 +10,24 @@ from com.sun.star.awt.MessageBoxType import QUERYBOX, ERRORBOX  # enum
 from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Ichiran():  # シート固有の定数設定。
-	def __init__(self):
+	def __init__(self, sheet):
 		self.menurow  = 0  # メニュー行インデックス。
 		self.splittedrow = 2  # 分割行インデックス。
 		self.sumicolumn = 0  # 済列インデックス。
+		self.yocolumn = 1  # 予列インデックス。
 		self.idcolumn = 2  # ID列インデックス。	
 		self.kanacolumn = 4  # カナ列インデックス。	
 		self.datecolumn = 5  # 入院日列インデックス。
 		self.checkstartcolumn = 8  # チェック列開始列インデックス。
 		self.memostartcolumn = 22  # メモ列開始列インデックス。
+		cellranges = sheet[self.splittedrow:, self.idcolumn].queryContentCells(CellFlags.STRING)  # ID列の文字列が入っているセルに限定して抽出。
+		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
+		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
+		self.bluerow = next(gene)  # 青3行インデックス。
+		self.skybluerow = next(gene)  # スカイブルー行インデックス。
+		self.redrow = next(gene)  # 赤3行インデックス。	
 def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	M  |
@@ -33,12 +41,12 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	
 	M: メニュー行。
 	C: メニュー行以外のスクロールしない部分。
-	B: スクロールする部分のうちヘッダが結合セルである列より左の部分。
-	D: スクロールする部分のうちヘッダが結合セルである部分。
-	E: スクロールする部分のうちヘッダが結合セルである列より右の部分。
+	B: スクロールする部分のうちチェック列より左の部分。
+	D: スクロールする部分のうちチェック列。
+	E: スクロールする部分のうちチェック列より右の部分。
 	A: ID列の最初の空行から下の部分。
 	"""
-	ichiran = Ichiran()  # クラスをインスタンス化。	
+	ichiran = Ichiran(sheet)  # クラスをインスタンス化。	
 	splittedrow = ichiran.splittedrow
 	checkstartcolumn = ichiran.checkstartcolumn
 	memostartcolumn = ichiran.memostartcolumn
@@ -302,8 +310,9 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 	changes = changesevent.Changes	
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
-			cell = change.ReplacedElement  # 値を変更したセルを取得。		
-			ichiran = Ichiran()  # 一覧シート固有の定数を取得。
+			cell = change.ReplacedElement  # 値を変更したセルを取得。	
+			sheet = cell.getSpreadsheet()
+			ichiran = Ichiran(sheet)  # 一覧シート固有の定数を取得。
 			celladdress = cell.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column
 			if r>ichiran.splittedrow-1:  # 分割行以降の時。
@@ -323,43 +332,81 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 					cell.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 			break
-def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。	
-	if contextmenuname=="cell":  # セルのとき
-		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 		karute.rng	addMenuentry("ActionTrigger", {"Text": "To blue", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
-# 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-# 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
-# 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
-# 		pass  # contextmenuを操作しないとすべての項目が表示されない。
-# 	elif contextmenuname=="sheettab":  # シートタブの時。
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	ichiran = getSectionName(sheet, target)  # セル固有の定数を取得。
+	sectionname = ichiran.sectionname  # クリックしたセルの区画名を取得。		
+	if sectionname in ("M", "C"):  # 固定行より上の時はコンテクストメニューを表示しない。
+		return EXECUTE_MODIFIED
+	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
+	startrow = rangeaddress.StartRow
+	if startrow in (ichiran.bluerow, ichiran.skybluerow, ichiran.redrow):  # タイトル行の時。
+		return EXECUTE_MODIFIED
+	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
+		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+			if rangeaddress.StartColumn in (ichiran.yocolumn,):  # 予列の時。
+				addMenuentry("ActionTrigger", {"Text": "退院ﾘｽﾄへ", "CommandURL": baseurl.format("entry1")}) 	
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+			elif rangeaddress.StartColumn in (ichiran.datecolumn+1,):  # 経過列の時。
+				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 	
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+		cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。			
+		if sectionname in ("A",):
+			cutcopypasteMenuEntries(addMenuentry)
+			rowMenuEntries(addMenuentry)
+			return EXECUTE_MODIFIED
+		if startrow<ichiran.bluerow:
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")})  
+		elif startrow<ichiran.skybluerow:
+			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry5")})
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")})    
+		elif startrow<ichiran.redrow:
+			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry4")})
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")}) 		
+		else:
+			addMenuentry("ActionTrigger", {"Text": "未入院へ", "CommandURL": baseurl.format("entry3")}) 		
+			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry4")})
+			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry5")}) 				
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})		
+		cutcopypasteMenuEntries(addMenuentry)
+		rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader":  # 列ヘッダーの時。
+		pass
+	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
+def cutcopypasteMenuEntries(addMenuentry):
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+	addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+def rowMenuEntries(addMenuentry):
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsAfter"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
 def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
 	colors = commons.COLORS
 	if entrynum==1:
 		target.setPropertyValue("CellBackColor", colors["blue3"])  # 背景を青色にする。
 	elif entrynum==2:
 		target.setPropertyValue("CellBackColor", colors["red3"]) 
+
+
+
+
+
+
 
 
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。

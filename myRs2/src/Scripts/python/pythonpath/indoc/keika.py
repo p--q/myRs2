@@ -151,6 +151,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 # 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
 # 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
 # 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+
+# 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
+# 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
+
+
 # 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
 # 		del contextmenu[:]  # contextmenu.clear()は不可。
 # 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
