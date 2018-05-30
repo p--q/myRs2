@@ -243,20 +243,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
 							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
-						
-						
-						
-# 						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
-# 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
-# 						if newsheetname in sheets:  # 経過シートがなければ作成する。
-# 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-# 						else:  # 経過シートがなければ作成する。
-# 							dateserial = int(sheet[r, ichiran.datecolumn].getValue())  # 入院日の日時シリアル値を取得。		
-# 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
-# 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-# 							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
-# 							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
-# 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 					return False  # セル編集モードにしない。		
 				elif sectionname=="D":
 					dic = {\
@@ -395,12 +381,29 @@ def rowMenuEntries(addMenuentry):
 	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
 	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsAfter"})
 	addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
-def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
-	colors = commons.COLORS
-	if entrynum==1:
-		target.setPropertyValue("CellBackColor", colors["blue3"])  # 背景を青色にする。
-	elif entrynum==2:
-		target.setPropertyValue("CellBackColor", colors["red3"]) 
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	selection = controller.getSelection()
+	if entrynum==1:  # 退院リストへ。
+		pass
+	elif entrynum==2:  # 経過ｼｰﾄをArchiveへ
+		pass	
+	
+	
+	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
+
+		elif entrynum==3:  # 未入院へ
+			pass
+		elif entrynum==4:  # Stableへ
+			pass
+		elif entrynum==5:  # Unstableへ
+			pass
+		elif entrynum==6:  # 新入院へ
+			pass
+
+	
 
 
 
