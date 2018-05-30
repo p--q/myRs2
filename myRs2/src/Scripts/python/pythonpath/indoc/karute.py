@@ -113,7 +113,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
 			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, karute.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
 			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
-			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
 			dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
 			dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
 			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
@@ -341,7 +341,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 def handleDS(functionaccess, ds, datecell, subjectcell):
 	if " " in ds:  # スペースがある時。
 		datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
-	else:  # スペースがない時とりあえず日付として処理する。
+	else:  # スペースがない時とりあえず日付として処理する。CellFlags.STRING+CellFlags.VALUE+CellFlags.DATETIME+CellFlags.FORMULA
 		datetxt = ds
 	if len(datetxt)>4 and datetxt[:4].isdigit():  # 最初の4文字がすべて数値の時。年月から始まっていると判断する。
 		datecell = int(functionaccess.callFunction("DATEVALUE", (datetxt.replace(datetxt[4], "/"),)))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
@@ -459,9 +459,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
 			return EXECUTE_MODIFIED
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})		
+		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
@@ -475,23 +473,18 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
 			return EXECUTE_MODIFIED
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsAfter"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
 		if sectionname in ("C",):
-			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})  
-			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
-			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")})  
-		elif sectionname in ("G",):
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")}) 
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})   
+		elif sectionname in ("G",):
 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  
 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})	
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
 		pass
 	elif contextmenuname=="sheettab":  # シートタブの時。
@@ -546,7 +539,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
-	sheet.insertCells(dest_rangeaddress, insert_rows)  # スカイブルー行の下に空行を挿入。	
+	sheet.insertCells(dest_rangeaddress, insert_rows)  # 空行を挿入。	
 	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
 	cursor = sheet.createCursorByRange(problemrange)  # セルカーサーを作成		
 	cursor.expandToEntireRows()  # セル範囲を行全体に拡大。		

@@ -11,6 +11,8 @@ from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FUL
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
+from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
+from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 class Ichiran():  # シート固有の定数設定。
 	def __init__(self, sheet):
 		self.menurow  = 0  # メニュー行インデックス。
@@ -28,6 +30,8 @@ class Ichiran():  # シート固有の定数設定。
 		self.bluerow = next(gene)  # 青3行インデックス。
 		self.skybluerow = next(gene)  # スカイブルー行インデックス。
 		self.redrow = next(gene)  # 赤3行インデックス。	
+		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
+		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
 def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	M  |
@@ -51,8 +55,7 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	checkstartcolumn = ichiran.checkstartcolumn
 	memostartcolumn = ichiran.memostartcolumn
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	cellranges = sheet[:, ichiran.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
-	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
+	emptyrow = ichiran.emptyrow
 	if len(sheet[ichiran.menurow, :checkstartcolumn].queryIntersection(rangeaddress)):  # メニューセルの時。
 		sectionname = "M"
 	elif len(sheet[splittedrow:emptyrow, :checkstartcolumn].queryIntersection(rangeaddress)):  # Dの左。
@@ -66,7 +69,6 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	else:
 		sectionname = "C"  
 	ichiran.sectionname = sectionname   # 区画名
-	ichiran.emptyrow = emptyrow  # 最終行インデックス+1を取得。
 	return ichiran
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
@@ -343,75 +345,93 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			elif rangeaddress.StartColumn in (ichiran.datecolumn+1,):  # 経過列の時。
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 	
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-		cutcopypasteMenuEntries(addMenuentry)
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。			
 		if sectionname in ("A",):
-			cutcopypasteMenuEntries(addMenuentry)
-			rowMenuEntries(addMenuentry)
+			commons.cutcopypasteMenuEntries(addMenuentry)
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+			commons.rowMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED
-		if startrow<ichiran.bluerow:
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")})  
-		elif startrow<ichiran.skybluerow:
-			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry5")})
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")})    
-		elif startrow<ichiran.redrow:
-			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry4")})
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry6")}) 		
-		else:
-			addMenuentry("ActionTrigger", {"Text": "未入院へ", "CommandURL": baseurl.format("entry3")}) 		
-			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry4")})
-			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry5")}) 				
+		if startrow<ichiran.bluerow:  # 未入院
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry3")})  
+		elif startrow<ichiran.skybluerow:  # Stable
+			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry4")})
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})    
+		elif startrow<ichiran.redrow:  # Unstable
+			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry6")})
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry7")}) 		
+		else:  # 新入院
+			addMenuentry("ActionTrigger", {"Text": "未入院へ", "CommandURL": baseurl.format("entry8")}) 		
+			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry9")})
+			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry10")}) 				
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})		
-		cutcopypasteMenuEntries(addMenuentry)
-		rowMenuEntries(addMenuentry)
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
 		pass
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
-def cutcopypasteMenuEntries(addMenuentry):
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-	addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-def rowMenuEntries(addMenuentry):
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsAfter"})
-	addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	selection = controller.getSelection()
-	if entrynum==1:  # 退院リストへ。
-		pass
-	elif entrynum==2:  # 経過ｼｰﾄをArchiveへ
-		pass	
-	
-	
-	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-
-		elif entrynum==3:  # 未入院へ
+	selection = controller.getSelection()  # 選択範囲を取得。
+	if entrynum<3:  # セルのコンテクストメニュー。
+		if entrynum==1:  # 退院リストへ。
+			
+			
+			
+			
 			pass
-		elif entrynum==4:  # Stableへ
-			pass
-		elif entrynum==5:  # Unstableへ
-			pass
-		elif entrynum==6:  # 新入院へ
-			pass
-
-	
-
-
-
-
-
-
-
-
+		elif entrynum==2:  # 経過ｼｰﾄをArchiveへ。
+			
+			
+			
+			
+			pass	
+	elif len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		ichiran = Ichiran(sheet)  # シート固有の値を取得。
+		if entrynum==3:  # 未入院から新入院に移動。
+			toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
+		elif entrynum==4:  # StableからUnstableへ移動。
+			toOtherEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.redrow)
+		elif entrynum==5:  # Stableから新入院へ移動。 
+			toNewEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.emptyrow)
+		elif entrynum==6:  # UnstableからStableへ移動。
+			toOtherEntry(sheet, rangeaddress, ichiran.redrow, ichiran.skybluerow)
+		elif entrynum==7:  # Unstableから新入院へ移動。
+			toNewEntry(sheet, rangeaddress, ichiran.redrow, ichiran.emptyrow)
+		elif entrynum==8:  # 新入院から未入院へ移動。
+			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.bluerow)
+		elif entrynum==9:  # 新入院からStableへ移動。
+			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
+		elif entrynum==10:  # 新入院からUnstableへ移動。
+			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
+def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 新入院へ。新規行挿入は不要。
+	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
+	if endrowbelow>edgerow:
+		endrowbelow = edgerow
+	sourcerangeaddress = sheet[startrow:endrowbelow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
+	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
+	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。
+def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が必要な移動。
+	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
+	if endrowbelow>edgerow:
+		endrowbelow = edgerow
+	sourcerange = sheet[startrow:endrowbelow, :]  # 行挿入前にソースのセル範囲を取得しておく。
+	dest_rangeaddress = sheet[dest_row:dest_row+(endrowbelow-startrow), :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+	sheet.insertCells(dest_rangeaddress, insert_rows)  # 空行を挿入。	
+	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
+	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
+	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	ichiran = getSectionName(sheet, cell)

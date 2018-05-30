@@ -94,6 +94,14 @@ def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにイン
 		menucontainer.insertByIndex(i, menuentry)  # submenucontainer[i]やsubmenucontainer[i:i]は不可。挿入以降のメニューコンテナの項目のインデックスは1増える。
 		i += 1  # インデックスを増やす。
 	return addMenuentry
+def cutcopypasteMenuEntries(addMenuentry):  # コンテクストメニュー追加。
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+def rowMenuEntries(addMenuentry):  # コンテクストメニュー追加。
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsAfter"})
+	addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
 def getBaseURL(xscriptcontext):	 # 埋め込みマクロのScriptingURLのbaseurlを返す。__file__はvnd.sun.star.tdoc:/4/Scripts/python/filename.pyというように返ってくる。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
@@ -134,3 +142,25 @@ def entry8():
 	invokeMenuEntry(8)
 def entry9():
 	invokeMenuEntry(9)	
+def entry10():
+	invokeMenuEntry(10)	
+def entry11():
+	invokeMenuEntry(11)	
+def entry12():
+	invokeMenuEntry(12)	
+def entry13():
+	invokeMenuEntry(13)	
+def entry14():
+	invokeMenuEntry(14)	
+def entry15():
+	invokeMenuEntry(15)	
+def entry16():
+	invokeMenuEntry(16)	
+def entry17():
+	invokeMenuEntry(17)	
+def entry18():
+	invokeMenuEntry(18)	
+def entry19():
+	invokeMenuEntry(19)	
+def entry20():
+	invokeMenuEntry(20)	
