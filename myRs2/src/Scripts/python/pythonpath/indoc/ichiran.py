@@ -189,12 +189,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにIDをコピーする。
 					elif header=="漢字名":  # カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
 						datarange = sheet[r, :checkstartcolumn]
-						datarow = list(datarange.getDataArray()[0])
+						datarow = datarange.getDataArray()[0]
+						createFormatKey = commons.formatkeyCreator(doc)	
 						if not datarow[-1]:  # 在院日数列に値がないときは未設定行と判断する。式が入っていても値がなければNoneが返る。
 							if all(datarow[ichiran.idcolumn:ichiran.datecolumn+1]):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。
 								datarow = "未", "", *datarow[ichiran.idcolumn:ichiran.datecolumn+1], "経過", ""
 								datarange.setDataArray((datarow,))
-								createFormatKey = commons.formatkeyCreator(doc)	
 								sheet[r, ichiran.idcolumn].setPropertyValue("NumberFormat", createFormatKey('@'))  # ID列の書式を文字列に設定。 	
 								sheet[r, ichiran.datecolumn].setPropertyValue("NumberFormat", createFormatKey('YY/MM/DD'))
 								cellstringaddress = sheet[r, ichiran.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
@@ -205,15 +205,13 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								componentwindow = controller.ComponentWindow
 								msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 								msgbox.execute()	
-								return
+								return False  # セル編集モードにしない。
 						idtxt = datarow[ichiran.idcolumn]
 						if idtxt in sheets:  # すでにカルテシートが存在するときはそれをアクティブにする。
 							controller.setActiveSheet(sheets[idtxt])
 						else:  # カルテシートがない時。					
 							sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
 							newsheet = sheets[idtxt]  # カルテシートを取得。  
-							if createFormatKey is None:
-								createFormatKey = commons.formatkeyCreator(doc)	
 							karuteconsts = karute.Karute(newsheet)	
 							karutesplittedrow = karuteconsts.splittedrow
 							newsheet[karutesplittedrow, karuteconsts.datecolumn].setValue(datarow[ichiran.datecolumn])  # カルテシートに入院日を入力。
@@ -221,12 +219,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							newsheet[:karutesplittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join(datarow[ichiran.idcolumn:ichiran.kanacolumn+1]),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
 					elif header=="ｶﾅ名":
-						datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
+						idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
 						transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 						transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
-						kana = datarow[2].replace(" ", "")  # 半角空白を除去してカナ名を取得。
-						zenkana = transliteration.transliterate(kana, 0, len(kana), [])[0]  # ｶﾅを全角に変換。
-						systemclipboard.setContents(commons.TextTransferable("".join((zenkana, datarow[0]))), None)  # クリップボードにカナ名+IDをコピーする。	
+						kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
+						kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
+						systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
 					elif header=="入院日":
 						if txt:  # すでに入力されている時。
 							return True  # セル編集モードにする。
@@ -236,16 +234,15 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							target.setValue(todayvalue)
 							target.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
 					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルをリストで取得。						
-						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
+						idtxt, kanjitxt, kanatxt, datevalue = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]  # ダブルクリックした行をID列から入院日列までのタプルを取得。						
+						newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 						if newsheetname in sheets:  # 経過シートがなければ作成する。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-						else:  # 経過シートがなければ作成する。
-							dateserial = int(sheet[r, ichiran.datecolumn].getValue())  # 入院日の日時シリアル値を取得。		
+						else:  # 経過シートがなければ作成する。		
 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-							keikasheet["F2"].setString(" ".join(ids))  # ID漢字名ｶﾅ名を入力。					
-							keika.setDates(doc, keikasheet, keikasheet["I2"], dateserial)  # 経過シートの日付を設定。
+							keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+							keika.setDates(doc, keikasheet, keikasheet["I2"], datevalue)  # 経過シートの日付を設定。
 							controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 					return False  # セル編集モードにしない。		
 				elif sectionname=="D":
@@ -402,6 +399,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。。
 		dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
+
+		
 		os.chdir(dirpath)  # このドキュメントのあるフォルダに移動	 
 		if not os.path.exists(kanatxt[0]):  # カタカナフォルダがないとき。
 			os.mkdir(kanatxt[0])  # カタカナフォルダを作成。
@@ -452,6 +451,13 @@ def toNewDoc(desktop, doc, name):  # 移動元doc、移動させるシート名n
 	newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
 	newsheets.importSheet(doc, name, 0)  # 新規ドキュメントにシートをコピー。
 	del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+	
+	
+	newdoc.storeToURL(filepicker.getFiles()[0], ())  
+	newdoc.close(True)  # 新規ドキュメントを閉じる。  
+	
+	
+	
 	return newdoc
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 新入院へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
