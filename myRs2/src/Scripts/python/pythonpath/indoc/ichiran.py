@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+import os, unohelper
 from indoc import commons, keika, karute
 from itertools import chain
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
@@ -13,6 +14,7 @@ from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
+from com.sun.star.beans import PropertyValue  # Struct
 class Ichiran():  # シート固有の定数設定。
 	def __init__(self, sheet):
 		self.menurow  = 0  # メニュー行インデックス。
@@ -234,7 +236,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							target.setValue(todayvalue)
 							target.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
 					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。						
+						ids = list(sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0])  # ダブルクリックした行をID列からｶﾅ名列までのタプルをリストで取得。						
 						newsheetname = "".join([ids[0], "経"])  # 経過シート名を取得。
 						if newsheetname in sheets:  # 経過シートがなければ作成する。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
@@ -360,7 +362,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry3")})  
 		elif startrow<ichiran.skybluerow:  # Stable
 			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry4")})
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})    
+			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})	
 		elif startrow<ichiran.redrow:  # Unstable
 			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry6")})
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry7")}) 		
@@ -378,17 +380,49 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()  # 選択範囲を取得。
+	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+	ichiran = Ichiran(sheet)  # シート固有の値を取得。
 	if entrynum<3:  # セルのコンテクストメニュー。
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+		transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))		
+		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+		sheets = doc.getSheets()
+		r = rangeaddress.StartRow
+		idtxt, dummy, kanatxt, datevalue = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
+		kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
+		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。。
+		dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
+		os.chdir(dirpath)  # このドキュメントのあるフォルダに移動	 
+		if not os.path.exists(kanatxt[0]):  # カタカナフォルダがないとき。
+			os.mkdir(kanatxt[0])  # カタカナフォルダを作成。
+		os.chdir(kanatxt[0])  # カタカナフォルダに移動。	 
+		desktop = xscriptcontext.getDesktop()
 		if entrynum==1:  # 退院リストへ。
+			if idtxt in sheets:
+				existingsheet = sheets[idtxt]  # カルテシートを取得。
+				newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+				existingsheet.setName(newsheetname)  # カルテシート名を変更。
+				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
+				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
+			if "".join([idtxt, "経"]) in sheets:
+				existingsheet = sheets["".join([idtxt, "経"])]  # 経過シートを取得。
+				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+				existingsheet.setName(newsheetname)  # カルテシート名を変更。
+				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
+				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 	
 			
 			
-			
-			
-			pass
+						
 		elif entrynum==2:  # 経過ｼｰﾄをArchiveへ。
 			
 			
@@ -396,8 +430,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			
 			pass	
 	elif len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
-		ichiran = Ichiran(sheet)  # シート固有の値を取得。
 		if entrynum==3:  # 未入院から新入院に移動。
 			toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
 		elif entrynum==4:  # StableからUnstableへ移動。
@@ -414,6 +446,13 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
 		elif entrynum==10:  # 新入院からUnstableへ移動。
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
+def toNewDoc(desktop, doc, name):  # 移動元doc、移動させるシート名name
+	propertyvalues = PropertyValue(Name="Hidden",Value=True),  # 新しいドキュメントのプロパティ。
+	newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+	newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
+	newsheets.importSheet(doc, name, 0)  # 新規ドキュメントにシートをコピー。
+	del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+	return newdoc
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 新入院へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
 	if endrowbelow>edgerow:
