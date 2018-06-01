@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, unohelper
-from indoc import commons, keika, karute
+from indoc import commons, keika, karute, ent
 from itertools import chain
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX, ERRORBOX  # enum
-from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FULLWIDTH_HALFWIDTH  # enum
+from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
@@ -144,9 +144,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 											datarows[r][ecgcol] = "E"							
 							checkrange.setDataArray(datarows)  # シートに書き戻す。
 					elif txt=="済をﾘｾｯﾄ":
-						containerwindow = controller.getFrame().getContainerWindow()  # コンテナウィンドウを取得。
-						toolkit = containerwindow.getToolkit() # ウィンドウピアオブジェクトからツールキットを取得。
-						msgbox = toolkit.createMessageBox(containerwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "済列の変更", "済をリセットしますか？")
+						msg = "済列をリセットしますか？"
+						componentwindow = controller.ComponentWindow
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 						if msgbox.execute()==MessageBoxResults.OK:
 							sheet[splittedrow:emptyrow, :].setPropertyValue("CharColor", commons.COLORS["black"])  # 文字色をリセット。
 							sheet[splittedrow:emptyrow, sumicolumn].setDataArray([("未",)]*(emptyrow-splittedrow))  # 済列をリセット。
@@ -306,15 +306,28 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
+				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))				
 				if c==ichiran.idcolumn:  # ID列の時。
 					txt = cell.getString()  # セルの文字列を取得。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
 					if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
 						cell.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
 				elif c==ichiran.kanacolumn:  # カナ列の時。
+					transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+					transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。
 					txt = cell.getString()  # セルの文字列を取得。
-					cell.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換。	
+					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
+					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+					if all(map(lambda x: "ｱ"<=x<="ﾝ", txt)):  # すべて半角カタカナであることを確認。
+						cell.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
+					else:
+						msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
+						doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+						controller = doc.getCurrentController()  # コントローラの取得。						
+						componentwindow = controller.ComponentWindow
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+						msgbox.execute()							
+						controller.select(cell)  # 元のセルに戻る。セル編集モードにするとおかしくなる。
 				elif c==ichiran.datecolumn:  # 日付列の時。
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 					cell.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
@@ -394,31 +407,74 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		sheets = doc.getSheets()
 		r = rangeaddress.StartRow
-		idtxt, dummy, kanatxt, datevalue = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		idtxt, dummy, kanatxt, datevalue = datarow
 		kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
 		kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。。
 		dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
-
-		
-		os.chdir(dirpath)  # このドキュメントのあるフォルダに移動	 
-		if not os.path.exists(kanatxt[0]):  # カタカナフォルダがないとき。
-			os.mkdir(kanatxt[0])  # カタカナフォルダを作成。
-		os.chdir(kanatxt[0])  # カタカナフォルダに移動。	 
+		k = kanatxt[0]  # 最初のカナ文字を取得。カタカナであることは入力時にチェック済。
+		kana = "ア", "カ", "サ", "タ", "ナ", "ハ", "マ", "ヤ", "ラ", "ワ"
+		for i in range(1, len(kana)):
+			if kanatxt[0]<kana[i]:
+				k = kana[i-1]
+				break
+		else:
+			k = kana[i]
+		kanadirpath = os.path.join(dirpath, k)  # 最初のカナ文字のフォルダへのパス。
+		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
+			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
 		desktop = xscriptcontext.getDesktop()
+		detachSheet = createDetachSheet(desktop, controller, doc, sheets, kanadirpath)
 		if entrynum==1:  # 退院リストへ。
-			if idtxt in sheets:
-				existingsheet = sheets[idtxt]  # カルテシートを取得。
-				newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-				existingsheet.setName(newsheetname)  # カルテシート名を変更。
-				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
-				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
-			if "".join([idtxt, "経"]) in sheets:
-				existingsheet = sheets["".join([idtxt, "経"])]  # 経過シートを取得。
-				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-				existingsheet.setName(newsheetname)  # カルテシート名を変更。
-				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
-				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 	
+			flgs = []
+			
+			newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+			flgs.append(detachSheet(idtxt, newsheetname))
+			newsheetname =  "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+			flgs.append(detachSheet("".join([idtxt, "経"]), newsheetname))
+			
+			if not all(flgs):
+				
+				
+				
+			datarow = list(datarow)
+			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
+			datarow.extend((todayvalue, "経過"))
+			entsheet = sheets["退院"]
+			entconsts = ent.Ent(entsheet)			
+			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))
+			entsheet[entconsts.splittedrow:entconsts.emptyrow, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
+			sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
+			
+			
+# 			if sheetname in sheets:  # シートがある時。
+# 				existingsheet = sheets[sheetname]  # カルテシートを取得。
+# 				existingsheet.setName(newsheetname)  # カルテシート名を変更。
+# 				propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
+# 				newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+# 				newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
+# 				newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
+# 				del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+# 				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
+# 				newdoc.storeToURL(os.path.join(kanadirpath, newsheetname, ".ods"), ())  
+# 				newdoc.close(True)				
+# 			else:
+# 				msg = "シート「{}」が存在しません。".format(sheetname)	
+# 				componentwindow = controller.ComponentWindow
+# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+# 				msgbox.execute()					
+			
+			
+			
+				
+				
+# 			if "".join([idtxt, "経"]) in sheets:
+# 				existingsheet = sheets["".join([idtxt, "経"])]  # 経過シートを取得。
+# 				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+# 				existingsheet.setName(newsheetname)  # カルテシート名を変更。
+# 				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
+# 				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 	
 			
 			
 						
@@ -445,20 +501,51 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
 		elif entrynum==10:  # 新入院からUnstableへ移動。
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
-def toNewDoc(desktop, doc, name):  # 移動元doc、移動させるシート名name
-	propertyvalues = PropertyValue(Name="Hidden",Value=True),  # 新しいドキュメントのプロパティ。
-	newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
-	newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
-	newsheets.importSheet(doc, name, 0)  # 新規ドキュメントにシートをコピー。
-	del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+# def toNewDoc(desktop, doc, name):  # 移動元doc、移動させるシート名name
+# 	
+# 	
+# 	
+# 	
+# 	propertyvalues = PropertyValue(Name="Hidden",Value=True),  # 新しいドキュメントのプロパティ。
+# 	newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+# 	newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
+# 	newsheets.importSheet(doc, name, 0)  # 新規ドキュメントにシートをコピー。
+# 	del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+# 	
+# 	
+# 	newdoc.storeToURL(filepicker.getFiles()[0], ())  
+# 	newdoc.close(True)  # 新規ドキュメントを閉じる。  
 	
 	
-	newdoc.storeToURL(filepicker.getFiles()[0], ())  
-	newdoc.close(True)  # 新規ドキュメントを閉じる。  
 	
-	
-	
-	return newdoc
+# 	return newdoc
+
+# def showMessageBox(controller, msg):
+# 	componentwindow = controller.ComponentWindow
+# 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+# 	return msgbox.execute()	
+
+def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
+	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
+	def detachSheet(sheetname, newsheetname):
+		if sheetname in sheets:  # シートがある時。
+			existingsheet = sheets[sheetname]  # カルテシートを取得。
+			existingsheet.setName(newsheetname)  # カルテシート名を変更。
+			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+			newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
+			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
+			del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
+			del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
+			newdoc.storeToURL(os.path.join(kanadirpath, newsheetname, ".ods"), ())  
+			newdoc.close(True)		
+			return True		
+		else:
+			msg = "シート「{}」が存在しません。".format(sheetname)	
+			componentwindow = controller.ComponentWindow
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			msgbox.execute()	
+			return False
+	return detachSheet
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 新入院へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
 	if endrowbelow>edgerow:

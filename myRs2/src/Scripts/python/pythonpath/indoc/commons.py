@@ -8,7 +8,7 @@ from com.sun.star.datatransfer import UnsupportedFlavorException
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
-from indoc import ichiran, karute, keika, rireki, taiin, yotei, documentevent  # 相対インポートは不可。
+from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
 COLORS = {\
 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -51,8 +51,8 @@ def getModule(sheetname):  # シート名に応じてモジュールを振り分
 		return ichiran
 # 	elif sheetname=="予定":
 # 		return yotei
-# 	elif sheetname=="退院":
-# 		return taiin
+	elif sheetname=="退院":
+		return ent
 # 	elif sheetname=="履歴":
 # 		return rireki
 	return None  # モジュールが見つからなかった時はNoneを返す。
