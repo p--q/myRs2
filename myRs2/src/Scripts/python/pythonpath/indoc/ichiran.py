@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-import os, unohelper
+import os, unohelper, glob
 from indoc import commons, keika, karute, ent
 from itertools import chain
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
@@ -78,8 +78,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
@@ -87,13 +85,16 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+				controller = doc.getCurrentController()  # コントローラの取得。
+				sheets = doc.getSheets()  # シートコレクションを取得。
 				systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 				ichiran = getSectionName(sheet, target)
 				sectionname, splittedrow, emptyrow, sumicolumn, checkstartcolumn, memostartcolumn\
 					= ichiran.sectionname, ichiran.splittedrow, ichiran.emptyrow, ichiran.sumicolumn, ichiran.checkstartcolumn, ichiran.memostartcolumn
 				celladdress = target.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-				txt = target.getString()  # クリックしたセルの文字列を取得。		
+				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="M":
 					if txt=="検予を反映":  # 経過シートから本日の検予を取得。
 						cellranges = sheet[splittedrow:, ichiran.idcolumn].queryContentCells(CellFlags.STRING)  # ID列に文字列が入っているセルを取得。
@@ -107,7 +108,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 						c = splittedcolumn + todayvalue  # 分割列と今日の日付のシリアル値の和。
 						if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
-							sheets = doc.getSheets()  # シートコレクションを取得。
 							iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 							checkrange = sheet[splittedrow:splittedrow+len(iddatarows), checkstartcolumn:memostartcolumn]  # チェック列範囲を取得。
 							datarows = list(map(list, checkrange.getDataArray()))  # 各行をリストにして取得。
@@ -162,13 +162,13 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						
 						
 						pass  # 入力支援odsを開く。
-					
+					elif txt=="退院ﾘｽﾄ":
+						controller.setActiveSheet(sheets["退院"])
 					return False  # セル編集モードにしない。
 				elif not target.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色でない時。何もしない。
 					return False  # セル編集モードにしない。
 				elif sectionname=="B":
 					header = sheet[splittedrow-1, c].getString()  # 固定行の最下端のセルの文字列を取得。
-					sheets = doc.getSheets()  # シートコレクションを取得。
 					if header=="済":
 						if txt=="未":
 							target.setString("待")
@@ -220,10 +220,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
 					elif header=="ｶﾅ名":
 						idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
-						transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-						transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
-						kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
-						kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
+						kanatxt = convertKanaFULLWIDTH(ctx, smgr, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 						systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
 					elif header=="入院日":
 						if txt:  # すでに入力されている時。
@@ -355,7 +352,14 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTrigger", {"Text": "退院ﾘｽﾄへ", "CommandURL": baseurl.format("entry1")}) 	
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 			elif rangeaddress.StartColumn in (ichiran.datecolumn+1,):  # 経過列の時。
-				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 	
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
+				idtxt, dummy, kanatxt = sheet[startrow, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]			
+				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+				for i, systempath in enumerate(glob.iglob(createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+					addMenuentry("ActionTrigger", {"Text": os.path.basename(systempath), "CommandURL": baseurl.format("entry{}".format(11+i))}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
@@ -390,29 +394,23 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-
-# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	desktop = xscriptcontext.getDesktop()
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()  # 選択範囲を取得。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+	r = rangeaddress.StartRow
 	ichiran = Ichiran(sheet)  # シート固有の値を取得。
 	if entrynum<3:  # セルのコンテクストメニュー。
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-		transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))		
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		sheets = doc.getSheets()
-		r = rangeaddress.StartRow
 		datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
 		idtxt, dummy, kanatxt, datevalue = datarow
-		kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
-		kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
-		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。。
-		dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
+		kanatxt = convertKanaFULLWIDTH(ctx, smgr, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。
 		k = kanatxt[0]  # 最初のカナ文字を取得。カタカナであることは入力時にチェック済。
 		kana = "ア", "カ", "サ", "タ", "ナ", "ハ", "マ", "ヤ", "ラ", "ワ"
 		for i in range(1, len(kana)):
@@ -421,69 +419,42 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				break
 		else:
 			k = kana[i]
+		dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
 		kanadirpath = os.path.join(dirpath, k)  # 最初のカナ文字のフォルダへのパス。
 		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
 			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
-		desktop = xscriptcontext.getDesktop()
 		detachSheet = createDetachSheet(desktop, controller, doc, sheets, kanadirpath)
 		if entrynum==1:  # 退院リストへ。
 			flgs = []
-			
 			newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
 			flgs.append(detachSheet(idtxt, newsheetname))
-			newsheetname =  "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+			newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
 			flgs.append(detachSheet("".join([idtxt, "経"]), newsheetname))
-			
 			if not all(flgs):
-				
-				
-				
+				msg = "{}{}をリストシートから退院シートに移動させますか？".format(kanatxt, idtxt)
+				componentwindow = controller.ComponentWindow
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
+				if msgbox.execute()!=MessageBoxResults.OK:  # OKでない時は何もしない。
+					return			
 			datarow = list(datarow)
 			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 			datarow.extend((todayvalue, "経過"))
-			entsheet = sheets["退院"]
-			entconsts = ent.Ent(entsheet)			
-			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))
-			entsheet[entconsts.splittedrow:entconsts.emptyrow, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
+			entsheet = sheets["退院"]  # 退院シートを取得。
+			entconsts = ent.Ent(entsheet)  # 退院シートの定数を取得。			
+			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
+			entsheet[entconsts.splittedrow:entconsts.emptyrow+1, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
 			sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
-			
-			
-# 			if sheetname in sheets:  # シートがある時。
-# 				existingsheet = sheets[sheetname]  # カルテシートを取得。
-# 				existingsheet.setName(newsheetname)  # カルテシート名を変更。
-# 				propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
-# 				newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
-# 				newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
-# 				newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
-# 				del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
-# 				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
-# 				newdoc.storeToURL(os.path.join(kanadirpath, newsheetname, ".ods"), ())  
-# 				newdoc.close(True)				
-# 			else:
-# 				msg = "シート「{}」が存在しません。".format(sheetname)	
-# 				componentwindow = controller.ComponentWindow
-# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 				msgbox.execute()					
-			
-			
-			
-				
-				
-# 			if "".join([idtxt, "経"]) in sheets:
-# 				existingsheet = sheets["".join([idtxt, "経"])]  # 経過シートを取得。
-# 				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-# 				existingsheet.setName(newsheetname)  # カルテシート名を変更。
-# 				toNewDoc(desktop, doc, newsheetname)  # カルテシートを切り出す。
-# 				del sheets[newsheetname]  # 切り出したカルテシートを削除する。 	
-			
-			
-						
 		elif entrynum==2:  # 経過ｼｰﾄをArchiveへ。
-			
-			
-			
-			
-			pass	
+			newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+			detachSheet("".join([idtxt, "経"]), newsheetname)  # 切り出したシートのfileurlを取得。
+	elif entrynum>10:  # startentrynum以上の数値の時はアーカイブファイルを開く。
+		startentrynum = 11
+		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
+		idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]
+		for i, systempath in enumerate(glob.iglob(createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+			if i==c:  # インデックスが一致する時。
+				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
+				break
 	elif len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
 		if entrynum==3:  # 未入院から新入院に移動。
 			toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
@@ -501,30 +472,15 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
 		elif entrynum==10:  # 新入院からUnstableへ移動。
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
-# def toNewDoc(desktop, doc, name):  # 移動元doc、移動させるシート名name
-# 	
-# 	
-# 	
-# 	
-# 	propertyvalues = PropertyValue(Name="Hidden",Value=True),  # 新しいドキュメントのプロパティ。
-# 	newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
-# 	newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
-# 	newsheets.importSheet(doc, name, 0)  # 新規ドキュメントにシートをコピー。
-# 	del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
-# 	
-# 	
-# 	newdoc.storeToURL(filepicker.getFiles()[0], ())  
-# 	newdoc.close(True)  # 新規ドキュメントを閉じる。  
-	
-	
-	
-# 	return newdoc
-
-# def showMessageBox(controller, msg):
-# 	componentwindow = controller.ComponentWindow
-# 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 	return msgbox.execute()	
-
+def createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt):
+	kanatxt = convertKanaFULLWIDTH(ctx, smgr, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+	dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
+	return os.path.join(dirpath, "*", "{}{}経_*開始.ods".format(kanatxt, idtxt))  # ワイルドカード入の経過シートファイル名を取得。	
+def convertKanaFULLWIDTH(ctx, smgr, kanatxt):  # カナ名を半角からスペースを削除して全角にして返す。
+	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+	transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
+	kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
+	return transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
@@ -536,9 +492,10 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
 			del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
 			del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
-			newdoc.storeToURL(os.path.join(kanadirpath, newsheetname, ".ods"), ())  
+			fileurl = unohelper.systemPathToFileUrl(os.path.join(kanadirpath, "{}.ods".format(newsheetname)))
+			newdoc.storeToURL(fileurl, ())  
 			newdoc.close(True)		
-			return True		
+			return True
 		else:
 			msg = "シート「{}」が存在しません。".format(sheetname)	
 			componentwindow = controller.ComponentWindow
