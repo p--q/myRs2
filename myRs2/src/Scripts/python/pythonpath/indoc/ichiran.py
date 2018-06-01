@@ -74,7 +74,10 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	return ichiran
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	sheet["C1:F1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	refreshCounts(sheet, Ichiran(sheet))
+	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])
+	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
@@ -180,6 +183,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						elif txt=="済":
 							target.setString("未")
 							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["black"])
+						refreshCounts(sheet, ichiran)
 					elif header=="予":
 						if txt:
 							target.clearContents(CellFlags.STRING)  # 予をクリア。
@@ -290,7 +294,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
-def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
+def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。マクロで変更した時は発火しない模様。	
 	changes = changesevent.Changes	
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
@@ -329,6 +333,22 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 					cell.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 			break
+def refreshCounts(sheet, ichiran):
+	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
+	datarange = sheet[ichiran.splittedrow:ichiran.emptyrow, ichiran.sumicolumn]
+	searchdescriptor = sheet.createSearchDescriptor()
+	counts = []
+	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できない。
+		searchdescriptor.setSearchString(txt)  # 戻り値はない。
+		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+		c = len([i for i in cellranges.getCells()]) if cellranges else 0  # セルで数えないといけない。
+		counts.append(c)
+	counts.append(ichiran.emptyrow-ichiran.splittedrow-3-sum(counts))  # 済、待、未、の順に数が入る。
+	datarows[0][1] = sum(counts)
+	datarows[0][3] = counts[0]
+	datarows[1][1] = counts[2]
+	datarows[1][3] = counts[1]
+	sheet[:2, ichiran.memostartcolumn:ichiran.memostartcolumn+4].setDataArray(datarows)	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
