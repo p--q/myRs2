@@ -270,14 +270,14 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							target.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
 							return False  # セルを編集モードにしない。
 						elif txt=="#":
-							datevalue = int(functionaccess.callFunction("DATEVALUE", (date.today().isoformat(),)))  # 今日のシリアル値を整数で取得。floatで返る。						
+							datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。						
 							sheet[r, c:c+2].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
 							createFormatKey = commons.formatkeyCreator(doc)	
 							target.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 							sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
 							return False  # セルを編集モードにしない。
 					elif c==karute.datecolumn+1:  # 日付列の時。
-						datevalue = int(functionaccess.callFunction("DATEVALUE", (date.today().isoformat(),)))  # 今日のシリアル値を整数で取得。floatで返る。
+						datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 						if txt:  # 日付列は日付シリアル値しか入っていないはず。
 							celldatevalue = int(target.getValue())  # セルに入っているシリアル値を整数で取得。
 							if celldatevalue>datevalue-2:  # 2日前までは1日遡る。

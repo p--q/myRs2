@@ -75,9 +75,6 @@ def getSectionName(sheet, target):  # 区画名を取得。
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	refreshCounts(sheet, Ichiran(sheet))
-	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])
-	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
@@ -92,19 +89,19 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				controller = doc.getCurrentController()  # コントローラの取得。
 				sheets = doc.getSheets()  # シートコレクションを取得。
 				systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+				functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 				ichiran = getSectionName(sheet, target)
 				sectionname, splittedrow, emptyrow, sumicolumn, checkstartcolumn, memostartcolumn\
 					= ichiran.sectionname, ichiran.splittedrow, ichiran.emptyrow, ichiran.sumicolumn, ichiran.checkstartcolumn, ichiran.memostartcolumn
 				celladdress = target.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="M":
+					txt = target.getString()  # クリックしたセルの文字列を取得。	
 					if txt=="検予を反映":  # 経過シートから本日の検予を取得。
 						cellranges = sheet[splittedrow:, ichiran.idcolumn].queryContentCells(CellFlags.STRING)  # ID列に文字列が入っているセルを取得。
 						headerrow = sheet[ichiran.menurow, checkstartcolumn:memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
 						eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol\
 							= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
-						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 						keikaconsts = keika.Keika()  # 経過シートの定数を取得。
 						daterow = keikaconsts.daterow  # 経過シートの日付行インデックスを取得。
 						splittedcolumn = keikaconsts.splittedcolumn  # 日付列の最初の列インデックスを取得。
@@ -151,7 +148,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						componentwindow = controller.ComponentWindow
 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 						if msgbox.execute()==MessageBoxResults.OK:
-							sheet[splittedrow:emptyrow, :].setPropertyValue("CharColor", commons.COLORS["black"])  # 文字色をリセット。
+							sheet[splittedrow:emptyrow, :].setPropertyValue("CharColor", commons.COLORS["black"])  # 文字色を黒色にする。
 							sheet[splittedrow:emptyrow, sumicolumn].setDataArray([("未",)]*(emptyrow-splittedrow))  # 済列をリセット。
 							searchdescriptor = sheet.createSearchDescriptor()
 							searchdescriptor.setSearchString("済")
@@ -161,85 +158,100 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						sheet[splittedrow:emptyrow, sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
 					elif txt=="入力支援":
 						
-						
-						
-						
 						pass  # 入力支援odsを開く。
+					
 					elif txt=="退院ﾘｽﾄ":
 						controller.setActiveSheet(sheets["退院"])
 					return False  # セル編集モードにしない。
 				elif not target.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色でない時。何もしない。
 					return False  # セル編集モードにしない。
 				elif sectionname=="B":
-					header = sheet[splittedrow-1, c].getString()  # 固定行の最下端のセルの文字列を取得。
-					if header=="済":
-						if txt=="未":
-							target.setString("待")
-							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["skyblue"])
-						elif txt=="待":
-							target.setString("済")
-							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["silver"])
-							doc.store()  # ドキュメントを保存する。
-						elif txt=="済":
-							target.setString("未")
-							sheet[r, :].setPropertyValue("CharColor", commons.COLORS["black"])
-						refreshCounts(sheet, ichiran)
-					elif header=="予":
-						if txt:
+					sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, keikatxt = sheet[r, :checkstartcolumn].getDataArray()[0]  # 日付は数値で返ってくる。				
+					if keikatxt and c==0:  # 経過列があり、かつ、済列の時。
+						items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
+						items.append(items[0])  # 最初の要素を最後の要素に追加する。
+						dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
+						target.setString(dic[sumitxt][0])
+						sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
+						refreshCounts(sheet, ichiran)  # カウントを更新する。
+					elif keikatxt and c==ichiran.yocolumn:  # 経過列があり、かつ、予列の時。
+						if yotxt:
 							target.clearContents(CellFlags.STRING)  # 予をクリア。
 						else:  # セルの文字列が空の時。
 							target.setString("予")
-					elif header=="ID":
-						systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにIDをコピーする。
-					elif header=="漢字名":  # カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
-						datarange = sheet[r, :checkstartcolumn]
-						datarow = datarange.getDataArray()[0]
-						createFormatKey = commons.formatkeyCreator(doc)	
-						if not datarow[-1]:  # 在院日数列に値がないときは未設定行と判断する。式が入っていても値がなければNoneが返る。
-							if all(datarow[ichiran.idcolumn:ichiran.datecolumn+1]):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。
-								datarow = "未", "", *datarow[ichiran.idcolumn:ichiran.datecolumn+1], "経過", ""
-								datarange.setDataArray((datarow,))
-								sheet[r, ichiran.idcolumn].setPropertyValue("NumberFormat", createFormatKey('@'))  # ID列の書式を文字列に設定。 	
-								sheet[r, ichiran.datecolumn].setPropertyValue("NumberFormat", createFormatKey('YY/MM/DD'))
-								cellstringaddress = sheet[r, ichiran.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
-								sheet[r, ichiran.checkstartcolumn-1].setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。			
-								sheet[r, ichiran.checkstartcolumn-1].setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 	
+					elif c==ichiran.idcolumn:  # ID列の時。
+						if keikatxt:  # 経過列がある時。
+							systemclipboard.setContents(commons.TextTransferable(idtxt), None)  # クリップボードにIDをコピーする。
+						else:
+							return True  # セル編集モードにする。		
+					elif c==ichiran.idcolumn+1:  # 漢字列の時。カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
+						if keikatxt and idtxt in sheets:  # 経過列があり、かつ、ID名のシートが存在する時。
+							controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
+						else:  # 在院日数列が空欄の時、または、カルテシートがない時。
+							
+							if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。
+								createFormatKey = commons.formatkeyCreator(doc)		
+								transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+								fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
+								
+# 								createFormatKey = commons.formatkeyCreator(doc)		
+# 								transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+# 								locale = Locale(Language = "ja", Country = "JP")
+# 								transliteration.loadModuleNew((HIRAGANA_KATAKANA,), locale)  # 変換モジュールをロード。	
+# 								kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ひらがなをカタカナに変換		
+# 								transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), locale)
+# 								kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換								
+# 								cellstringaddress = sheet[r, ichiran.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
+# 								cell = sheet[r, checkstartcolumn-1]
+# 								cell.setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。	
+# 								cell.setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 							
+# 								datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue, "経過"  # 他の列を追加。								
+# 								sheet[r, :checkstartcolumn-1].setDataArray((datarow,))
+								
+								
+								newsheet = sheets[idtxt]  # カルテシートを取得。  
+								karuteconsts = karute.Karute(newsheet)	
+								karutedatecell = newsheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
+								karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+								karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+								newsheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+								controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。	
 							else:
-								msg = "ID、漢字名、カナ名、入院日\nすべてを入力してください。"
-								componentwindow = controller.ComponentWindow
-								msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-								msgbox.execute()	
-								return False  # セル編集モードにしない。
-						idtxt = datarow[ichiran.idcolumn]
-						if idtxt in sheets:  # すでにカルテシートが存在するときはそれをアクティブにする。
-							controller.setActiveSheet(sheets[idtxt])
-						else:  # カルテシートがない時。					
-							sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。
-							newsheet = sheets[idtxt]  # カルテシートを取得。  
-							karuteconsts = karute.Karute(newsheet)	
-							karutesplittedrow = karuteconsts.splittedrow
-							newsheet[karutesplittedrow, karuteconsts.datecolumn].setValue(datarow[ichiran.datecolumn])  # カルテシートに入院日を入力。
-							newsheet[karutesplittedrow, karuteconsts.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-							newsheet[:karutesplittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join(datarow[ichiran.idcolumn:ichiran.kanacolumn+1]),))  # カルテシートのコピー日時をクリア。ID名前を入力。
-							controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。
-					elif header=="ｶﾅ名":
-						idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]  # ID、漢字名、ｶﾅ名、を取得。
-						kanatxt = convertKanaFULLWIDTH(ctx, smgr, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
-						systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
-					elif header=="入院日":
-						if txt:  # すでに入力されている時。
+								return True  # セル編集モードにする。		
+					elif c==ichiran.kanacolumn:  # カナ名列の時。
+						if keikatxt:  # 経過列がすでにある時。
+							kanatxt = convertKanaFULLWIDTH(ctx, smgr, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+							systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
+						else:
+							return True  # セル編集モードにする。		
+					elif c==ichiran.datecolumn:  # 入院日列の時。
+						if keikatxt:  # 経過列がすでにある時。
 							return True  # セル編集モードにする。
-						else:  # まだ空欄の時。
-							functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-							todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-							target.setValue(todayvalue)
-							target.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YY/MM/DD'))
-					elif txt=="経過":  # このボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。
-						idtxt, kanjitxt, kanatxt, datevalue = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]  # ダブルクリックした行をID列から入院日列までのタプルを取得。						
+						else:
+							todaydatevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
+							if datevalue:  # すでに日付が入っている時。
+								items = [todaydatevalue-2, todaydatevalue-1, todaydatevalue, todaydatevalue+1]
+								items.append(items[0])  # 最初の要素を最後の要素に追加する。
+								dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
+								if datevalue in dic:
+									datevalue = dic[datevalue]
+								else:
+									return True  # セル編集モードにする。
+							else:
+								datevalue = todaydatevalue
+							target.setValue(datevalue)
+							target.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))
+					elif c==ichiran.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
 						newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
-						if newsheetname in sheets:  # 経過シートがなければ作成する。
+						if keikatxt and newsheetname in sheets:  # 経過列がすでにあり、かつ、経過シートがある時。。		
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-						else:  # 経過シートがなければ作成する。		
+						else:  # 経過シートがなければ作成する。
+							
+								
+							createFormatKey = commons.formatkeyCreator(doc)		
+							transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。									
+							fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
+								
 							sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 							keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 							keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
@@ -280,9 +292,21 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				elif sectionname=="A":
 					if sheet[splittedrow-1, c].getString()=="ｶﾅ名":  # 固定行の最下端のセルの文字列を取得。
 						
-						pass  # 漢字名からｶﾅを取得する。
+						pass  # 漢字名からｶﾅを取得する。つまりふりがなを降る。
 
 	return True  # セル編集モードにする。	
+def fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue):		
+	locale = Locale(Language = "ja", Country = "JP")
+	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), locale)  # 変換モジュールをロード。	
+	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ひらがなをカタカナに変換		
+	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), locale)
+	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換								
+	cellstringaddress = sheet[r, ichiran.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
+	cell = sheet[r, ichiran.checkstartcolumn-1]
+	cell.setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。	
+	cell.setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 							
+	datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue, "経過"  # 他の列を追加。								
+	sheet[r, :ichiran.checkstartcolumn-1].setDataArray((datarow,))
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source
 	sheet = controller.getActiveSheet()
@@ -319,7 +343,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					txt = cell.getString()  # セルの文字列を取得。
 					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if all(map(lambda x: "ｱ"<=x<="ﾝ", txt)):  # すべて半角カタカナであることを確認。
+					if all(map(lambda x: "ｱ"<=x<="ﾝ", txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
 						cell.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
 					else:
 						msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
@@ -333,7 +357,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 					cell.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 			break
-def refreshCounts(sheet, ichiran):
+def refreshCounts(sheet, ichiran):  # カウントを更新する。
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
 	datarange = sheet[ichiran.splittedrow:ichiran.emptyrow, ichiran.sumicolumn]
 	searchdescriptor = sheet.createSearchDescriptor()
@@ -379,7 +403,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				for i, systempath in enumerate(glob.iglob(createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
-					addMenuentry("ActionTrigger", {"Text": os.path.basename(systempath), "CommandURL": baseurl.format("entry{}".format(11+i))}) 
+					addMenuentry("ActionTrigger", {"Text": os.path.basename(systempath), "CommandURL": baseurl.format("entry{}".format(21+i))}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
@@ -463,12 +487,17 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			entconsts = ent.Ent(entsheet)  # 退院シートの定数を取得。			
 			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
 			entsheet[entconsts.splittedrow:entconsts.emptyrow+1, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
+			searchdescriptor = sheet.createSearchDescriptor()
+			searchdescriptor.setSearchString(idtxt)  # 戻り値はない。
+			cellranges = entsheet[entconsts.splittedrow:entconsts.emptyrow, entconsts.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+			if cellranges:  # ID列に同じIDがすでにある時。
+				[entsheet.removeRange(i, delete_rows) for i in cellranges.getRangeAddresses()]  # 同じIDの行を削除。
 			sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
 		elif entrynum==2:  # 経過ｼｰﾄをArchiveへ。
 			newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
 			detachSheet("".join([idtxt, "経"]), newsheetname)  # 切り出したシートのfileurlを取得。
-	elif entrynum>10:  # startentrynum以上の数値の時はアーカイブファイルを開く。
-		startentrynum = 11
+	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
+		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
 		idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]
 		for i, systempath in enumerate(glob.iglob(createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
@@ -512,7 +541,14 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
 			del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
 			del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
-			fileurl = unohelper.systemPathToFileUrl(os.path.join(kanadirpath, "{}.ods".format(newsheetname)))
+			systempath = os.path.join(kanadirpath, "{}.ods".format(newsheetname))
+			if os.path.exists(systempath):  # すでにファイルが存在する時。
+				msg = "シート{}はすでにバックアップ済です。\n上書きしますか？"
+				componentwindow = controller.ComponentWindow
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
+				if msgbox.execute()!=MessageBoxResults.OK:			
+					return True  # 上書きしない時は、切り出したものとして返す。
+			fileurl = unohelper.systemPathToFileUrl(systempath)
 			newdoc.storeToURL(fileurl, ())  
 			newdoc.close(True)		
 			return True

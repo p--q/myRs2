@@ -164,3 +164,24 @@ def entry19():
 	invokeMenuEntry(19)	
 def entry20():
 	invokeMenuEntry(20)	
+def entry21():
+	invokeMenuEntry(21)	
+def entry22():
+	invokeMenuEntry(22)	
+def entry23():
+	invokeMenuEntry(23)	
+def entry24():
+	invokeMenuEntry(24)	
+def entry25():
+	invokeMenuEntry(25)	
+def entry26():
+	invokeMenuEntry(26)	
+def entry27():
+	invokeMenuEntry(27)	
+def entry28():
+	invokeMenuEntry(28)	
+def entry29():
+	invokeMenuEntry(29)	
+def entry30():
+	invokeMenuEntry(30)	
+	
