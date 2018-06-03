@@ -57,7 +57,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				elif sectionname=="B":
 					systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ichiran, target)
+					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ent, target)
 				elif sectionname=="A":
 					pass
 	return True  # セル編集モードにする。	
