@@ -78,10 +78,14 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 		self.xscriptcontext = xscriptcontext
 		self.selectionrangeaddress = None  # selectionChanged()メソッドが何回も無駄に発火するので選択範囲アドレスのStructをキャッシュして比較する。
 	def selectionChanged(self, eventobject):  # マウスから呼び出した時の反応が遅い。このメソッドでエラーがでるとショートカットキーでの操作が必要。
-		selectionrangeaddress = eventobject.Source.getSelection().getRangeAddress()
-		if selectionrangeaddress != self.selectionrangeaddress:  # キャッシュのセル範囲アドレスと一致しない時のみ。Structで比較。セル範囲では比較できない。
-			self.selectionrangeaddress = selectionrangeaddress  # キャッシュを更新。
-			invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)		
+		selection = eventobject.Source.getSelection()
+		if hasattr(selection, "getRangeAddress"):  # 選択範囲がセル範囲とは限らないのでgetRangeAddress()メソッドがあるか確認する。
+			selectionrangeaddress = selection.getRangeAddress()
+			if selectionrangeaddress==self.selectionrangeaddress:  # キャッシュのセル範囲アドレスと一致する時。Structで比較。セル範囲では比較できない。
+				return  # 何もしない。
+			else:  # キャッシュのセル範囲と一致しない時。
+				self.selectionrangeaddress = selectionrangeaddress  # キャッシュを更新。
+		invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)		
 	def disposing(self, eventobject):
 		eventobject.Source.removeSelectionChangeListener(self)		
 class ChangesListener(unohelper.Base, XChangesListener):

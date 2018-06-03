@@ -179,7 +179,7 @@ def contextMenuEntries(target, entrynum):  # コンテクストメニュー番�
 		target.setPropertyValue("CellBackColor", colors["red3"]) 		
 		
 		
-def setDates(doc, sheet, cell, dateserial):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。。
+def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。。
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
 	holidays = commons.HOLIDAYS
@@ -189,7 +189,7 @@ def setDates(doc, sheet, cell, dateserial):  # sheet:経過シート、cell: 日
 	sheet[:r+1, c:].clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA+CellFlags.HARDATTR+CellFlags.STYLES)  # セルの内容を削除。
 	endcolumn = c + daycount + 1
 	endcolumn = endcolumn if endcolumn<1024 else 1023  # 列インデックスの上限1023。
-	sheet[r, c:endcolumn].setDataArray(([i for i in range(dateserial, dateserial+daycount+1)],))  # 日時シリアル値を経過シートに入力。
+	sheet[r, c:endcolumn].setDataArray(([i for i in range(datevalue, datevalue+daycount+1)],))  # 日時シリアル値を経過シートに入力。
 	sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
 	y, m, d = map(int, sheet[r, c].getString().split("/"))  # 年、月、日を整数型で取得。
 	weekday, days = calendar.monthrange(y, m)  # 月曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
