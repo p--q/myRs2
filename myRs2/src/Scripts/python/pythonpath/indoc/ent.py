@@ -13,12 +13,12 @@ class Ent():  # シート固有の定数設定。
 		self.kanjicolumn = 1  # 漢字列インデックス。
 		self.kanacolumn = 2  # カナ列インデックス。	
 		self.datecolumn = 3  # 入院日列インデックス。
-		self.cleardatecolumn = 4  # リスト消去日列インデックス。
+		self.keikacolumn = 5  # 経過列インデックス。
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
 def getSectionName(sheet, target):  # 区画名を取得。
 	"""
-	M  
+	M 
 	===========  # 行の固定の境界
 	B  
 	-----------
@@ -62,18 +62,31 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					pass
 	return True  # セル編集モードにする。	
 def mousePressedWSectionM(doc, sheet, functionaccess, ent, target):
-	controller = doc.getCurrentController()  # コントローラの取得。
-	sheets = doc.getSheets()  # シートコレクションを取得。
-	txt = target.getString()  # クリックしたセルの文字列を取得。	
-
-	if txt=="予をﾘｾｯﾄ":
-		sheet[splittedrow:emptyrow, ichiran.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
-	elif txt=="入力支援":
-		
-		pass  # 入力支援odsを開く。
+	celladdress = target.getCellAddress()
+	r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。
+	if c>ent.keikacolumn:
+		pass
+	else:
+		datarange = sheet[ent.splittedrow:ent.emptyrow, :ent.keikacolumn+1]
+		datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
+		datarows.sort(key=lambda x:x[c])  # 各行を列インデックスcでソート。
+		datarange.setDataArray(datarows)  # シートに代入する。
 	
-	elif txt=="退院ﾘｽﾄ":
-		controller.setActiveSheet(sheets["退院"])
+	
+	
+	
+# 	controller = doc.getCurrentController()  # コントローラの取得。
+# 	sheets = doc.getSheets()  # シートコレクションを取得。
+# 	txt = target.getString()  # クリックしたセルの文字列を取得。	
+# 
+# 	if txt=="予をﾘｾｯﾄ":
+# 		sheet[splittedrow:emptyrow, ichiran.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
+# 	elif txt=="入力支援":
+# 		
+# 		pass  # 入力支援odsを開く。
+# 	
+# 	elif txt=="退院ﾘｽﾄ":
+# 		controller.setActiveSheet(sheets["退院"])
 	return False  # セル編集モードにしない。	
 def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ent, target):
 	createFormatKey = commons.formatkeyCreator(doc)
