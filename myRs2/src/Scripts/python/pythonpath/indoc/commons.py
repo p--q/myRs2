@@ -1,7 +1,6 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
-import unohelper
-import os
+import os, unohelper
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
 from com.sun.star.datatransfer import UnsupportedFlavorException
@@ -9,6 +8,7 @@ from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
 from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
+from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH  # enum
 COLORS = {\
 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -85,6 +85,14 @@ def createBorders():# 枠線の作成。
 	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
 	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
 	return noneline, tableborder2, topbottomtableborder, leftrighttableborder  # 作成した枠線をまとめたタプル。
+def convertKanaFULLWIDTH(transliteration, kanatxt):  # カナ名を半角からスペースを削除して全角にして返す。
+	transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
+	kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
+	return transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
+def createKeikaPathname(doc, transliteration, idtxt, kanatxt, filename):
+	kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+	dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
+	return os.path.join(dirpath, "*", filename.format(kanatxt, idtxt))  # ワイルドカード入のシートファイル名を取得。	
 def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	i = 0  # インデックスを初期化する。
 	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。

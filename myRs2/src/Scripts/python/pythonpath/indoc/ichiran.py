@@ -8,7 +8,7 @@ from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX, ERRORBOX  # enum
-from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH, FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
+from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
@@ -222,7 +222,7 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 				return True  # セル編集モードにする。		
 	elif c==ichiran.kanacolumn:  # カナ名列の時。
 		if keikatxt:  # 経過列がすでにある時。
-			kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+			kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 			systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
 		else:
 			return True  # セル編集モードにする。		
@@ -396,11 +396,12 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			elif rangeaddress.StartColumn in (ichiran.datecolumn+1,):  # 経過列の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
 				idtxt, dummy, kanatxt = sheet[startrow, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]			
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-				for i, systempath in enumerate(glob.iglob(createKeikaPathname(ctx, smgr, doc, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+				for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
 					addMenuentry("ActionTrigger", {"Text": os.path.basename(systempath), "CommandURL": baseurl.format("entry{}".format(21+i))}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
@@ -452,7 +453,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		sheets = doc.getSheets()
 		datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
 		idtxt, dummy, kanatxt, datevalue = datarow
-		kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。
 		k = kanatxt[0]  # 最初のカナ文字を取得。カタカナであることは入力時にチェック済。
 		kana = "ア", "カ", "サ", "タ", "ナ", "ハ", "マ", "ヤ", "ラ", "ワ"
@@ -499,7 +500,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
 		idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]
-		for i, systempath in enumerate(glob.iglob(createKeikaPathname(doc, transliteration, idtxt, kanatxt), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+		for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
 			if i==c:  # インデックスが一致する時。
 				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
 				break
@@ -520,14 +521,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
 		elif entrynum==10:  # 新入院からUnstableへ移動。
 			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
-def createKeikaPathname(doc, transliteration, idtxt, kanatxt):
-	kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
-	dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
-	return os.path.join(dirpath, "*", "{}{}経_*開始.ods".format(kanatxt, idtxt))  # ワイルドカード入の経過シートファイル名を取得。	
-def convertKanaFULLWIDTH(transliteration, kanatxt):  # カナ名を半角からスペースを削除して全角にして返す。
-	transliteration.loadModuleNew((HALFWIDTH_FULLWIDTH,), Locale(Language = "ja", Country = "JP"))
-	kanatxt = kanatxt.replace(" ", "")  # 半角空白を除去してカナ名を取得。
-	return transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ｶﾅを全角に変換。
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):

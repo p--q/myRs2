@@ -1,10 +1,11 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
-from indoc import commons
-# from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
+import glob, os, unohelper
+from indoc import commons, ichiran
+from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
-from com.sun.star.awt import MouseButton
-
+from com.sun.star.awt import MouseButton  # 定数
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Ent():  # シート固有の定数設定。
 	def __init__(self, sheet):
 		self.menurow  = 0  # メニュー行インデックス。
@@ -38,6 +39,9 @@ def getSectionName(sheet, target):  # 区画名を取得。
 		sectionname = "A"  
 	ent.sectionname = sectionname   # 区画名
 	return ent
+def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "ﾘｽﾄに戻る"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = target.getSpreadsheet()
@@ -49,124 +53,52 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-				functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 				ent = getSectionName(sheet, target)
 				sectionname	= ent.sectionname	
+				celladdress = target.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。
 				if sectionname=="M":
-					return mousePressedWSectionM(doc, sheet, functionaccess, ent, target)			
+					return mousePressedWSectionM(doc, sheet, ent, target, c)			
 				elif sectionname=="B":
 					systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ent, target)
-				elif sectionname=="A":
-					pass
+					return mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, target, r, c)
+				elif sectionname=="A":  # ID列が空欄の時。キーボードからの入力は想定しない。
+					sortRows(sheet, ent, c)  # 昇順にソート。
+					return False  # セル編集モードにしない。	
 	return True  # セル編集モードにする。	
-def mousePressedWSectionM(doc, sheet, functionaccess, ent, target):
-	celladdress = target.getCellAddress()
-	r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。
-	if c>ent.keikacolumn:
-		pass
-	else:
-		datarange = sheet[ent.splittedrow:ent.emptyrow, :ent.keikacolumn+1]
-		datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
-		datarows.sort(key=lambda x:x[c])  # 各行を列インデックスcでソート。
-		datarange.setDataArray(datarows)  # シートに代入する。
-	
-	
-	
-	
-# 	controller = doc.getCurrentController()  # コントローラの取得。
-# 	sheets = doc.getSheets()  # シートコレクションを取得。
-# 	txt = target.getString()  # クリックしたセルの文字列を取得。	
-# 
-# 	if txt=="予をﾘｾｯﾄ":
-# 		sheet[splittedrow:emptyrow, ichiran.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
-# 	elif txt=="入力支援":
-# 		
-# 		pass  # 入力支援odsを開く。
-# 	
-# 	elif txt=="退院ﾘｽﾄ":
-# 		controller.setActiveSheet(sheets["退院"])
-	return False  # セル編集モードにしない。	
-def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ent, target):
-	createFormatKey = commons.formatkeyCreator(doc)
-	controller = doc.getCurrentController()  # コントローラの取得。
-	sheets = doc.getSheets()  # シートコレクションを取得。	
-	celladdress = target.getCellAddress()
-	r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-	sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, keikatxt = sheet[r, :ichiran.checkstartcolumn-1].getDataArray()[0]  # 日付はfloatで返ってくる。	
-	datevalue = datevalue and int(datevalue)  # 計算しにくいのでdatevalueがあるときはfloatを整数にしておく。	
-	if keikatxt and c==0:  # 経過列があり、かつ、済列の時。
-		items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
-		items.append(items[0])  # 最初の要素を最後の要素に追加する。
-		dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
-		target.setString(dic[sumitxt][0])
-		sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
-		refreshCounts(sheet, ichiran)  # カウントを更新する。
-	elif keikatxt and c==ichiran.yocolumn:  # 経過列があり、かつ、予列の時。
-		if yotxt:
-			target.clearContents(CellFlags.STRING)  # 予をクリア。
-		else:  # セルの文字列が空の時。
-			target.setString("予")
-	elif c==ichiran.idcolumn:  # ID列の時。
-		if keikatxt:  # 経過列がある時。
-			systemclipboard.setContents(commons.TextTransferable(idtxt), None)  # クリップボードにIDをコピーする。
-		else:
-			return True  # セル編集モードにする。		
-	elif c==ichiran.idcolumn+1:  # 漢字列の時。カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
-		if keikatxt and idtxt in sheets:  # 経過列があり、かつ、ID名のシートが存在する時。
-			controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
-		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
-			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
-				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				newsheet = sheets[idtxt]  # カルテシートを取得。  
-				karuteconsts = karute.Karute(newsheet)	
-				karutedatecell = newsheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
-				karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
-				karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-				newsheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
-				controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。	
-			else:
-				return True  # セル編集モードにする。		
-	elif c==ichiran.kanacolumn:  # カナ名列の時。
-		if keikatxt:  # 経過列がすでにある時。
-			kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
-			systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
-		else:
-			return True  # セル編集モードにする。		
-	elif c==ichiran.datecolumn:  # 入院日列の時。
-		if keikatxt:  # 経過列がすでにある時。
-			return True  # セル編集モードにする。
-		else:
-			todaydatevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-			if datevalue:  # すでに日付が入っている時。
-				items = [todaydatevalue-1, todaydatevalue-2, todaydatevalue, todaydatevalue+1]
-				items.append(items[0])  # 最初の要素を最後の要素に追加する。
-				dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
-				if datevalue in dic:
-					datevalue = dic[datevalue]
-				else:
-					return True  # セル編集モードにする。
-			else:
-				datevalue = todaydatevalue
-			target.setValue(datevalue)
-			target.setPropertyValue("NumberFormat", createFormatKey('YYYY/MM/DD'))
-	elif c==ichiran.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
-		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
-		if keikatxt and newsheetname in sheets:  # 経過列がすでにあり、かつ、経過シートがある時。。		
-			controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-		else:  # 経過シートがなければ作成する。
-			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
-				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				if newsheetname in sheets:  # すでに経過シートがある時。
-					keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-				else:	
-					sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
-					keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-					keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-					keika.setDates(doc, keikasheet, keikasheet["I2"], datevalue)  # 経過シートの日付を設定。
-				controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
+def mousePressedWSectionM(doc, sheet, ent, target, c):
+	if c>ent.keikacolumn:  # 経過列より右の時。
+		txt = target.getString()
+		if txt=="ﾘｽﾄに戻る":
+			controller = doc.getCurrentController()  # コントローラの取得。
+			sheets = doc.getSheets()
+			controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。	
+	elif c<ent.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
+		sortRows(sheet, ent, c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		
+def sortRows(sheet, ent, c, *, reverse=None):
+	datarange = sheet[ent.splittedrow:ent.emptyrow, :ent.keikacolumn+1]
+	datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
+	datarows.sort(key=lambda x:x[c], reverse=reverse)  # 各行を列インデックスcでソート。
+	datarange.setDataArray(datarows)  # シートに代入する。	
+def mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, target, r, c):
+	if c==ent.idcolumn:  # ID列の時。
+		systemclipboard.setContents(commons.TextTransferable(target.getString()), None)  # クリップボードにIDをコピーする。
+	elif c==ent.kanacolumn:  # カナ名列の時。
+		idtxt, dummy, kanatxt = sheet[r, :ent.kanacolumn+1].getDataArray()[0]
+		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+		systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
+	elif c==ent.datecolumn+1:  # リスト消去日列の時。
+		datarows = sheet[r, ent.idcolumn:ent.datecolumn].getDataArray()  # ID、漢字名、カナ名を取得。
+		sheets = doc.getSheets()
+		ichiransheet = sheets["一覧"]
+		ichiranconsts = ichiran.Ichiran(ichiransheet)
+		datarange = ichiransheet[ichiranconsts.emptyrow, ichiranconsts.idcolumn:ichiranconsts.datecolumn]
+		datarange.setDataArray(datarows)
+		controller = doc.getCurrentController()  # コントローラの取得。
+		controller.setActiveSheet(ichiransheet)
+	return False  # セル編集モードにしない。			
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source
 	sheet = controller.getActiveSheet()
@@ -182,11 +114,81 @@ def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	ent = getSectionName(sheet, cell)
 	sectionname = ent.sectionname	
-	if sectionname in ("M", ):
+	if sectionname in ("M", "A"):
 		return	
 	noneline, dummy, topbottomtableborder, dummy = borders	
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
-	if sectionname in ("A", "B"):
+	if sectionname in ("B",):
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。					
-
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	ent = getSectionName(sheet, target)  # セル固有の定数を取得。
+	sectionname = ent.sectionname  # クリックしたセルの区画名を取得。		
+	if sectionname in ("M", ):  # 固定行より上の時はコンテクストメニューを表示しない。
+		return EXECUTE_MODIFIED
+	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
+	startrow = rangeaddress.StartRow
+	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
+		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
+			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+			startcolumn = rangeaddress.StartColumn
+			idtxt, dummy, kanatxt = sheet[startrow, ent.idcolumn:ent.datecolumn].getDataArray()[0]
+			filename = ""
+			if startcolumn in (ent.datecolumn,):  # 入院日列の時。
+				filename = "{}{}_*入院.ods"  # カルテシートファイル名。
+			elif startcolumn in (ent.keikacolumn,):  # 経過列の時。
+				filename = "{}{}経_*開始.ods"  # 経過シートファイル名。
+			if filename:  # ファイル名が取得出来ている時。		
+				for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, filename), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+					addMenuentry("ActionTrigger", {"Text": os.path.basename(systempath), "CommandURL": baseurl.format("entry{}".format(21+i))}) 
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。				
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader":  # 列ヘッダーの時。
+		pass
+	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	desktop = xscriptcontext.getDesktop()
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	selection = controller.getSelection()  # 選択範囲を取得。
+	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+	r = rangeaddress.StartRow
+	ent = Ent(sheet)  # シート固有の値を取得。
+	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+	if entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
+		startentrynum = 21
+		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
+		idtxt, dummy, kanatxt = sheet[r, ent.idcolumn:ent.datecolumn].getDataArray()[0]
+		startcolumn = rangeaddress.StartColumn
+		if startcolumn in (ent.datecolumn,):  # 入院日列の時。
+			filename = "{}{}_*入院.ods"  # カルテシートファイル名。
+		elif startcolumn in (ent.keikacolumn,):  # 経過列の時。
+			filename = "{}{}経_*開始.ods"  # 経過シートファイル名。		
+		for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, filename), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
+			if i==c:  # インデックスが一致する時。
+				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
+				break
