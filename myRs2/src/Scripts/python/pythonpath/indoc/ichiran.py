@@ -211,12 +211,15 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
 				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				newsheet = sheets[idtxt]  # カルテシートを取得。  
-				karuteconsts = karute.Karute(newsheet)	
-				karutedatecell = newsheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
-				karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
-				karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-				newsheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+				if idtxt in sheets:  # すでに経過シートがある時。
+					newsheet = sheets[idtxt]  # カルテシートを取得。  
+				else:
+					sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
+					karuteconsts = karute.Karute(newsheet)	
+					karutedatecell = newsheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
+					karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+					karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+					newsheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 				controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		

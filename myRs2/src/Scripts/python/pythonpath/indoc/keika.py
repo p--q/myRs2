@@ -6,15 +6,18 @@ from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER  # enum
-from com.sun.star.awt import MouseButton  # 定数
+from com.sun.star.awt import MouseButton, MessageBoxButtons  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
+from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
-	def __init__(self):
+	def __init__(self, sheet):
 		self.daterow = 1  # 日付行インデックス。
 		self.splittedrow = 4  # 分割行インデックス。
 		self.yakucolumn = 5  # 薬名列インデックス。
 		self.splittedcolumn = 8  # 分割列インデックス。
+		cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
+		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。		
 def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
@@ -23,11 +26,12 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	-----------  # 薬品列の最下行の一つ下の行。
 	E  ||  F
 	"""
-	keika = Keika()  # クラスをインスタンス化。	
+	keika = Keika(sheet)  # クラスをインスタンス化。	
 	splittedrow = keika.splittedrow
 	splittedcolumn = keika.splittedcolumn
-	cellranges = sheet[:, keika.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
-	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
+	emptyrow = keika.emptyrow
+# 	cellranges = sheet[:, keika.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
+# 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[splittedrow:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "D"	
@@ -78,10 +82,20 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 					elif txt=="ｶﾙﾃへ":
-						pass
+						idtxt = sheet["F2"].getString().split(" ")[0]  # 半角スペースで分割して最初の要素を取得。
+						if not idtxt.isdigit():  # IDに数値以外が混じっている時。
+							msg = "IDが取得できませんでした。"	
+							componentwindow = controller.ComponentWindow
+							msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+							msgbox.execute()	
+							return False  # セル編集モードにしない						
+						sheets = doc.getSheets()
+						if idtxt in sheets:  # ID名のシートがあるとき。
+							controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
 						
 						
 						
+					return False  # セル編集モードにしない。	
 						
 						
 # 						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
