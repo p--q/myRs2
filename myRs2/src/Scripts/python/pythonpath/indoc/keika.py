@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import calendar
-from indoc import commons
+from indoc import commons, ichiran
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 from com.sun.star.sheet import CellFlags  # 定数
@@ -82,7 +82,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 					elif txt=="ｶﾙﾃへ":
-						idtxt = sheet["F2"].getString().split(" ")[0]  # 半角スペースで分割して最初の要素を取得。
+						datarow = sheet[2, keika.yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
+						idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
+						idtxt = idcelltxts[0]  # 最初の要素を取得。
 						if not idtxt.isdigit():  # IDに数値以外が混じっている時。
 							msg = "IDが取得できませんでした。"	
 							componentwindow = controller.ComponentWindow
@@ -92,8 +94,20 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						sheets = doc.getSheets()
 						if idtxt in sheets:  # ID名のシートがあるとき。
 							controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
-						
-						
+						else:
+							if len(idcelltxts)==5:
+								
+							
+							kanjitxt, kanatxt = idcelltxts[-2:]
+							
+							idcelltxts[-2:]
+							
+							
+							
+							
+							datevalue = datarow[-1]
+							karutesheet = ichiran.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
+							controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
 						
 					return False  # セル編集モードにしない。	
 						

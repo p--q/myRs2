@@ -211,16 +211,8 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
 				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				if idtxt in sheets:  # すでに経過シートがある時。
-					newsheet = sheets[idtxt]  # カルテシートを取得。  
-				else:
-					sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
-					karuteconsts = karute.Karute(newsheet)	
-					karutedatecell = newsheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
-					karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
-					karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-					newsheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
-				controller.setActiveSheet(newsheet)  # カルテシートをアクティブにする。	
+				karutesheet = getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
+				controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		
 	elif c==ichiran.kanacolumn:  # カナ名列の時。
@@ -253,15 +245,31 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
 				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				if newsheetname in sheets:  # すでに経過シートがある時。
-					keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-				else:	
-					sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
-					keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-					keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-					keika.setDates(doc, keikasheet, keikasheet["I2"], datevalue)  # 経過シートの日付を設定。
+				keikasheet =  getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
+def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+	if idtxt in sheets:  # すでに経過シートがある時。
+		karutesheet = sheets[idtxt]  # カルテシートを取得。  
+	else:
+		sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
+		karutesheet = sheets[idtxt]  # カルテシートを取得。  
+		karuteconsts = karute.Karute(karutesheet)	
+		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
+		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+	return karutesheet
+def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
+	if newsheetname in sheets:  # すでに経過シートがある時。
+		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+	else:	
+		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
+		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+		keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+		keika.setDates(doc, keikasheet, keikasheet["I2"], datevalue)  # 経過シートの日付を設定。
+	return keikasheet
 def mousePressedWSectionD(sheet, ichiran, target):
 	txt = target.getString()  # クリックしたセルの文字列を取得。	
 	celladdress = target.getCellAddress()
