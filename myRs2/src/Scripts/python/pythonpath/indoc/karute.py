@@ -3,7 +3,7 @@
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from datetime import date, datetime, timedelta
 from itertools import chain
-from indoc import commons
+from indoc import commons, ichiran
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
@@ -136,6 +136,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				karute = getSectionName(sheet, target)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
 				txt = target.getString()  # クリックしたセルの文字列を取得。	
+				createFormatKey = commons.formatkeyCreator(doc)	
 				if sectionname in ("A",):
 					sheets = doc.getSheets()  # シートコレクションを取得。
 					if txt=="一覧へ":
@@ -144,10 +145,26 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
 						if newsheetname in sheets:  # 経過シート名がある時。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-						else:
-							# 経過シートの作成。
-							
-							pass
+						else:  # 経過シートの作成。
+							idcelltxts = sheet["G2"].getString().split(" ")  # 半角スペースで分割。
+							idtxt = idcelltxts[0]  # 最初の要素を取得。
+							if idtxt.isdigit():  # IDが数値のみの時。					
+								sheets = doc.getSheets()
+								if idtxt in sheets:  # ID名のシートがあるとき。
+									controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
+								else:
+									if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
+										kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
+										datevalue = sheet["C3"].getValue()
+										keikasheet =  ichiran.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+										controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
+									else:
+										commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
+							else:
+								commons.showErrorMessageBox(controller, "IDが取得できませんでした。")		
+					elif txt[:8].isdigit():  # 最初8文字が数値の時。
+						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 					return False  # セルを編集モードにしない。
 				elif sectionname in ("B",):						
 					if txt=="COPY":
@@ -202,7 +219,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							newdatarows.append(datarow)
 						datarange.setDataArray(newdatarows)
 						sheet[splittedrow:bluerow, karute.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
-						createFormatKey = commons.formatkeyCreator(doc)	
 						sheet[splittedrow:bluerow, karute.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 						sheet[splittedrow:bluerow, karute.subjectcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
 					return False  # セルを編集モードにしない。
@@ -254,7 +270,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
 								sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
 								sheet[emptyrow:endrowbelow, sharpcolumn:sharpcolumn+len(newdatarows[0])].setDataArray(newdatarows)
-								createFormatKey = commons.formatkeyCreator(doc)	
 								sheet[emptyrow:endrowbelow, karute.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 								datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。
 						return False  # セルを編集モードにしない。
@@ -272,7 +287,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						elif txt=="#":
 							datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。						
 							sheet[r, c:c+2].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
-							createFormatKey = commons.formatkeyCreator(doc)	
 							target.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 							sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
 							return False  # セルを編集モードにしない。
@@ -285,7 +299,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							else:
 								datevalue = ""
 						sheet[r, c-1:c+1].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
-						createFormatKey = commons.formatkeyCreator(doc)	
 						sheet[r, c-1].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 						target.setPropertyValue("CharColor", commons.COLORS["white"])					
 						return False  # セルを編集モードにしない。

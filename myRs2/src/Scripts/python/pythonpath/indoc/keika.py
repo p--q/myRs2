@@ -9,6 +9,7 @@ from com.sun.star.table.CellHoriJustify import CENTER  # enum
 from com.sun.star.awt import MouseButton, MessageBoxButtons  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
+from com.sun.star.beans import PropertyValue  # Struct
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
 	def __init__(self, sheet):
@@ -17,7 +18,9 @@ class Keika():  # シート固有の定数設定。
 		self.yakucolumn = 5  # 薬名列インデックス。
 		self.splittedcolumn = 8  # 分割列インデックス。
 		cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
-		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。		
+		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
+		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in (commons.COLORS["black"],))
+		self.blackrow = next(gene)  # 黒行インデックスを取得。			
 def getSectionName(sheet, target):  # 区画名を取得。
 	"""
 	A  ||  B
@@ -76,62 +79,99 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				controller = doc.getCurrentController()  # コントローラの取得。
 				keika = getSectionName(sheet, target)  # セル固有の定数を取得。
 				sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
+				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="A":
-					txt = target.getString()  # クリックしたセルの文字列を取得。	
 					sheets = doc.getSheets()  # シートコレクションを取得。
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
-					elif txt=="ｶﾙﾃへ":
-						datarow = sheet[2, keika.yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
+					elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
+						datarow = sheet[1, keika.yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
 						idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
 						idtxt = idcelltxts[0]  # 最初の要素を取得。
-						if not idtxt.isdigit():  # IDに数値以外が混じっている時。
-							msg = "IDが取得できませんでした。"	
-							componentwindow = controller.ComponentWindow
-							msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-							msgbox.execute()	
-							return False  # セル編集モードにしない						
-						sheets = doc.getSheets()
-						if idtxt in sheets:  # ID名のシートがあるとき。
-							controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
+						if idtxt.isdigit():  # IDが数値のみの時。					
+							sheets = doc.getSheets()
+							if idtxt in sheets:  # ID名のシートがあるとき。
+								controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
+							else:
+								if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
+									kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
+									datevalue = datarow[-1]
+									karutesheet = ichiran.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
+									controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
+								else:
+									commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
 						else:
-							if len(idcelltxts)==5:
+							commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
+					elif txt=="薬品整理":  # クリックするたびに初使用順、昇順に並び替える。黒行の上のみ。
+						if keika.splittedrow>keika.blackrow:
+							ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+							smgr = ctx.getServiceManager()  # サービスマネージャーの取得。								
+							datarange = sheet[keika.splittedrow:keika.blackrow, :]  # 黒行より上の行のセル範囲を取得。
+							datarange[:, 0].setDataArray([(i,) for i in range(keika.blackrow-keika.splittedrow)])  # 列インデックス0に行の順番を代入。
+							datarows = list(datarange.getDataArray())  # 行をリストにして取得。
+							sortkeycolumnindex = keika.yakucolumn  # 薬名列インデックスを取得。
+							datarows.sort(key=lambda x:x[sortkeycolumnindex])  # 各行を薬名列インデックスでソート。
+							
+							
+							
+							controller.select(datarange)
+							propertyvalue = PropertyValue(Name="Col1", Value=keika.yakucolumn)  # 薬名列インデックスでソートする。
+							dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+							dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, (propertyvalue,))
+
+							
+# 							datarange.sort()
+							
+							
+							
+							datarows = list(map(list, datarange.getDataArray()))  # 各行をリストにして取得。
+							orders = list(range(len(datarows)))  # 昇順の番号のリストを取得。
+							for i in orders:
+								datarows[i][0] = i  # 列インデックス0に行の順番を代入。
+							sortkeycolumnindex = keika.yakucolumn  # 薬名列インデックスを取得。
+							
+							datarows.sort(key=lambda x:x[sortkeycolumnindex])  # 各行を薬名列インデックスでソート。
+							
+							if orders==[datarows[i][0] for i in orders]:  # 順番が入れ替わっていない時、初使用順にソートする。
+								for i in range(keika.splittedrow, keika.blackrow-keika.splittedrow):  # 分割行インデックスから、黒行の前まで。
+									for j in range(keika.splittedcolumn, 1024-keika.splittedcolumn):  # 開始日列インデックスから最終列まで。
+										if sheet[i, j].getPropertyValue()!=-1:  # 背景色がある時。
+											datarows[i][0] = j  # データ行の0列目に列インデックスを代入。
+											break
+										
+								datarows.sort(key=lambda x:x[0])  # 各行を列インデックス0でソート。
 								
-							
-							kanjitxt, kanatxt = idcelltxts[-2:]
-							
-							idcelltxts[-2:]
-							
-							
+							datarange.setDataArray(datarows)
+							sheet[keika.splittedrow:keika.blackrow, 0].clearContents(511)  # 黒行より上の列インデックス0のセルをクリア。
+					elif txt=="薬品名抽出":
+						pass
 							
 							
-							datevalue = datarow[-1]
-							karutesheet = ichiran.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
-							controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
-						
+							
+					elif txt[:8].isdigit():  # 最初8文字が数値の時。
+						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
+						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 					return False  # セル編集モードにしない。	
-						
-						
-# 						newsheetname = "".join([sheet.getName(), "経"])  # 経過シート名を取得。
-# 						if newsheetname in sheets:  # 経過シート名がある時。
-# 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
-# 						else:
-# 							pass
-								
-				
-				
-				
-				
-# 				ichiran = getSectionName(controller, sheet, target)
-# 				section, startrow, emptyrow, sumi_retu, dstart = ichiran.sectionname, ichiran.startrow, ichiran.emptyrow, ichiran.sumi_retu, ichiran.dstart
-# 				celladdress = target.getCellAddress()
-# 				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。		
-# 				
-				
-				
-				
-				
-				
+				elif sectionname=="B":
+					celladdress = target.getCellAddress()
+					r = celladdress.Row  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
+					items = []
+					if r==2:	
+						items = ["", "○", "尿"]						
+					elif r==3:
+						items = ["", "胸Xp", "腹ｴ", "心ｴ"]
+					if items:
+						if txt in items:  # セルの内容にある時。
+							items.append(items[0])  # 最初の要素を最後の要素に追加する。
+							dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
+							txt = dic[txt]  # 次の要素を代入する。	
+							target.setString(txt)
+					if txt:  # 文字がある時。
+						target.setPropertyValue("CellBackColor", commons.colors["skyblue"])  # 背景をスカイブルーにする。		
+					else:
+						target.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
 	return True  # セル編集モードにする。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source

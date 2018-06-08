@@ -93,6 +93,10 @@ def createKeikaPathname(doc, transliteration, idtxt, kanatxt, filename):
 	kanatxt = convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 	dirpath = os.path.dirname(unohelper.fileUrlToSystemPath(doc.getURL()))  # このドキュメントのあるディレクトリのフルパスを取得。
 	return os.path.join(dirpath, "*", filename.format(kanatxt, idtxt))  # ワイルドカード入のシートファイル名を取得。	
+def showErrorMessageBox(controller, msg):
+	componentwindow = controller.ComponentWindow
+	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+	msgbox.execute()
 def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	i = 0  # インデックスを初期化する。
 	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。
