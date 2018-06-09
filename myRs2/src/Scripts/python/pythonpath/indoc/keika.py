@@ -11,6 +11,8 @@ from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 
+
+
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
 	def __init__(self, sheet):
@@ -82,6 +84,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
 				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="A":
+					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
 					sheets = doc.getSheets()  # シートコレクションを取得。
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
@@ -103,60 +107,53 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 									commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
 						else:
 							commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
-					elif txt=="薬品整理":  # クリックするたびに初使用順、昇順に並び替える。黒行の上のみ。
-						if keika.splittedrow>keika.blackrow:
-							ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-							smgr = ctx.getServiceManager()  # サービスマネージャーの取得。								
+					elif txt=="薬品整理":  # クリックするたびに終了順、昇順に並び替える。黒行の上のみ。
+						if keika.splittedrow>keika.blackrow:  # 分割行から黒行より上に行がある時のみ。
 							datarange = sheet[keika.splittedrow:keika.blackrow, :]  # 黒行より上の行のセル範囲を取得。
-							
-							
-							
-							
-							
-							datarange[:, 0].setDataArray([(i,) for i in range(keika.blackrow-keika.splittedrow)])  # 列インデックス0に行の順番を代入。
-							datarows = list(datarange.getDataArray())  # 行をリストにして取得。
-							sortkeycolumnindex = keika.yakucolumn  # 薬名列インデックスを取得。
-							datarows.sort(key=lambda x:x[sortkeycolumnindex])  # 各行を薬名列インデックスでソート。
-							
-							
-							
-							controller.select(datarange)
-							propertyvalue = PropertyValue(Name="Col1", Value=keika.yakucolumn)  # 薬名列インデックスでソートする。
+							controller.select(datarange)  # ソートするセル範囲を取得。
+							if target.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
+								target.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # ボタンの背景色を付ける。				
+								props = PropertyValue(Name="Col1", Value=keika.yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
+							else:  # ボタンの背景色がある時、終了順でソート。終了列インデックスを先頭列に代入しておく。
+								datarows = []  # 終了行インデックスを入れる行のリスト。
+								for i in range(keika.blackrow-keika.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
+									cellranges = datarange[i, keika.splittedcolumn:].queryContentCells(CellFlags.STRING)  # 文字列のあるセル範囲コレクションを取得。
+									if len(cellranges):  # セル範囲が取得出来た時。
+										datarows.append((cellranges.getRangeAddresses()[-1].EndColumn,))  # 最終列インデックスを取得。
+									else:
+										datarows.append((1,))  # 色セルがない行は1にして上に持ってくる。0にするとFalseになってしまう。
+								datarange[:, 0].setDataArray(datarows)  # 開始列インデックスをシートに代入。
+								datarange[:, 0].setPropertyValue("CharColor", commons.COLORS["white"])  # 先頭列の文字色を白色にする。
+								target.setPropertyValue("CellBackColor", -1)  # ボタンの背景色を消す。		
+								props = PropertyValue(Name="Col1", Value=1),  # Col1の番号は優先順位。Valueはインデックス+1。 
 							dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-							dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, (propertyvalue,))
-
-							
-# 							datarange.sort()
-							
-							
-							
-							datarows = list(map(list, datarange.getDataArray()))  # 各行をリストにして取得。
-							orders = list(range(len(datarows)))  # 昇順の番号のリストを取得。
-							for i in orders:
-								datarows[i][0] = i  # 列インデックス0に行の順番を代入。
-							sortkeycolumnindex = keika.yakucolumn  # 薬名列インデックスを取得。
-							
-							datarows.sort(key=lambda x:x[sortkeycolumnindex])  # 各行を薬名列インデックスでソート。
-							
-							if orders==[datarows[i][0] for i in orders]:  # 順番が入れ替わっていない時、初使用順にソートする。
-								for i in range(keika.splittedrow, keika.blackrow-keika.splittedrow):  # 分割行インデックスから、黒行の前まで。
-									for j in range(keika.splittedcolumn, 1024-keika.splittedcolumn):  # 開始日列インデックスから最終列まで。
-										if sheet[i, j].getPropertyValue()!=-1:  # 背景色がある時。
-											datarows[i][0] = j  # データ行の0列目に列インデックスを代入。
-											break
-										
-								datarows.sort(key=lambda x:x[0])  # 各行を列インデックス0でソート。
-								
-							datarange.setDataArray(datarows)
-							sheet[keika.splittedrow:keika.blackrow, 0].clearContents(511)  # 黒行より上の列インデックス0のセルをクリア。
+							dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
+							controller.select(target)  # ボタンを選択し直す。	
 					elif txt=="薬品名抽出":
-						pass
+						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (keika.yakucolumn+1, keika.yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
+						if firstrow<keika.emptyrow:
+							datarows = []
+							for i in sheet[firstrow:keika.emptyrow, keika.yakucolumn].getDataArray():  # 用法設定していない薬品列の各行のタプルについて。
+								if i[0].endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時削除する。
+									continue
+								if i[0] in ("ペンニードル", "ビタメジン", "ブドウ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):
+									continue
+								if not i[0] in datarows:  # まだ追加していない要素の時のみ。
+									datarows.append((i[0],))
+						
+						
+						
+						
+						cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
+						self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。						
+						
+						datarange = sheet[keika.blackrow:keika.emptyrow, keika.yakucolumn:keika.splittedcolumn]  # 黒行より下の行の回数列までのセル範囲を取得。
 							
 							
 							
-					elif txt[:8].isdigit():  # 最初8文字が数値の時。
-						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
+							
+							
+					elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 					return False  # セル編集モードにしない。	
