@@ -10,6 +10,7 @@ from com.sun.star.awt import MouseButton, MessageBoxButtons  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
+
 # from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
 	def __init__(self, sheet):
@@ -107,6 +108,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 							smgr = ctx.getServiceManager()  # サービスマネージャーの取得。								
 							datarange = sheet[keika.splittedrow:keika.blackrow, :]  # 黒行より上の行のセル範囲を取得。
+							
+							
+							
+							
+							
 							datarange[:, 0].setDataArray([(i,) for i in range(keika.blackrow-keika.splittedrow)])  # 列インデックス0に行の順番を代入。
 							datarows = list(datarange.getDataArray())  # 行をリストにして取得。
 							sortkeycolumnindex = keika.yakucolumn  # 薬名列インデックスを取得。
