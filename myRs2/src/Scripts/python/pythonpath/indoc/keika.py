@@ -1,19 +1,20 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
+# 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
-from indoc import commons, ichiran
+from itertools import chain
+from indoc import commons, ichiran, dialogs
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 from com.sun.star.sheet import CellFlags  # 定数
-from com.sun.star.table.CellHoriJustify import CENTER  # enum
+from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
 from com.sun.star.awt import MouseButton, MessageBoxButtons  # 定数
-from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
+from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
+from com.sun.star.lang import Locale  # Struct
 
 
-
-# from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 class Keika():  # シート固有の定数設定。
 	def __init__(self, sheet):
 		self.daterow = 1  # 日付行インデックス。
@@ -55,7 +56,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3:F4"].setDataArray((("薬品整理",), ("薬品名抽出",)))
-	keika = Keika()
+	keika = Keika(sheet)
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
@@ -131,26 +132,32 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					elif txt=="薬品名抽出":
 						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (yakucolumn+1, yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
 						if firstrow<keika.emptyrow:
-							newdatarows = []
+							transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+							transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
 							datarows = sheet[firstrow:keika.emptyrow, yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
-							datarowlength = len(datarows)
-							for i, datarow in enumerate(datarows):  # 行の相対インデックスとともにイテレートする。
-								if datarow[0].endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
-									if datarow[0] in ("ペンニードル", "ビタメジン", "ブドウ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
+							sep = "*sep*"  # 区切り文字。
+							concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
+							transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
+							rowtxts = concatenetedtxt.split(sep)  # 区切り文字で分割。
+							rowtxtslength = len(rowtxts)
+							newdatarows = []
+							for i, rowtxt in enumerate(rowtxts):  # 行の相対インデックスとともにイテレートする。
+								if rowtxt.endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
+									if rowtxt in ("ﾍﾟﾝﾆｰﾄﾞﾙ", "ﾋﾞﾀﾒｼﾞﾝ", "ﾌﾞﾄﾞｳ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
 										continue									
 									for j in range(i+1, i+4):  # 3行下の行まで。
-										if j<datarowlength:  # j行が存在する時。
-											if "1日間" in datarows[j][0]:  # j行に"1日間"がある時。
-												if j+1<datarowlength:  # j+1行が存在する時。
-													if not "日間" in datarows[j+1][0]:  # j+1行に"日間"がない時。
+										if j<rowtxtslength:  # j行が存在する時。
+											if "1日間" in rowtxts[j]:  # j行に"1日間"がある時。
+												if j+1<rowtxtslength:  # j+1行が存在する時。
+													if not "日間" in rowtxts[j+1]:  # j+1行に"日間"がない時。
 														break  
 												else:  # "1日間"で終わっている時。
 													break	
 										else:
 											break
 									else:  # breakされなかった時。
-										if not datarow[0] in newdatarows:  # まだ追加していない要素の時のみ。
-											newdatarows.append((i[0],))  # その行を取得。
+										if not rowtxt in newdatarows:  # まだ追加していない要素の時のみ。
+											newdatarows.append((rowtxt,))  # その行を取得。
 							sheets[firstrow:keika.emptyrow, yakucolumn:keika.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
 							sheets[firstrow:firstrow+len(newdatarows), yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
 					elif txt[:8].isdigit():  # 最初8文字が数値の時。						
@@ -162,9 +169,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					r = celladdress.Row  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
 					items = []
 					if r==2:	
-						items = ["", "○", "尿"]						
+						items = ["", "○", "尿"]			
+						horijustify	= CENTER
 					elif r==3:
 						items = ["", "胸Xp", "腹ｴ", "心ｴ"]
+						horijustify	= LEFT
 					if items:
 						if txt in items:  # セルの内容にある時。
 							items.append(items[0])  # 最初の要素を最後の要素に追加する。
@@ -172,7 +181,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							txt = dic[txt]  # 次の要素を代入する。	
 							target.setString(txt)
 					if txt:  # 文字がある時。
-						target.setPropertyValue("CellBackColor", commons.colors["skyblue"])  # 背景をスカイブルーにする。		
+						target.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
 					else:
 						target.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
 					return False  # セル編集モードにしない。	
@@ -183,10 +192,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return True  # セル編集モードにする。
 					elif c==yakucolumn+1:  # 用法列の時。
 						if txt:
-							
-							
-							
+# 							dialogs.createDialog(xscriptcontext)
 							pass
+							
 						else:
 							target.setString("分3")
 					elif c==yakucolumn+2:  # 回数列の時。
@@ -218,8 +226,22 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
-	pass
-		
+	changes = changesevent.Changes	
+	for change in changes:
+		if change.Accessor=="cell-change":  # セルの値が変化した時。
+			target = change.ReplacedElement  # 値を変更したセルを取得。	
+			sheet = target.getSpreadsheet()
+			keika = getSectionName(sheet, target)  # 経過シート固有の定数を取得。
+			sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
+			if not sectionname in ("A",):  # 領域A以外の時。
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
+				txt = target.getString()  # セルの文字列を取得。	
+				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
+				target.setString(txt)
+			break
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -228,50 +250,72 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
-	target = controller.getSelection()  # 現在選択しているセル範囲を取得。	
+	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
 		keika = getSectionName(sheet, target)  # セル固有の定数を取得。
 		sectionname = keika.sectionname  # クリックしたセルの区画名を取得。			
-		if sectionname in ("A",):  # 固定行より上の時はコンテクストメニューを表示しない。
-			return EXECUTE_MODIFIED
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})		
-		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
-		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})			
+		if sectionname in ("A",):
+			if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				txt = target.getString()
+				if txt=="薬品整理":
+					addMenuentry("ActionTrigger", {"Text": "同薬品抽出", "CommandURL": baseurl.format("entry1")}) 
+					addMenuentry("ActionTrigger", {"Text": "同薬品結合", "CommandURL": baseurl.format("entry2")}) 
+			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+		elif sectionname in ("B",):
+			if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				celladdress = target.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
+				r = celladdress.Row
+				if r==keika.daterow:  # 日付行の時。
+					addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
+				elif r==keika.daterow+2:  # 処置行の時。
+					commons.cutcopypasteMenuEntries(addMenuentry)
+			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+		elif sectionname in ("D",):
+			if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				pass
+			elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+				
+				addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
+				addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry11")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
+				
+			
+			
+			
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+			commons.cutcopypasteMenuEntries(addMenuentry)
 		
 		
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 		karute.rng	addMenuentry("ActionTrigger", {"Text": "To blue", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
-# 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。
+# 		commons.cutcopypasteMenuEntries(addMenuentry)
 # 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-
-# 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
-# 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
-
-
-# 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
-# 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
-# 		pass  # contextmenuを操作しないとすべての項目が表示されない。
-# 	elif contextmenuname=="sheettab":  # シートタブの時。
-# 		del contextmenu[:]  # contextmenu.clear()は不可。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
+# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+# # 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# # 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
+# # 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+# # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
+	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
+		karute = getSectionName(sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
+		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
+		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
+			return EXECUTE_MODIFIED
+		if sectionname in ("C",):
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")}) 
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})   
+		elif sectionname in ("G",):
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})	
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader":  # 列ヘッダーの時。
+		pass
+	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
 	colors = commons.COLORS
 	if entrynum==1:

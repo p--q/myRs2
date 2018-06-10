@@ -331,29 +331,28 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 	changes = changesevent.Changes	
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
-			cell = change.ReplacedElement  # 値を変更したセルを取得。	
-			sheet = cell.getSpreadsheet()
+			target = change.ReplacedElement  # 値を変更したセルを取得。	
+			sheet = target.getSpreadsheet()
 			ichiran = Ichiran(sheet)  # 一覧シート固有の定数を取得。
-			celladdress = cell.getCellAddress()
+			celladdress = target.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column
 			if r>ichiran.splittedrow-1:  # 分割行以降の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))				
+				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))	
+				txt = target.getString()  # セルの文字列を取得。			
 				if c==ichiran.idcolumn:  # ID列の時。
-					txt = cell.getString()  # セルの文字列を取得。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
 					if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
-						cell.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
+						target.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
 				elif c==ichiran.kanacolumn:  # カナ列の時。
 					transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
 					transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。
-					txt = cell.getString()  # セルの文字列を取得。
 					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
 					if all(map(lambda x: "ｱ"<=x<="ﾝ", txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
-						cell.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
+						target.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
 					else:
 						msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
 						doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
@@ -361,10 +360,10 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 						componentwindow = controller.ComponentWindow
 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 						msgbox.execute()							
-						controller.select(cell)  # 元のセルに戻る。セル編集モードにするとおかしくなる。
+						controller.select(target)  # 元のセルに戻る。セル編集モードにするとおかしくなる。
 				elif c==ichiran.datecolumn:  # 日付列の時。
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-					cell.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+					target.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 			break
 def refreshCounts(sheet, ichiran):  # カウントを更新する。
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
