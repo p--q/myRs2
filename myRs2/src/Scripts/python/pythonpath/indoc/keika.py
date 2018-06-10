@@ -36,8 +36,6 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	splittedrow = keika.splittedrow
 	splittedcolumn = keika.splittedcolumn
 	emptyrow = keika.emptyrow
-# 	cellranges = sheet[:, keika.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
-# 	emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
 	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[splittedrow:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
 		sectionname = "D"	
@@ -82,6 +80,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				controller = doc.getCurrentController()  # コントローラの取得。
 				keika = getSectionName(sheet, target)  # セル固有の定数を取得。
 				sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
+				yakucolumn = keika.yakucolumn
 				txt = target.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="A":
 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -90,7 +89,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 					elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
-						datarow = sheet[1, keika.yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
+						datarow = sheet[1, yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
 						idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
 						idtxt = idcelltxts[0]  # 最初の要素を取得。
 						if idtxt.isdigit():  # IDが数値のみの時。					
@@ -113,7 +112,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							controller.select(datarange)  # ソートするセル範囲を取得。
 							if target.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
 								target.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # ボタンの背景色を付ける。				
-								props = PropertyValue(Name="Col1", Value=keika.yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
+								props = PropertyValue(Name="Col1", Value=yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
 							else:  # ボタンの背景色がある時、終了順でソート。終了列インデックスを先頭列に代入しておく。
 								datarows = []  # 終了行インデックスを入れる行のリスト。
 								for i in range(keika.blackrow-keika.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
@@ -130,29 +129,30 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
 							controller.select(target)  # ボタンを選択し直す。	
 					elif txt=="薬品名抽出":
-						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (keika.yakucolumn+1, keika.yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
+						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (yakucolumn+1, yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
 						if firstrow<keika.emptyrow:
-							datarows = []
-							for i in sheet[firstrow:keika.emptyrow, keika.yakucolumn].getDataArray():  # 用法設定していない薬品列の各行のタプルについて。
-								if i[0].endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時削除する。
-									continue
-								if i[0] in ("ペンニードル", "ビタメジン", "ブドウ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):
-									continue
-								if not i[0] in datarows:  # まだ追加していない要素の時のみ。
-									datarows.append((i[0],))
-						
-						
-						
-						
-						cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
-						self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。						
-						
-						datarange = sheet[keika.blackrow:keika.emptyrow, keika.yakucolumn:keika.splittedcolumn]  # 黒行より下の行の回数列までのセル範囲を取得。
-							
-							
-							
-							
-							
+							newdatarows = []
+							datarows = sheet[firstrow:keika.emptyrow, yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
+							datarowlength = len(datarows)
+							for i, datarow in enumerate(datarows):  # 行の相対インデックスとともにイテレートする。
+								if datarow[0].endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
+									if datarow[0] in ("ペンニードル", "ビタメジン", "ブドウ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
+										continue									
+									for j in range(i+1, i+4):  # 3行下の行まで。
+										if j<datarowlength:  # j行が存在する時。
+											if "1日間" in datarows[j][0]:  # j行に"1日間"がある時。
+												if j+1<datarowlength:  # j+1行が存在する時。
+													if not "日間" in datarows[j+1][0]:  # j+1行に"日間"がない時。
+														break  
+												else:  # "1日間"で終わっている時。
+													break	
+										else:
+											break
+									else:  # breakされなかった時。
+										if not datarow[0] in newdatarows:  # まだ追加していない要素の時のみ。
+											newdatarows.append((i[0],))  # その行を取得。
+							sheets[firstrow:keika.emptyrow, yakucolumn:keika.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
+							sheets[firstrow:firstrow+len(newdatarows), yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
 					elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
@@ -175,6 +175,36 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						target.setPropertyValue("CellBackColor", commons.colors["skyblue"])  # 背景をスカイブルーにする。		
 					else:
 						target.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
+					return False  # セル編集モードにしない。	
+				elif sectionname in ("C", "E"):
+					celladdress = target.getCellAddress()  # ターゲットのセルアドレスを取得。
+					r, c = celladdress.Row, celladdress.Column
+					if c==yakucolumn:  # 薬名列の時。
+						return True  # セル編集モードにする。
+					elif c==yakucolumn+1:  # 用法列の時。
+						if txt:
+							
+							
+							
+							pass
+						else:
+							target.setString("分3")
+					elif c==yakucolumn+2:  # 回数列の時。
+						if txt:
+							
+							
+							pass
+						else:
+							target.setString("持続")						
+					return False  # セル編集モードにしない。	
+				elif sectionname=="D":
+					if txt:
+						
+						
+						pass
+					else:
+						target.setString("止")								
+					return False  # セル編集モードにしない。		
 	return True  # セル編集モードにする。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source
