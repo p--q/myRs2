@@ -56,7 +56,7 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	splittedrow = ichiran.splittedrow
 	checkstartcolumn = ichiran.checkstartcolumn
 	memostartcolumn = ichiran.memostartcolumn
-	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	rangeaddress = target[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	emptyrow = ichiran.emptyrow
 	if len(sheet[ichiran.menurow, :checkstartcolumn].queryIntersection(rangeaddress)):  # メニューセルの時。
 		sectionname = "M"
@@ -267,8 +267,9 @@ def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, dateva
 	else:	
 		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-		keikasheet["F2"].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-		keika.setDates(doc, keikasheet, keikasheet["I2"], datevalue)  # 経過シートの日付を設定。
+		keikaconsts = keika.Keika(keikasheet)
+		keikasheet[keikaconsts.daterow, keikaconsts.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+		keika.setDates(doc, keikasheet, keikasheet[keikaconsts.daterow, keikaconsts.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet
 def mousePressedWSectionD(sheet, ichiran, target):
 	txt = target.getString()  # クリックしたセルの文字列を取得。	

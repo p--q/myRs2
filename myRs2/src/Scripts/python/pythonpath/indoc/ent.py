@@ -30,7 +30,7 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	A: ID列の最初の空行から下の部分。
 	"""
 	ent = Ent(sheet)  # クラスをインスタンス化。	
-	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	rangeaddress = target[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[ent.menurow, :].queryIntersection(rangeaddress)):  # メニューセルの時。
 		sectionname = "M"
 	elif len(sheet[ent.splittedrow:ent.emptyrow, :].queryIntersection(rangeaddress)):  # スクロールする部分のうちID欄が空欄でない行。

@@ -48,7 +48,7 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	bluerow = karute.bluerow
 	skybluerow = karute.skybluerow
 	redrow = karute.redrow
-	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	rangeaddress = target[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"
 	elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
@@ -146,7 +146,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						if newsheetname in sheets:  # 経過シート名がある時。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:  # 経過シートの作成。
-							idcelltxts = sheet["G2"].getString().split(" ")  # 半角スペースで分割。
+							idcelltxts = sheet[karute.splittedrow-1, karute.articlecolumn].getString().split(" ")  # 半角スペースで分割。
 							idtxt = idcelltxts[0]  # 最初の要素を取得。
 							if idtxt.isdigit():  # IDが数値のみの時。					
 								sheets = doc.getSheets()
@@ -155,7 +155,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								else:
 									if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 										kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
-										datevalue = sheet["C3"].getValue()
+										datevalue = sheet[karute.splittedrow, karute.datecolumn].getValue()
 										keikasheet =  ichiran.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 										controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 									else:
@@ -482,7 +482,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 # 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-		karute = getSectionName(sheet, target[0, 0])  # 選択範囲の最初のセルの定数を取得。
+		karute = getSectionName(sheet, target)  # 選択範囲の最初のセルの定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
 			return EXECUTE_MODIFIED
@@ -509,7 +509,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-		karute = getSectionName(sheet, selection[0, 0])
+		karute = getSectionName(sheet, selection)
 		splittedrow = karute.splittedrow
 		bluerow = karute.bluerow
 		skybluerow = karute.skybluerow
