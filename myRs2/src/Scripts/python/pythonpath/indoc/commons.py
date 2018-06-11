@@ -228,7 +228,7 @@ def entry19():
 	invokeMenuEntry(19)	
 def entry20():
 	invokeMenuEntry(20)	
-# これ以降はファイルの選択に使用する。ファイルが増えたら単に連番の関数を追加するだけで良い。
+# ファイルの選択はこれ以降を使用する。ファイルが増えたら単に連番の関数を追加するだけで良い。
 def entry21():
 	invokeMenuEntry(21)	
 def entry22():
