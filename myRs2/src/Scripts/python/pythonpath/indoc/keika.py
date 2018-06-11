@@ -278,17 +278,20 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				celladdress = target.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
 				r = celladdress.Row
 				if r==keika.daterow:  # 日付行の時。
-					addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
+					if target.getValue():  # セルに値があるとき。
+						addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
 				elif r==keika.daterow+2:  # 処置行の時。
 					commons.cutcopypasteMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 		elif sectionname in ("D", "F"):
-			if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-				pass
-			elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-				addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
-				addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry11")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
-				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+			addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
+			addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry11")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
+			
+# 			if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# 				pass
+# 			elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # セル以外のセル範囲の時、つまり連続した複数セルの時。
+# 				addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry11")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			commons.cutcopypasteMenuEntries(addMenuentry)
 		elif sectionname in ("C", "E", "G", "H"):	
 			commons.cutcopypasteMenuEntries(addMenuentry)
@@ -320,8 +323,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
-	keika = getSectionName(sheet, selection)	
-	
+# 	keika = getSectionName(sheet, selection)	
+	keika = Keika(sheet)	
 	
 		
 	
@@ -330,11 +333,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		pass
 	elif entrynum==2:  # 同薬品結合
 		pass
-	elif entrynum==5:  # 日付追加
-		setDates(doc, sheet, sheet[keika.daterow, keika.splittedcolumn], int(selection.getValue()))  # 経過シートの日付を設定。
-	elif entrynum==10:  # 処方
+	elif entrynum==5:  # 日付追加。selectionは単一セル。
+		setDates(doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
+		if int(selection.getString())!=1:  # 日付が１日でない時。
+			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
+			r, c = celladdress.Row, celladdress.Column
+			if c!=keika.splittedcolumn:  # 固定列でないとき。
+				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
+	elif entrynum==10:  # 処方。selectionは単一セルか複数セル。
 		pass		
-	elif entrynum==11:  # 翌月まで
+	elif entrynum==11:  # 翌月まで。selectionは複数セル。
 		pass		
 	
 	
@@ -373,7 +381,7 @@ def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日�
 	daycount = 100  # 経過シートに入力する日数。
 	celladdress = cell.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column
-	sheet[:r+1, c:].clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA+CellFlags.HARDATTR+CellFlags.STYLES)  # セルの内容を削除。
+	sheet[:r+1, c:].clearContents(511)  # 開始列より右の日付行の内容を削除。
 	endcolumn = c + daycount + 1
 	endcolumn = endcolumn if endcolumn<1024 else 1023  # 列インデックスの上限1023。
 	sheet[r, c:endcolumn].setDataArray(([i for i in range(datevalue, datevalue+daycount+1)],))  # 日時シリアル値を経過シートに入力。
