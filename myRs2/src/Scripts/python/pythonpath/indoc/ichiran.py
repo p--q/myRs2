@@ -12,7 +12,6 @@ from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIR
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
-from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 class Ichiran():  # シート固有の定数設定。
@@ -211,7 +210,7 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
 				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				karutesheet = getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
+				karutesheet = commons.getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
 				controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		
@@ -245,32 +244,9 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
 				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
-				keikasheet =  getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+				keikasheet =  commons.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
-def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
-	if idtxt in sheets:  # すでに経過シートがある時。
-		karutesheet = sheets[idtxt]  # カルテシートを取得。  
-	else:
-		sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
-		karutesheet = sheets[idtxt]  # カルテシートを取得。  
-		karuteconsts = karute.Karute(karutesheet)	
-		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
-		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
-		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
-	return karutesheet
-def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
-	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
-	if newsheetname in sheets:  # すでに経過シートがある時。
-		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-	else:	
-		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
-		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-		keikaconsts = keika.Keika(keikasheet)
-		keikasheet[keikaconsts.daterow, keikaconsts.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-		keika.setDates(doc, keikasheet, keikasheet[keikaconsts.daterow, keikaconsts.splittedcolumn], datevalue)  # 経過シートの日付を設定。
-	return keikasheet
 def mousePressedWSectionD(sheet, ichiran, target):
 	txt = target.getString()  # クリックしたセルの文字列を取得。	
 	celladdress = target.getCellAddress()
@@ -517,21 +493,21 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				break
 	elif len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
 		if entrynum==3:  # 未入院から新入院に移動。
-			toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
+			commons.toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
 		elif entrynum==4:  # StableからUnstableへ移動。
-			toOtherEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.redrow)
+			commons.toOtherEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.redrow)
 		elif entrynum==5:  # Stableから新入院へ移動。 
-			toNewEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.emptyrow)
+			commons.toNewEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.emptyrow)
 		elif entrynum==6:  # UnstableからStableへ移動。
-			toOtherEntry(sheet, rangeaddress, ichiran.redrow, ichiran.skybluerow)
+			commons.toOtherEntry(sheet, rangeaddress, ichiran.redrow, ichiran.skybluerow)
 		elif entrynum==7:  # Unstableから新入院へ移動。
-			toNewEntry(sheet, rangeaddress, ichiran.redrow, ichiran.emptyrow)
+			commons.toNewEntry(sheet, rangeaddress, ichiran.redrow, ichiran.emptyrow)
 		elif entrynum==8:  # 新入院から未入院へ移動。
-			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.bluerow)
+			commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.bluerow)
 		elif entrynum==9:  # 新入院からStableへ移動。
-			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
+			commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
 		elif entrynum==10:  # 新入院からUnstableへ移動。
-			toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
+			commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
@@ -561,24 +537,6 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 			msgbox.execute()	
 			return False
 	return detachSheet
-def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 新入院へ。新規行挿入は不要。
-	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
-	if endrowbelow>edgerow:
-		endrowbelow = edgerow
-	sourcerangeaddress = sheet[startrow:endrowbelow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。
-def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が必要な移動。
-	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
-	if endrowbelow>edgerow:
-		endrowbelow = edgerow
-	sourcerange = sheet[startrow:endrowbelow, :]  # 行挿入前にソースのセル範囲を取得しておく。
-	dest_rangeaddress = sheet[dest_row:dest_row+(endrowbelow-startrow), :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
-	sheet.insertCells(dest_rangeaddress, insert_rows)  # 空行を挿入。	
-	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
-	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
-	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
-	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	ichiran = getSectionName(sheet, cell)

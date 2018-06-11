@@ -9,6 +9,11 @@ from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
 from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH  # enum
+from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
+from com.sun.star.awt import MessageBoxButtons  # 定数
+from com.sun.star.table.CellHoriJustify import LEFT  # enum
+from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
+from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 COLORS = {\
 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -97,6 +102,53 @@ def showErrorMessageBox(controller, msg):
 	componentwindow = controller.ComponentWindow
 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 	msgbox.execute()
+def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+	if idtxt in sheets:  # すでに経過シートがある時。
+		karutesheet = sheets[idtxt]  # カルテシートを取得。  
+	else:
+		sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
+		karutesheet = sheets[idtxt]  # カルテシートを取得。  
+		karuteconsts = karute.Karute(karutesheet)	
+		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
+		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+	return karutesheet	
+def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
+	if newsheetname in sheets:  # すでに経過シートがある時。
+		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+	else:	
+		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
+		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
+		keikaconsts = keika.Keika(keikasheet)
+		keikasheet[keikaconsts.daterow, keikaconsts.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+		keika.setDates(doc, keikasheet, keikasheet[keikaconsts.daterow, keikaconsts.splittedcolumn], datevalue)  # 経過シートの日付を設定。
+	return keikasheet	
+def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 使用中最下行へ。新規行挿入は不要。
+	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
+	if endrowbelow>edgerow:
+		endrowbelow = edgerow
+	sourcerangeaddress = sheet[startrow:endrowbelow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
+	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
+	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。
+def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が必要な移動。
+	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
+	if endrowbelow>edgerow:
+		endrowbelow = edgerow
+	sourcerange = sheet[startrow:endrowbelow, :]  # 行挿入前にソースのセル範囲を取得しておく。
+	dest_rangeaddress = sheet[dest_row:dest_row+(endrowbelow-startrow), :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+	sheet.insertCells(dest_rangeaddress, insert_rows)  # 空行を挿入。	
+	sheet.queryIntersection(dest_rangeaddress).clearContents(511)  # 挿入した行の内容をすべてを削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
+	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
+	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。		
+	
+	
+	
+	
+	
+	
 def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	i = 0  # インデックスを初期化する。
 	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。

@@ -3,7 +3,7 @@
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from datetime import date, datetime, timedelta
 from itertools import chain
-from indoc import commons, ichiran
+from indoc import commons
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
@@ -156,7 +156,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 									if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 										kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
 										datevalue = sheet[karute.splittedrow, karute.datecolumn].getValue()
-										keikasheet =  ichiran.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+										keikasheet =  commons.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 										controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 									else:
 										commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
