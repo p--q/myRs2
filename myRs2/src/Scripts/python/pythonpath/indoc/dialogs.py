@@ -13,14 +13,14 @@
 # from com.sun.star.view.SelectionType import MULTI  # enum 
 # 
 # 
-# def createDialog(xscriptcontext):	
-# 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
-# 	containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
-# 	toolkit = containerwindow.getToolkit()  # ピアからツールキットを取得。  
-# 	m = 6  # コントロール間の間隔
+def createDialog(xscriptcontext):	
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
+	containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
+	toolkit = containerwindow.getToolkit()  # ピアからツールキットを取得。  
+	m = 6  # コントロール間の間隔
 # 	grid = {"PositionX": m, "PositionY": m, "Width": 100, "Height": 50, "ShowRowHeader": False, "ShowColumnHeader": False, "SelectionModel": MULTI, "VScroll": True, "PosSize": PosSize.POSSIZE}  # グリッドコントロールの基本プロパティ。
 # 	textbox = {"PositionX": m, "PositionY": YHeight(grid, m), "Height": 12, "PosSize": PosSize.POSSIZE}  # テクストボックスコントロールの基本プロパティ。
 # 	button = {"PositionY": textbox["PositionY"]-1, "Width": 23, "Height":textbox["Height"]+2, "PushButtonType": 2, "PosSize": PosSize.POSSIZE}  # ボタンの基本プロパティ。PushButtonTypeの値はEnumではエラーになる。VerticalAlignではtextboxと高さが揃わない。

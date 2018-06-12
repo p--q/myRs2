@@ -30,7 +30,7 @@ class Karute():  # シート固有の定数設定。
 		self.bluerow = next(gene)  # 青3行インデックス。
 		self.skybluerow = next(gene)  # スカイブルー行インデックス。
 		self.redrow = next(gene)  # 赤3行インデックス。		
-def getSectionName(sheet, target):  # 区画名を取得。
+def getSectionName(sheet, selection):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -48,7 +48,7 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	bluerow = karute.bluerow
 	skybluerow = karute.skybluerow
 	redrow = karute.redrow
-	rangeaddress = target[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+	rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
 	if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
 		sectionname = "A"
 	elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
@@ -122,20 +122,20 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (karute.datecolumn, karute.subjectcolumn, karute.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	sheet = target.getSpreadsheet()
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	sheet = selection.getSpreadsheet()
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
-		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(controller, sheet, target, commons.createBorders())  # 枠線の作成。
+				drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-				karute = getSectionName(sheet, target)  # セル固有の定数を取得。
+				karute = getSectionName(sheet, selection)  # セル固有の定数を取得。
 				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
-				txt = target.getString()  # クリックしたセルの文字列を取得。	
+				txt = selection.getString()  # クリックしたセルの文字列を取得。	
 				createFormatKey = commons.formatkeyCreator(doc)	
 				if sectionname in ("A",):
 					sheets = doc.getSheets()  # シートコレクションを取得。
@@ -198,7 +198,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						newdatarows = formatProblemList(karute.splittedrow, karute.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
 						copieddatecell = sheet[0, karute.articlecolumn]  # コピー日時セルを取得。	
 						copyCells(controller, copieddatecell, newdatarows)
-						target.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
+						selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
 					elif txt=="#分離":
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
 						splittedrow = karute.splittedrow
@@ -224,7 +224,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					return False  # セルを編集モードにしない。
 				elif sectionname in ("C", "E", "G", "I"):	
 					functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
-					celladdress = target.getCellAddress()
+					celladdress = selection.getCellAddress()
 					r, c = celladdress.Row, celladdress.Column  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
 					if c==0:  # 行挿列の時。
 						sheet.insertCells(sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
@@ -275,41 +275,41 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return False  # セルを編集モードにしない。
 					elif c==karute.sharpcolumn:  # #列の時。
 						if txt:
-							target.clearContents(CellFlags.STRING)
+							selection.clearContents(CellFlags.STRING)
 						else:
-							target.setString("#")
+							selection.setString("#")
 						return False  # セルを編集モードにしない。
 					elif c==karute.datecolumn:  # Date列の時。
 						if not txt:  # 空文字の時。
 							sheet[r, c:c+2].setDataArray((("#", ""),))  # Date列と日付列に値を代入。
-							target.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
+							selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
 							return False  # セルを編集モードにしない。
 						elif txt=="#":
 							datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。						
 							sheet[r, c:c+2].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
-							target.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+							selection.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 							sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
 							return False  # セルを編集モードにしない。
 					elif c==karute.datecolumn+1:  # 日付列の時。
 						datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 						if txt:  # 日付列は日付シリアル値しか入っていないはず。
-							celldatevalue = int(target.getValue())  # セルに入っているシリアル値を整数で取得。
+							celldatevalue = int(selection.getValue())  # セルに入っているシリアル値を整数で取得。
 							if celldatevalue>datevalue-2:  # 2日前までは1日遡る。
 								datevalue = celldatevalue - 1	
 							else:
 								datevalue = ""
 						sheet[r, c-1:c+1].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
 						sheet[r, c-1].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-						target.setPropertyValue("CharColor", commons.COLORS["white"])					
+						selection.setPropertyValue("CharColor", commons.COLORS["white"])					
 						return False  # セルを編集モードにしない。
 					elif c==karute.subjectcolumn:  # Subject列の時。
 						if not txt:  # 空文字の時。
-							target.setString("#")
-							target.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
+							selection.setString("#")
+							selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
 							return False  # セルを編集モードにしない。		
 						elif txt=="#":
-							target.setString("")
-							target.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
+							selection.setString("")
+							selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 					elif c==karute.subjectcolumn+1:  # S履歴列の時。
 						
 						
@@ -466,9 +466,9 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
-	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
-		karute = getSectionName(sheet, target)  # セル固有の定数を取得。
+		karute = getSectionName(sheet, selection)  # セル固有の定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
 			return EXECUTE_MODIFIED
@@ -477,14 +477,14 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
-# 		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
-# 		elif target.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+# 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
-	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-		karute = getSectionName(sheet, target)  # 選択範囲の最初のセルの定数を取得。
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+		karute = getSectionName(sheet, selection)  # 選択範囲の最初のセルの定数を取得。
 		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
-		if sectionname in ("A",) or target[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
+		if sectionname in ("A",) or selection[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
 			return EXECUTE_MODIFIED
 		if sectionname in ("C",):
 			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
