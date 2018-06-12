@@ -300,7 +300,11 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 		elif sectionname in ("D", "F"):
 			addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
-			addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry11")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
+			
+			addMenuentry("ActionTrigger", {"Text": "翌火へ", "CommandURL": baseurl.format("entry11")})
+			addMenuentry("ActionTrigger", {"Text": "翌金へ", "CommandURL": baseurl.format("entry12")})
+			
+			addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry13")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			commons.cutcopypasteMenuEntries(addMenuentry)
 		elif sectionname in ("C", "E", "G", "H"):	
@@ -377,10 +381,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum in (20, 21):	
 		if len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 行全体が選択されている場合もあるので列全体が選択されていることを確認する。
 			if entrynum==20:  # 退院翌日
-				
-				
-				selection[keika.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS[""])
+				selection[keika.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])
 			elif entrynum==21:  # 退院取消
+				
+				
+				
+				
 				pass
 	
 	
