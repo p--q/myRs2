@@ -216,9 +216,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return True  # セル編集モードにする。
 					elif c==yakucolumn+1:  # 用法列の時。
 						if txt:
-							dialogs.createDialog(xscriptcontext)
+# 							dialogs.createDialog(xscriptcontext)
 
-							
+							pass
 						else:
 							selection.setString("分3")
 					elif c==yakucolumn+2:  # 回数列の時。

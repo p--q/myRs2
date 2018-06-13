@@ -1,5 +1,5 @@
-# #!/opt/libreoffice5.4/program/python
-# # -*- coding: utf-8 -*-
+# # #!/opt/libreoffice5.4/program/python
+# # # -*- coding: utf-8 -*-
 # import unohelper, json
 # from datetime import datetime
 # from com.sun.star.awt import XMenuListener, XMouseListener
@@ -13,14 +13,14 @@
 # from com.sun.star.view.SelectionType import MULTI  # enum 
 # 
 # 
-def createDialog(xscriptcontext):	
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
-	containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
-	toolkit = containerwindow.getToolkit()  # ピアからツールキットを取得。  
-	m = 6  # コントロール間の間隔
+# def createDialog(xscriptcontext):	
+# 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+# 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+# 	docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
+# 	containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
+# 	toolkit = containerwindow.getToolkit()  # ピアからツールキットを取得。  
+# 	m = 6  # コントロール間の間隔
 # 	grid = {"PositionX": m, "PositionY": m, "Width": 100, "Height": 50, "ShowRowHeader": False, "ShowColumnHeader": False, "SelectionModel": MULTI, "VScroll": True, "PosSize": PosSize.POSSIZE}  # グリッドコントロールの基本プロパティ。
 # 	textbox = {"PositionX": m, "PositionY": YHeight(grid, m), "Height": 12, "PosSize": PosSize.POSSIZE}  # テクストボックスコントロールの基本プロパティ。
 # 	button = {"PositionY": textbox["PositionY"]-1, "Width": 23, "Height":textbox["Height"]+2, "PushButtonType": 2, "PosSize": PosSize.POSSIZE}  # ボタンの基本プロパティ。PushButtonTypeの値はEnumではエラーになる。VerticalAlignではtextboxと高さが揃わない。
@@ -40,14 +40,19 @@ def createDialog(xscriptcontext):
 # 	column1.ColumnWidth = grid["Width"] - column0.ColumnWidth  #  列幅。列の合計がグリッドコントロールの幅に一致するようにする。
 # 	gridcolumn.addColumn(column1)  # 列を追加。	
 # 	griddata = gridmodel.getPropertyValue("GridDataModel")  # GridDataModel
-# 	datarows = getSavedGridRows(doc, "Grid1")  # グリッドコントロールの行をhistoryシートのragenameから取得する。	
+# 	datarows = getSavedGridRows(doc, "Grid1")  # グリッドコントロールの行をhistoryシートのrangenameから取得する。	
+# 	
+# 	
 # 	now = datetime.now()  # 現在の日時を取得。
 # 	d = now.date().isoformat()
 # 	t = now.time().isoformat().split(".")[0]	
+# 	
+# 	
 # 	if datarows:  # 行のリストが取得出来た時。
 # 		griddata.insertRows(0, ("",)*len(datarows), datarows)  # グリッドに行を挿入。
 # 	else:
 # 		griddata.addRow("", (t, d))  # 現在の行を入れる。
+# 		
 # 	textbox1, textbox2 = [textbox.copy() for dummy in range(2)]
 # 	textbox1["Width"] = 34
 # 	textbox1["Text"] = t
