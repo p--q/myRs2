@@ -33,7 +33,7 @@ class Ichiran():  # シート固有の定数設定。
 		self.redrow = next(gene)  # 赤3行インデックス。	
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-def getSectionName(sheet, selection):  # 区画名を取得。
+def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	M  |
 	---
@@ -51,26 +51,27 @@ def getSectionName(sheet, selection):  # 区画名を取得。
 	E: スクロールする部分のうちチェック列より右の部分。
 	A: ID列の最初の空行から下の部分。
 	"""
-	ichiran = Ichiran(sheet)  # クラスをインスタンス化。	
-	splittedrow = ichiran.splittedrow
-	checkstartcolumn = ichiran.checkstartcolumn
-	memostartcolumn = ichiran.memostartcolumn
-	rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	emptyrow = ichiran.emptyrow
-	if len(sheet[ichiran.menurow, :checkstartcolumn].queryIntersection(rangeaddress)):  # メニューセルの時。
-		sectionname = "M"
-	elif len(sheet[splittedrow:emptyrow, :checkstartcolumn].queryIntersection(rangeaddress)):  # Dの左。
-		sectionname = "B"	
-	elif len(sheet[splittedrow:emptyrow, checkstartcolumn:memostartcolumn].queryIntersection(rangeaddress)):  # チェック列の時。
-		sectionname = "D"		
-	elif len(sheet[splittedrow:emptyrow, memostartcolumn:].queryIntersection(rangeaddress)):  # Dの右。
-		sectionname = "E"		
-	elif len(sheet[emptyrow:, :].queryIntersection(rangeaddress)):  # まだデータのない行の時。
-		sectionname = "A"	
-	else:
-		sectionname = "C"  
-	ichiran.sectionname = sectionname   # 区画名
-	return ichiran
+	consts = Ichiran(sheet)  # クラスをインスタンス化。	
+	if selection is not None:
+		splittedrow = consts.splittedrow
+		checkstartcolumn = consts.checkstartcolumn
+		memostartcolumn = consts.memostartcolumn
+		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+		emptyrow = consts.emptyrow
+		if len(sheet[consts.menurow, :checkstartcolumn].queryIntersection(rangeaddress)):  # メニューセルの時。
+			sectionname = "M"
+		elif len(sheet[splittedrow:emptyrow, :checkstartcolumn].queryIntersection(rangeaddress)):  # Dの左。
+			sectionname = "B"	
+		elif len(sheet[splittedrow:emptyrow, checkstartcolumn:memostartcolumn].queryIntersection(rangeaddress)):  # チェック列の時。
+			sectionname = "D"		
+		elif len(sheet[splittedrow:emptyrow, memostartcolumn:].queryIntersection(rangeaddress)):  # Dの右。
+			sectionname = "E"		
+		elif len(sheet[emptyrow:, :].queryIntersection(rangeaddress)):  # まだデータのない行の時。
+			sectionname = "A"	
+		else:
+			sectionname = "C"  
+		consts.sectionname = sectionname   # 区画名
+	return consts
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
@@ -86,42 +87,39 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 				functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-				ichiran = getSectionName(sheet, selection)
-				sectionname	= ichiran.sectionname	
+				consts = getConsts(sheet, selection)
+				sectionname	= consts.sectionname	
 				if sectionname=="M":
-					return mousePressedWSectionM(doc, sheet, functionaccess, ichiran, selection)			
+					return mousePressedWSectionM(doc, sheet, functionaccess, consts, selection)			
 				elif not selection.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色でない時以外何もしない。
 					return False  # セル編集モードにしない。
 				elif sectionname=="B":
 					systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ichiran, selection)
+					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, consts, selection)
 				elif sectionname=="D":
-					return mousePressedWSectionD(sheet, ichiran, selection)
+					return mousePressedWSectionD(sheet, consts, selection)
 				elif sectionname=="A":
 # 					celladdress = selection.getCellAddress()
 # 					r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-# 					if c==ichiran.kanacolumn:  # カナ列の時。
+# 					if c==consts.kanacolumn:  # カナ列の時。
 
 						
 					pass  # 漢字名からｶﾅを取得する。つまりふりがなを降る。
 
 	return True  # セル編集モードにする。	
-def mousePressedWSectionM(doc, sheet, functionaccess, ichiran, selection):
+def mousePressedWSectionM(doc, sheet, functionaccess, consts, selection):
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheets = doc.getSheets()  # シートコレクションを取得。
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	if txt=="検予を反映":  # 経過シートから本日の検予を取得。
-		splittedrow, checkstartcolumn, memostartcolumn = ichiran.splittedrow, ichiran.checkstartcolumn, ichiran.memostartcolumn
-		cellranges = sheet[splittedrow:, ichiran.idcolumn].queryContentCells(CellFlags.STRING)  # ID列に文字列が入っているセルを取得。
-		headerrow = sheet[ichiran.menurow, checkstartcolumn:memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
+		splittedrow, checkstartcolumn, memostartcolumn = consts.splittedrow, consts.checkstartcolumn, consts.memostartcolumn
+		cellranges = sheet[splittedrow:, consts.idcolumn].queryContentCells(CellFlags.STRING)  # ID列に文字列が入っているセルを取得。
+		headerrow = sheet[consts.menurow, checkstartcolumn:memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
 		eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol\
 			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
-		keikaconsts = keika.Keika()  # 経過シートの定数を取得。
-		daterow = keikaconsts.daterow  # 経過シートの日付行インデックスを取得。
-		splittedcolumn = keikaconsts.splittedcolumn  # 日付列の最初の列インデックスを取得。
-		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-		c = splittedcolumn + todayvalue  # 分割列と今日の日付のシリアル値の和。
+		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
+		keikaconsts = None
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 			checkrange = sheet[splittedrow:splittedrow+len(iddatarows), checkstartcolumn:memostartcolumn]  # チェック列範囲を取得。
@@ -132,6 +130,11 @@ def mousePressedWSectionM(doc, sheet, functionaccess, ichiran, selection):
 					if not sheetname in sheets:  # 経過シートがない時は次のループに行く。
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
+					if keikaconsts is None:
+						keikaconsts = keika.getConsts(keikasheet)  # 経過シートの定数を取得。
+						daterow = keikaconsts.daterow  # 経過シートの日付行インデックスを取得。
+						splittedcolumn = keikaconsts.splittedcolumn  # 日付列の最初の列インデックスを取得。
+						c = splittedcolumn + todayvalue  # 分割列と今日の日付のシリアル値の和。
 					startdatevalue = int(keikasheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 					keikadatarows = keikasheet[daterow+1:daterow+3, c-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
 					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
@@ -163,15 +166,15 @@ def mousePressedWSectionM(doc, sheet, functionaccess, ichiran, selection):
 		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:
-			emptyrow = ichiran.emptyrow
+			emptyrow = consts.emptyrow
 			sheet[splittedrow:emptyrow, :].setPropertyValue("CharColor", commons.COLORS["black"])  # 文字色を黒色にする。
-			sheet[splittedrow:emptyrow, ichiran.sumicolumn].setDataArray([("未",)]*(emptyrow-splittedrow))  # 済列をリセット。
+			sheet[splittedrow:emptyrow, consts.sumicolumn].setDataArray([("未",)]*(emptyrow-splittedrow))  # 済列をリセット。
 			searchdescriptor = sheet.createSearchDescriptor()
 			searchdescriptor.setSearchString("済")
 			cellranges = sheet[splittedrow:emptyrow, checkstartcolumn:memostartcolumn].findAll(searchdescriptor)  # チェック列の「済」が入っているセル範囲コレクションを取得。
 			cellranges.setPropertyValue("CharColor", commons.COLORS["silver"])
 	elif txt=="予をﾘｾｯﾄ":
-		sheet[splittedrow:emptyrow, ichiran.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
+		sheet[splittedrow:emptyrow, consts.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
 	elif txt=="入力支援":
 		
 		pass  # 入力支援odsを開く。
@@ -179,13 +182,13 @@ def mousePressedWSectionM(doc, sheet, functionaccess, ichiran, selection):
 	elif txt=="退院ﾘｽﾄ":
 		controller.setActiveSheet(sheets["退院"])
 	return False  # セル編集モードにしない。	
-def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, ichiran, selection):
+def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, consts, selection):
 	createFormatKey = commons.formatkeyCreator(doc)
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheets = doc.getSheets()  # シートコレクションを取得。	
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-	sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, keikatxt = sheet[r, :ichiran.checkstartcolumn-1].getDataArray()[0]  # 日付はfloatで返ってくる。	
+	sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, keikatxt = sheet[r, :consts.checkstartcolumn-1].getDataArray()[0]  # 日付はfloatで返ってくる。	
 	datevalue = datevalue and int(datevalue)  # 計算しにくいのでdatevalueがあるときはfloatを整数にしておく。	
 	if keikatxt and c==0:  # 経過列があり、かつ、済列の時。
 		items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
@@ -193,34 +196,34 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
 		selection.setString(dic[sumitxt][0])
 		sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
-		refreshCounts(sheet, ichiran)  # カウントを更新する。
-	elif keikatxt and c==ichiran.yocolumn:  # 経過列があり、かつ、予列の時。
+		refreshCounts(sheet, consts)  # カウントを更新する。
+	elif keikatxt and c==consts.yocolumn:  # 経過列があり、かつ、予列の時。
 		if yotxt:
 			selection.clearContents(CellFlags.STRING)  # 予をクリア。
 		else:  # セルの文字列が空の時。
 			selection.setString("予")
-	elif c==ichiran.idcolumn:  # ID列の時。
+	elif c==consts.idcolumn:  # ID列の時。
 		if keikatxt:  # 経過列がある時。
 			systemclipboard.setContents(commons.TextTransferable(idtxt), None)  # クリップボードにIDをコピーする。
 		else:
 			return True  # セル編集モードにする。		
-	elif c==ichiran.idcolumn+1:  # 漢字列の時。カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
+	elif c==consts.idcolumn+1:  # 漢字列の時。カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
 		if keikatxt and idtxt in sheets:  # 経過列があり、かつ、ID名のシートが存在する時。
 			controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
-				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
+				fillColumns(transliteration, createFormatKey, sheet, r, consts, idtxt, kanjitxt, kanatxt, datevalue)
 				karutesheet = commons.getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
 				controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		
-	elif c==ichiran.kanacolumn:  # カナ名列の時。
+	elif c==consts.kanacolumn:  # カナ名列の時。
 		if keikatxt:  # 経過列がすでにある時。
 			kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 			systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
 		else:
 			return True  # セル編集モードにする。		
-	elif c==ichiran.datecolumn:  # 入院日列の時。
+	elif c==consts.datecolumn:  # 入院日列の時。
 		if keikatxt:  # 経過列がすでにある時。
 			return True  # セル編集モードにする。
 		else:
@@ -237,17 +240,17 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 				datevalue = todaydatevalue
 			selection.setValue(datevalue)
 			selection.setPropertyValue("NumberFormat", createFormatKey('YYYY/MM/DD'))
-	elif c==ichiran.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
+	elif c==consts.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		if keikatxt and newsheetname in sheets:  # 経過列がすでにあり、かつ、経過シートがある時。。		
 			controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
-				fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue)
+				fillColumns(transliteration, createFormatKey, sheet, r, consts, idtxt, kanjitxt, kanatxt, datevalue)
 				keikasheet =  commons.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
-def mousePressedWSectionD(sheet, ichiran, selection):
+def mousePressedWSectionD(sheet, consts, selection):
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	celladdress = selection.getCellAddress()
 	c = celladdress.Column  # selectionの行と列のインデックスを取得。		
@@ -264,7 +267,7 @@ def mousePressedWSectionD(sheet, ichiran, selection):
 		"面談": ["", "面"],\
 		"便指": ["", "済", "少", "無"]\
 	}
-	header = sheet[ichiran.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
+	header = sheet[consts.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
 	newtxt = txt
 	if header in dic:	
 		items = dic[header]	 # 順繰りのリストを取得。			
@@ -281,18 +284,18 @@ def mousePressedWSectionD(sheet, ichiran, selection):
 	color = commons.COLORS["silver"] if "済" in newtxt else -1
 	selection.setPropertyValue("CharColor", color)			
 	return False  # セル編集モードにしない。
-def fillColumns(transliteration, createFormatKey, sheet, r, ichiran, idtxt, kanjitxt, kanatxt, datevalue):		
+def fillColumns(transliteration, createFormatKey, sheet, r, consts, idtxt, kanjitxt, kanatxt, datevalue):		
 	locale = Locale(Language = "ja", Country = "JP")
 	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), locale)  # 変換モジュールをロード。	
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ひらがなをカタカナに変換		
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), locale)
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換								
-	cellstringaddress = sheet[r, ichiran.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
-	cell = sheet[r, ichiran.checkstartcolumn-1]
+	cellstringaddress = sheet[r, consts.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
+	cell = sheet[r, consts.checkstartcolumn-1]
 	cell.setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。	
 	cell.setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 
 	datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue, "経過"  # 他の列を追加。								
-	sheet[r, :ichiran.checkstartcolumn-1].setDataArray((datarow,))
+	sheet[r, :consts.checkstartcolumn-1].setDataArray((datarow,))
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source
 	sheet = controller.getActiveSheet()
@@ -310,20 +313,20 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
 			sheet = selection.getSpreadsheet()
-			ichiran = Ichiran(sheet)  # 一覧シート固有の定数を取得。
+			consts = getConsts(sheet)  # 一覧シート固有の定数を取得。
 			celladdress = selection.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column
-			if r>ichiran.splittedrow-1:  # 分割行以降の時。
+			if r>consts.splittedrow-1:  # 分割行以降の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
 				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))	
 				txt = selection.getString()  # セルの文字列を取得。			
-				if c==ichiran.idcolumn:  # ID列の時。
+				if c==consts.idcolumn:  # ID列の時。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
 					if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
 						selection.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
-				elif c==ichiran.kanacolumn:  # カナ列の時。
+				elif c==consts.kanacolumn:  # カナ列の時。
 					transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
 					transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。
 					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
@@ -338,13 +341,13 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 						msgbox.execute()							
 						controller.select(selection)  # 元のセルに戻る。セル編集モードにするとおかしくなる。
-				elif c==ichiran.datecolumn:  # 日付列の時。
+				elif c==consts.datecolumn:  # 日付列の時。
 					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 					selection.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 			break
-def refreshCounts(sheet, ichiran):  # カウントを更新する。
+def refreshCounts(sheet, consts):  # カウントを更新する。
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
-	datarange = sheet[ichiran.splittedrow:ichiran.emptyrow, ichiran.sumicolumn]
+	datarange = sheet[consts.splittedrow:consts.emptyrow, consts.sumicolumn]
 	searchdescriptor = sheet.createSearchDescriptor()
 	counts = []
 	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できない。
@@ -352,12 +355,12 @@ def refreshCounts(sheet, ichiran):  # カウントを更新する。
 		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
 		c = len([i for i in cellranges.getCells()]) if cellranges else 0  # セルで数えないといけない。
 		counts.append(c)
-	counts.append(ichiran.emptyrow-ichiran.splittedrow-3-sum(counts))  # 済、待、未、の順に数が入る。
+	counts.append(consts.emptyrow-consts.splittedrow-3-sum(counts))  # 済、待、未、の順に数が入る。
 	datarows[0][1] = sum(counts)
 	datarows[0][3] = counts[0]
 	datarows[1][1] = counts[2]
 	datarows[1][3] = counts[1]
-	sheet[:2, ichiran.memostartcolumn:ichiran.memostartcolumn+4].setDataArray(datarows)	
+	sheet[:2, consts.memostartcolumn:consts.memostartcolumn+4].setDataArray(datarows)	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -367,25 +370,25 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	ichiran = getSectionName(sheet, selection)  # セル固有の定数を取得。
-	sectionname = ichiran.sectionname  # クリックしたセルの区画名を取得。		
+	consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。		
 	if sectionname in ("M", "C"):  # 固定行より上の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
 	startrow = rangeaddress.StartRow
-	if startrow in (ichiran.bluerow, ichiran.skybluerow, ichiran.redrow):  # タイトル行の時。
+	if startrow in (consts.bluerow, consts.skybluerow, consts.redrow):  # タイトル行の時。
 		return EXECUTE_MODIFIED
 	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-			if rangeaddress.StartColumn in (ichiran.yocolumn,):  # 予列の時。
+			if rangeaddress.StartColumn in (consts.yocolumn,):  # 予列の時。
 				addMenuentry("ActionTrigger", {"Text": "退院ﾘｽﾄへ", "CommandURL": baseurl.format("entry1")}) 	
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-			elif rangeaddress.StartColumn in (ichiran.datecolumn+1,):  # 経過列の時。
+			elif rangeaddress.StartColumn in (consts.datecolumn+1,):  # 経過列の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
-				idtxt, dummy, kanatxt = sheet[startrow, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]			
+				idtxt, dummy, kanatxt = sheet[startrow, consts.idcolumn:consts.datecolumn].getDataArray()[0]			
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
@@ -402,12 +405,12 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 			commons.rowMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED
-		if startrow<ichiran.bluerow:  # 未入院
+		if startrow<consts.bluerow:  # 未入院
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry3")})  
-		elif startrow<ichiran.skybluerow:  # Stable
+		elif startrow<consts.skybluerow:  # Stable
 			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry4")})
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})	
-		elif startrow<ichiran.redrow:  # Unstable
+		elif startrow<consts.redrow:  # Unstable
 			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry6")})
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry7")}) 		
 		else:  # 新入院
@@ -433,12 +436,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	selection = controller.getSelection()  # 選択範囲を取得。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 	r = rangeaddress.StartRow
-	ichiran = Ichiran(sheet)  # シート固有の値を取得。
+	consts = getConsts(sheet)  # シート固有の値を取得。
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	if entrynum<3:  # セルのコンテクストメニュー。
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		sheets = doc.getSheets()
-		datarow = sheet[r, ichiran.idcolumn:ichiran.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		datarow = sheet[r, consts.idcolumn:consts.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
 		idtxt, dummy, kanatxt, datevalue = datarow
 		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。
@@ -471,7 +474,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 			datarow.extend((todayvalue, "経過"))
 			entsheet = sheets["退院"]  # 退院シートを取得。
-			entconsts = ent.Ent(entsheet)  # 退院シートの定数を取得。			
+			entconsts = ent.getConsts(entsheet)  # 退院シートの定数を取得。			
 			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
 			entsheet[entconsts.splittedrow:entconsts.emptyrow+1, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
 			searchdescriptor = sheet.createSearchDescriptor()
@@ -486,27 +489,27 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
-		idtxt, dummy, kanatxt = sheet[r, ichiran.idcolumn:ichiran.datecolumn].getDataArray()[0]
+		idtxt, dummy, kanatxt = sheet[r, consts.idcolumn:consts.datecolumn].getDataArray()[0]
 		for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
 			if i==c:  # インデックスが一致する時。
 				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
 				break
 	elif entrynum==3:  # 未入院から新入院に移動。
-		commons.toNewEntry(sheet, rangeaddress, ichiran.bluerow, ichiran.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, consts.bluerow, consts.emptyrow)
 	elif entrynum==4:  # StableからUnstableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.redrow)
+		commons.toOtherEntry(sheet, rangeaddress, consts.skybluerow, consts.redrow)
 	elif entrynum==5:  # Stableから新入院へ移動。 
-		commons.toNewEntry(sheet, rangeaddress, ichiran.skybluerow, ichiran.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, consts.skybluerow, consts.emptyrow)
 	elif entrynum==6:  # UnstableからStableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, ichiran.redrow, ichiran.skybluerow)
+		commons.toOtherEntry(sheet, rangeaddress, consts.redrow, consts.skybluerow)
 	elif entrynum==7:  # Unstableから新入院へ移動。
-		commons.toNewEntry(sheet, rangeaddress, ichiran.redrow, ichiran.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, consts.redrow, consts.emptyrow)
 	elif entrynum==8:  # 新入院から未入院へ移動。
-		commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.bluerow)
+		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.bluerow)
 	elif entrynum==9:  # 新入院からStableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.skybluerow)
+		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.skybluerow)
 	elif entrynum==10:  # 新入院からUnstableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, ichiran.emptyrow, ichiran.redbluerow)
+		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.redbluerow)
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
@@ -538,8 +541,8 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	return detachSheet
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	ichiran = getSectionName(sheet, cell)
-	sectionname = ichiran.sectionname	
+	consts = getConsts(sheet, cell)
+	sectionname = consts.sectionname	
 	if sectionname in ("M", ):
 		return	
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	

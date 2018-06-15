@@ -26,7 +26,7 @@ class Keika():  # シート固有の定数設定。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in (commons.COLORS["black"],))
 		self.blackrow = next(gene)  # 黒行インデックスを取得。			
-def getSectionName(sheet, selection):  # 区画名を取得。
+def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -37,46 +37,47 @@ def getSectionName(sheet, selection):  # 区画名を取得。
 	G  ||  H
 	
 	"""
-	keika = Keika(sheet)
-	splittedrow = keika.splittedrow
-	splittedcolumn = keika.splittedcolumn
-	blackrow = keika.blackrow
-	emptyrow = keika.emptyrow
-	rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	sectionname = ""
-	if splittedrow<blackrow:
-		if len(sheet[splittedrow:blackrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "C"			
-		elif len(sheet[splittedrow:blackrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "D"			
-	elif blackrow+1<emptyrow:
-		if len(sheet[blackrow+1:emptyrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "E"				
-		elif len(sheet[blackrow+1:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "F"	
-	if not sectionname:		
-		if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "A"	
-		elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "B"					
-		elif len(sheet[emptyrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "G"					
-		elif len(sheet[emptyrow:, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "H"
-		else:
-			sectionname = "I"
-	keika.sectionname = sectionname  # 区画名
-	return keika  
+	consts = Keika(sheet)
+	if selection is not None:
+		splittedrow = consts.splittedrow
+		splittedcolumn = consts.splittedcolumn
+		blackrow = consts.blackrow
+		emptyrow = consts.emptyrow
+		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+		sectionname = ""
+		if splittedrow<blackrow:
+			if len(sheet[splittedrow:blackrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+				sectionname = "C"			
+			elif len(sheet[splittedrow:blackrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+				sectionname = "D"			
+		elif blackrow+1<emptyrow:
+			if len(sheet[blackrow+1:emptyrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+				sectionname = "E"				
+			elif len(sheet[blackrow+1:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+				sectionname = "F"	
+		if not sectionname:		
+			if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+				sectionname = "A"	
+			elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+				sectionname = "B"					
+			elif len(sheet[emptyrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
+				sectionname = "G"					
+			elif len(sheet[emptyrow:, splittedcolumn:].queryIntersection(rangeaddress)): 
+				sectionname = "H"
+			else:
+				sectionname = "I"
+		consts.sectionname = sectionname  # 区画名
+	return consts  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3:F4"].setDataArray((("薬品整理",), ("薬品名抽出",)))
-	keika = Keika(sheet)
+	consts = getConsts(sheet)
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
-	daterow = keika.daterow
-	splittedcolumn = keika.splittedcolumn
+	daterow = consts.daterow
+	splittedcolumn = consts.splittedcolumn
 	startdatevalue = int(sheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 	sheet[daterow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
@@ -94,9 +95,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 				controller = doc.getCurrentController()  # コントローラの取得。
-				keika = getSectionName(sheet, selection)  # セル固有の定数を取得。
-				sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
-				yakucolumn = keika.yakucolumn
+				consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+				sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
+				yakucolumn = consts.yakucolumn
 				txt = selection.getString()  # クリックしたセルの文字列を取得。	
 				if sectionname=="A":
 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -105,7 +106,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					if txt=="一覧へ":
 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 					elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
-						datarow = sheet[1, yakucolumn:keika.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
+						datarow = sheet[1, yakucolumn:consts.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
 						idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
 						idtxt = idcelltxts[0]  # 最初の要素を取得。
 						if idtxt.isdigit():  # IDが数値のみの時。					
@@ -123,16 +124,16 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						else:
 							commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
 					elif txt=="薬品整理":  # クリックするたびに終了順、昇順に並び替える。黒行の上のみ。
-						if keika.splittedrow>keika.blackrow:  # 分割行から黒行より上に行がある時のみ。
-							datarange = sheet[keika.splittedrow:keika.blackrow, :]  # 黒行より上の行のセル範囲を取得。
+						if consts.splittedrow>consts.blackrow:  # 分割行から黒行より上に行がある時のみ。
+							datarange = sheet[consts.splittedrow:consts.blackrow, :]  # 黒行より上の行のセル範囲を取得。
 							controller.select(datarange)  # ソートするセル範囲を取得。
 							if selection.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
 								selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # ボタンの背景色を付ける。				
 								props = PropertyValue(Name="Col1", Value=yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
 							else:  # ボタンの背景色がある時、終了順でソート。終了列インデックスを先頭列に代入しておく。
 								datarows = []  # 終了行インデックスを入れる行のリスト。
-								for i in range(keika.blackrow-keika.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
-									cellranges = datarange[i, keika.splittedcolumn:].queryContentCells(CellFlags.STRING)  # 文字列のあるセル範囲コレクションを取得。
+								for i in range(consts.blackrow-consts.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
+									cellranges = datarange[i, consts.splittedcolumn:].queryContentCells(CellFlags.STRING)  # 文字列のあるセル範囲コレクションを取得。
 									if len(cellranges):  # セル範囲が取得出来た時。
 										datarows.append((cellranges.getRangeAddresses()[-1].EndColumn,))  # 最終列インデックスを取得。
 									else:
@@ -146,10 +147,10 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							controller.select(selection)  # ボタンを選択し直す。	
 					elif txt=="薬品名抽出":
 						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (yakucolumn+1, yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
-						if firstrow<keika.emptyrow:
+						if firstrow<consts.emptyrow:
 							transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 							transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
-							datarows = sheet[firstrow:keika.emptyrow, yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
+							datarows = sheet[firstrow:consts.emptyrow, yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
 							sep = "*sep*"  # 区切り文字。
 							concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
 							transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
@@ -173,7 +174,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 									else:  # breakされなかった時。
 										if not rowtxt in newdatarows:  # まだ追加していない要素の時のみ。
 											newdatarows.append((rowtxt,))  # その行を取得。
-							sheets[firstrow:keika.emptyrow, yakucolumn:keika.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
+							sheets[firstrow:consts.emptyrow, yakucolumn:consts.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
 							sheets[firstrow:firstrow+len(newdatarows), yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
 					elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
@@ -188,7 +189,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
 						c = celladdress.Column  # ダブルクリックしたセルの列インデックスを取得。
-						datevalue = int(sheet[keika.daterow, c].getValue())
+						datevalue = int(sheet[consts.daterow, c].getValue())
 						m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 						selection.setString(txtCycle(["", "{}月".format(m)], txt))
 						return False  # セル編集モードにしない。
@@ -259,8 +260,8 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
 			sheet = selection.getSpreadsheet()
-			keika = getSectionName(sheet, selection)  # 経過シート固有の定数を取得。
-			sectionname = keika.sectionname  # クリックしたセルの区画名を取得。
+			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
+			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
 			if not sectionname in ("A",):  # 領域A以外の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
@@ -279,8 +280,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	keika = getSectionName(sheet, selection)  # セル固有の定数を取得。
-	sectionname = keika.sectionname  # クリックしたセルの区画名を取得。		
+	consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。		
 	if contextmenuname=="cell":  # セルのとき		
 		if sectionname in ("A",):
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
@@ -293,10 +294,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
 				celladdress = selection.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
 				r = celladdress.Row
-				if r==keika.daterow:  # 日付行の時。
+				if r==consts.daterow:  # 日付行の時。
 					if selection.getValue():  # セルに値があるとき。
 						addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
-				elif r==keika.daterow+2:  # 処置行の時。
+				elif r==consts.daterow+2:  # 処置行の時。
 					commons.cutcopypasteMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 		elif sectionname in ("D", "F"):
@@ -328,8 +329,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		commons.rowMenuEntries(addMenuentry)
 	elif contextmenuname=="colheader" and len(selection[:, 0].getColumns())==len(sheet[:, 0].getColumns()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		if sectionname in ("B",):
-			if len(selection[0, :].getColumns())==1 and selection[0, 0].getCellAddress().Column>keika.splittedcolumn:  # 選択列数が1つだけ、かつ、固定列より右の時。
-				if selection[keika.blackrow, 0].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 選択範囲の黒行のセルの背景色が黒色の時。
+			if len(selection[0, :].getColumns())==1 and selection[0, 0].getCellAddress().Column>consts.splittedcolumn:  # 選択列数が1つだけ、かつ、固定列より右の時。
+				if selection[consts.blackrow, 0].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 選択範囲の黒行のセルの背景色が黒色の時。
 					addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
 				else:
 					addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
@@ -341,7 +342,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
-	keika = getSectionName(sheet, selection)	
+	consts = getConsts(sheet, selection)	
 	if entrynum==1:  # 同薬品抽出
 		
 		
@@ -356,7 +357,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		if int(selection.getString())!=1:  # 日付が１日でない時。
 			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
 			r, c = celladdress.Row, celladdress.Column
-			if c!=keika.splittedcolumn:  # 固定列でないとき。
+			if c!=consts.splittedcolumn:  # 固定列でないとき。
 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
 	elif entrynum==10:  # 処方。selectionは単一セルか複数セル。
 		
@@ -368,8 +369,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	
 	elif 14<entrynum<20:
 		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
-		blackrow = keika.blackrow
-		emptyrow = keika.emptyrow
+		blackrow = consts.blackrow
+		emptyrow = consts.emptyrow
 		if entrynum==15:  # 使用中最上行へ
 			commons.toOtherEntry(sheet, rangeaddress, blackrow, blackrow+1)
 		elif entrynum==16:  # 使用中最下行へ
@@ -382,16 +383,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			commons.toNewEntry(sheet, rangeaddress, blackrow, emptyrow) 
 	elif entrynum in (20, 21):	
 		if entrynum==20:  # 退院翌日
-			selection[keika.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける。
+			selection[consts.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける。
 		elif entrynum==21:  # 退院取消
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 			dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
 			docframe = controller.getFrame()
 			c = selection[0, 0].getCellAddress().Column  # 選択セル範囲の一番上のセルの列インデックスを取得。
-			controller.select(sheet[keika.splittedrow:, c-1])  # 選択列の左の列を選択。
+			controller.select(sheet[consts.splittedrow:, c-1])  # 選択列の左の列を選択。
 			dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # コピー。
-			controller.select(sheet[keika.splittedrow:, c])  # 元の列を選択し直す。
+			controller.select(sheet[consts.splittedrow:, c])  # 元の列を選択し直す。
 			nvs = ("Flags", "T"),\
 				("FormulaCommand", 0),\
 				("SkipEmptyCells", False),\
@@ -452,8 +453,8 @@ def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindex
 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	keika = getSectionName(sheet, cell)
-	sectionname = keika.sectionname
+	consts = getConsts(sheet, cell)
+	sectionname = consts.sectionname
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
 	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。

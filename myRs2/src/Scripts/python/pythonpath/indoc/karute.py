@@ -30,7 +30,7 @@ class Karute():  # シート固有の定数設定。
 		self.bluerow = next(gene)  # 青3行インデックス。
 		self.skybluerow = next(gene)  # スカイブルー行インデックス。
 		self.redrow = next(gene)  # 赤3行インデックス。		
-def getSectionName(sheet, selection):  # 区画名を取得。
+def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	A  ||  B
 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
@@ -42,53 +42,54 @@ def getSectionName(sheet, selection):  # 区画名を取得。
 	-----------  # Date列の文字列があるセルの背景色が赤3の行。
 	I  ||  J
 	"""
-	karute = Karute(sheet)  # クラスをインスタンス化。	
-	splittedrow = karute.splittedrow
-	splittedcolumn = karute.splittedcolumn
-	bluerow = karute.bluerow
-	skybluerow = karute.skybluerow
-	redrow = karute.redrow
-	rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-		sectionname = "A"
-	elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-		sectionname = "B"
-	elif len(sheet[:bluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
-		sectionname = "C"
-	elif len(sheet[:bluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
-		sectionname = "D"
-	elif len(sheet[:skybluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
-		sectionname = "E"
-	elif len(sheet[:skybluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
-		sectionname = "F"	
-	elif len(sheet[:redrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-		sectionname = "G"
-	elif len(sheet[:redrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-		sectionname = "H"	
-	elif len(sheet[redrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
-		sectionname = "I"  
-	else:
-		sectionname = "J" 
-	karute.sectionname = sectionname   # 区画名	
-	return karute  
+	consts = Karute(sheet)  # クラスをインスタンス化。	
+	if selection is not None:
+		splittedrow = consts.splittedrow
+		splittedcolumn = consts.splittedcolumn
+		bluerow = consts.bluerow
+		skybluerow = consts.skybluerow
+		redrow = consts.redrow
+		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+		if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+			sectionname = "A"
+		elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+			sectionname = "B"
+		elif len(sheet[:bluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
+			sectionname = "C"
+		elif len(sheet[:bluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
+			sectionname = "D"
+		elif len(sheet[:skybluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
+			sectionname = "E"
+		elif len(sheet[:skybluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
+			sectionname = "F"	
+		elif len(sheet[:redrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+			sectionname = "G"
+		elif len(sheet[:redrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+			sectionname = "H"	
+		elif len(sheet[redrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
+			sectionname = "I"  
+		else:
+			sectionname = "J" 
+		consts.sectionname = sectionname   # 区画名	
+	return consts  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 	doc = xscriptcontext.getDocument()
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	karute = Karute(sheet)  # クラスをインスタンス化。	
+	consts = getConsts(sheet)  # クラスをインスタンス化。	
 	cellrange = sheet["A1:M1"]  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	datarow = list(cellrange.getDataArray()[0])  # 行をリストで取得。
-	datarow[karute.datecolumn] = "一覧へ"
-	datarow[karute.subjectcolumn] = "経過へ"
-	datarow[karute.splittedcolumn] = "COPY"
-	datarow[karute.splittedcolumn+1] = "退院ｻﾏﾘ"
-	datarow[karute.splittedcolumn+2] = "#分離"
-	sheet[0, karute.splittedcolumn+1].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
+	datarow[consts.datecolumn] = "一覧へ"
+	datarow[consts.subjectcolumn] = "経過へ"
+	datarow[consts.splittedcolumn] = "COPY"
+	datarow[consts.splittedcolumn+1] = "退院ｻﾏﾘ"
+	datarow[consts.splittedcolumn+2] = "#分離"
+	sheet[0, consts.splittedcolumn+1].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
 	cellrange.setDataArray((datarow,))  # 行をシートに戻す。
 	# コピー日時セルの色を設定。
-	copieddatecell = sheet[0, karute.articlecolumn]  # コピー日時セルを取得。
+	copieddatecell = sheet[0, consts.articlecolumn]  # コピー日時セルを取得。
 	copieddatetxt = copieddatecell.getString()  # コピー日時セルの文字列を取得。
 	if copieddatetxt:
-		copieddatetime = datetime.strptime(copieddatetxt, karute.dateformat)  # コピーした日時を取得。
+		copieddatetime = datetime.strptime(copieddatetxt, consts.dateformat)  # コピーした日時を取得。
 		now = datetime.now()  # 現在の日時を取得。
 		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
 			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
@@ -96,22 +97,22 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
 	dateformat = "****%Y年%m月%d日(%a)****"
-	daterange = sheet[karute.bluerow, karute.articlecolumn]  # 本日の記事の日付セルを取得。
+	daterange = sheet[consts.bluerow, consts.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	if articledate!=todaydate:  # 今日の日付でない時。
-		todayarticle = sheet[karute.bluerow+1:karute.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
-		datarows = todayarticle[:, karute.sharpcolumn:karute.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
+		todayarticle = sheet[consts.bluerow+1:consts.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
+		datarows = todayarticle[:, consts.sharpcolumn:consts.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
 		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		if txt:  # 記事の文字列があるときのみ。
 			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
-			stringlength = karute.stringlength  # 1セルあたりの文字数。
+			stringlength = consts.stringlength  # 1セルあたりの文字数。
 			newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
-			dest_start_ridx = karute.redrow + 1  # 移動先の開始行インデックス。
+			dest_start_ridx = consts.redrow + 1  # 移動先の開始行インデックス。
 			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
-			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, karute.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, consts.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
 			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
 			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
 			dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
@@ -119,7 +120,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
 			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
 		daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
-		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (karute.datecolumn, karute.subjectcolumn, karute.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
+		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (consts.datecolumn, consts.subjectcolumn, consts.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -133,8 +134,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-				karute = getSectionName(sheet, selection)  # セル固有の定数を取得。
-				sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+				consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+				sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
 				txt = selection.getString()  # クリックしたセルの文字列を取得。	
 				createFormatKey = commons.formatkeyCreator(doc)	
 				if sectionname in ("A",):
@@ -146,7 +147,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						if newsheetname in sheets:  # 経過シート名がある時。
 							controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 						else:  # 経過シートの作成。
-							idcelltxts = sheet[karute.splittedrow-1, karute.articlecolumn].getString().split(" ")  # 半角スペースで分割。
+							idcelltxts = sheet[consts.splittedrow-1, consts.articlecolumn].getString().split(" ")  # 半角スペースで分割。
 							idtxt = idcelltxts[0]  # 最初の要素を取得。
 							if idtxt.isdigit():  # IDが数値のみの時。					
 								sheets = doc.getSheets()
@@ -155,7 +156,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								else:
 									if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 										kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
-										datevalue = sheet[karute.splittedrow, karute.datecolumn].getValue()
+										datevalue = sheet[consts.splittedrow, consts.datecolumn].getValue()
 										keikasheet =  commons.getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 										controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 									else:
@@ -168,8 +169,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					return False  # セルを編集モードにしない。
 				elif sectionname in ("B",):						
 					if txt=="COPY":
-						splittedrow, bluerow, skybluerow = karute.splittedrow, karute.bluerow, karute.skybluerow
-						sharpcolumn, articlecolumn, subjectcolumn = karute.sharpcolumn, karute.articlecolumn, karute.subjectcolumn
+						splittedrow, bluerow, skybluerow = consts.splittedrow, consts.bluerow, consts.skybluerow
+						sharpcolumn, articlecolumn, subjectcolumn = consts.sharpcolumn, consts.articlecolumn, consts.subjectcolumn
 						getCopyDataRows, formatArticleColumn, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
 						c = formatArticleColumn(sheet[bluerow+1:skybluerow, sharpcolumn:articlecolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
 						datarows = sheet[bluerow:skybluerow+c, sharpcolumn:articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
@@ -191,23 +192,23 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
 						copieddatecell = sheet[0, articlecolumn]  # コピー日時セルを取得。	
 						copyCells(controller, copieddatecell, newdatarows)
-						copieddatecell.setString(datetime.now().strftime(karute.dateformat))  # コピーボタンを押した日付を入力。
+						copieddatecell.setString(datetime.now().strftime(consts.dateformat))  # コピーボタンを押した日付を入力。
 						copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 					elif txt=="退院ｻﾏﾘ":
 						dummy, dummy, formatProblemList, copyCells = createCopyFuncs(ctx, smgr, doc, sheet)
-						newdatarows = formatProblemList(karute.splittedrow, karute.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
-						copieddatecell = sheet[0, karute.articlecolumn]  # コピー日時セルを取得。	
+						newdatarows = formatProblemList(consts.splittedrow, consts.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
+						copieddatecell = sheet[0, consts.articlecolumn]  # コピー日時セルを取得。	
 						copyCells(controller, copieddatecell, newdatarows)
 						selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
 					elif txt=="#分離":
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
-						splittedrow = karute.splittedrow
-						bluerow = karute.bluerow
-						datarange = sheet[splittedrow:bluerow, :karute.articlecolumn+1]
+						splittedrow = consts.splittedrow
+						bluerow = consts.bluerow
+						datarange = sheet[splittedrow:bluerow, :consts.articlecolumn+1]
 						datarows = datarange.getDataArray()
 						newdatarows = []
 						for datarow in datarows:
-							datatxt = datarow[karute.articlecolumn]  # Article列の文字列を取得。
+							datatxt = datarow[consts.articlecolumn]  # Article列の文字列を取得。
 							if datatxt.startswith("#"):  # #がある時。
 								datecell, subjectcell = "", ""
 								if len(datatxt)>1:  # #以外の文字もある時。
@@ -218,9 +219,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 								datarow = "", "#", datecell, "", subjectcell, "", datatxt
 							newdatarows.append(datarow)
 						datarange.setDataArray(newdatarows)
-						sheet[splittedrow:bluerow, karute.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
-						sheet[splittedrow:bluerow, karute.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-						sheet[splittedrow:bluerow, karute.subjectcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
+						sheet[splittedrow:bluerow, consts.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
+						sheet[splittedrow:bluerow, consts.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+						sheet[splittedrow:bluerow, consts.subjectcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
 					return False  # セルを編集モードにしない。
 				elif sectionname in ("C", "E", "G", "I"):	
 					functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
@@ -230,19 +231,19 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						sheet.insertCells(sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
 						sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
 						return False  # セルを編集モードにしない。
-					elif r in (karute.bluerow, karute.skybluerow, karute.redrow):  # カラー行の時。
+					elif r in (consts.bluerow, consts.skybluerow, consts.redrow):  # カラー行の時。
 						if txt=="問題ﾘｽﾄへ変換":
-							articlecolumn = karute.articlecolumn
-							sharpcolumn = karute.sharpcolumn
-							cellranges = sheet[karute.redrow+1:, articlecolumn].queryContentCells(CellFlags.STRING)  # Article列の文字列が入っているセルに限定して抽出。
+							articlecolumn = consts.articlecolumn
+							sharpcolumn = consts.sharpcolumn
+							cellranges = sheet[consts.redrow+1:, articlecolumn].queryContentCells(CellFlags.STRING)  # Article列の文字列が入っているセルに限定して抽出。
 							if len(cellranges):  # セル範囲が取得出来た時。
 								transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 								transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
 								newdatarows = [] 
 								emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-								datarange = sheet[karute.redrow+1:emptyrow, articlecolumn]
+								datarange = sheet[consts.redrow+1:emptyrow, articlecolumn]
 								datarows = datarange.getDataArray()
-								stringlength = karute.stringlength  # 1セルあたりの文字数。
+								stringlength = consts.stringlength  # 1セルあたりの文字数。
 								sharpcell, datecell, subjectcell, articletxts = "", "", "", []
 								for datatxt in map(str, chain.from_iterable(datarows)):
 									if datatxt:  # 空文字でない時。
@@ -263,23 +264,23 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 												articletxts.append(datatxt)  # Article列の文字列のリストに追加。
 								if articletxts:  # すでに取得したArticle列の行がある時。
 									addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows)  # 最後のプロブレムを処理。
-								problemrange = sheet[karute.splittedrow:karute.bluerow, karute.sharpcolumn:articlecolumn+1]
+								problemrange = sheet[consts.splittedrow:consts.bluerow, consts.sharpcolumn:articlecolumn+1]
 								cellranges = problemrange.queryContentCells(CellFlags.STRING)
-								emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else karute.splittedrow
+								emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else consts.splittedrow
 								endrowbelow = emptyrow + len(newdatarows)	
 								sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
 								sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
 								sheet[emptyrow:endrowbelow, sharpcolumn:sharpcolumn+len(newdatarows[0])].setDataArray(newdatarows)
-								sheet[emptyrow:endrowbelow, karute.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+								sheet[emptyrow:endrowbelow, consts.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 								datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。
 						return False  # セルを編集モードにしない。
-					elif c==karute.sharpcolumn:  # #列の時。
+					elif c==consts.sharpcolumn:  # #列の時。
 						if txt:
 							selection.clearContents(CellFlags.STRING)
 						else:
 							selection.setString("#")
 						return False  # セルを編集モードにしない。
-					elif c==karute.datecolumn:  # Date列の時。
+					elif c==consts.datecolumn:  # Date列の時。
 						if not txt:  # 空文字の時。
 							sheet[r, c:c+2].setDataArray((("#", ""),))  # Date列と日付列に値を代入。
 							selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
@@ -290,7 +291,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							selection.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 							sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
 							return False  # セルを編集モードにしない。
-					elif c==karute.datecolumn+1:  # 日付列の時。
+					elif c==consts.datecolumn+1:  # 日付列の時。
 						datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 						if txt:  # 日付列は日付シリアル値しか入っていないはず。
 							celldatevalue = int(selection.getValue())  # セルに入っているシリアル値を整数で取得。
@@ -302,7 +303,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						sheet[r, c-1].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 						selection.setPropertyValue("CharColor", commons.COLORS["white"])					
 						return False  # セルを編集モードにしない。
-					elif c==karute.subjectcolumn:  # Subject列の時。
+					elif c==consts.subjectcolumn:  # Subject列の時。
 						if not txt:  # 空文字の時。
 							selection.setString("#")
 							selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
@@ -310,15 +311,15 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						elif txt=="#":
 							selection.setString("")
 							selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
-					elif c==karute.subjectcolumn+1:  # S履歴列の時。
+					elif c==consts.subjectcolumn+1:  # S履歴列の時。
 						
 						
 						return False  # セルを編集モードにしない。	
-					elif c>karute.articlecolumn:  # Article列の右列の時。
+					elif c>consts.articlecolumn:  # Article列の右列の時。
 						transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 						transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。						
 						dateformat = "%Y/%-m/%-d"  # Article列にいれる日付書式。0で埋めない。
-						kijirange = sheet[r, karute.articlecolumn:karute.articlecolumn+2]  # Article列と過去日列のみ取得。
+						kijirange = sheet[r, consts.articlecolumn:consts.articlecolumn+2]  # Article列と過去日列のみ取得。
 						articletxt, datetxt = kijirange.getDataArray()[0]  # Articleセルと挿入済日付セルの値を取得。
 						articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
 						newdateobj = date.today()  # 今日の日付オブジェクトをまず取得。						
@@ -326,11 +327,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							if articletxt.endswith(datetxt):  # Article列の最後がこのボタンで入れた日付で終わっている時。
 								dateobj = datetime.strptime(datetxt, dateformat.replace("-", "")).date()  # 日時を取得。0で埋めない-があるとValueError: '-' is a bad directiveがでる。
 								articletxt = articletxt[:-len(datetxt)]  # すでにある日付を削る。
-								if c==karute.articlecolumn+1 and dateobj>newdateobj-timedelta(days=2):  # 過去日列かつ2日前までの時。
+								if c==consts.articlecolumn+1 and dateobj>newdateobj-timedelta(days=2):  # 過去日列かつ2日前までの時。
 									newdateobj = dateobj - timedelta(days=1)  # 1日遡る。
-								elif c==karute.articlecolumn+2 and dateobj<newdateobj+timedelta(days=2):  # 未来日列かつ2日後までの時。	
+								elif c==consts.articlecolumn+2 and dateobj<newdateobj+timedelta(days=2):  # 未来日列かつ2日後までの時。	
 									newdateobj = dateobj + timedelta(days=1)  # 1日進める。
-								elif c==karute.articlecolumn+3:  # 入替列の時。
+								elif c==consts.articlecolumn+3:  # 入替列の時。
 									txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
 									if len(txts)>1:  # ｡の後ろに日付を移動させる。
 										if txts[-1]:  # 日付の直前が｡でない時。
@@ -348,7 +349,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						datetxt = newdateobj.strftime(dateformat)							
 						articletxt += datetxt
 						kijirange.setDataArray(((articletxt, datetxt),))						
-						sheet[r, karute.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
+						sheet[r, consts.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
 						return False  # セルを編集モードにしない。
 	return True  # セル編集モードにする。
 def handleDS(functionaccess, ds, datecell, subjectcell):
@@ -369,8 +370,8 @@ def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newd
 	if len(articlecells)>1:  # 複数行ある時。
 		newdatarows.extend(("", "", "", "", "", i) for i in articlecells[1:])	 # 2行目以降について処理。
 def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返す関数。
-	karute = Karute(sheet)  # クラスをインスタンス化。	
-	stringlength = karute.stringlength  # 1セルあたりの文字数。
+	consts = getConsts(sheet)  # クラスをインスタンス化。	
+	stringlength = consts.stringlength  # 1セルあたりの文字数。
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
@@ -425,13 +426,13 @@ def createCopyFuncs(ctx, smgr, doc, sheet):  # コピーのための関数を返
 					sheet.queryIntersection(newrangeaddress).clearContents(511)  # セル範囲アドレスでは行がずれるので不可。
 				newarticlerows.extend(newdatarows)	# 新しい記事列に行を追加。	
 		if newarticlerows:  # 新しい行があるとき。空行だけのときはエラーになるので。
-			newrange = sheet[datarangestartrow:datarangestartrow+len(newarticlerows), karute.articlecolumn]  # 記事列のセル範囲を取得。
+			newrange = sheet[datarangestartrow:datarangestartrow+len(newarticlerows), consts.articlecolumn]  # 記事列のセル範囲を取得。
 			newrange.clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
 			newrange.setDataArray(newarticlerows)  # 記事列に代入。
 		return c  # 追加した行数を返す。
 	def formatProblemList(startrow, endrow, title):  # プロブレム欄を整形。
-		c = formatArticleColumn(sheet[startrow:endrow, karute.sharpcolumn:karute.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
-		datarows = sheet[startrow:endrow+c, karute.sharpcolumn:karute.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
+		c = formatArticleColumn(sheet[startrow:endrow, consts.sharpcolumn:consts.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
+		datarows = sheet[startrow:endrow+c, consts.sharpcolumn:consts.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		newdatarows = [(title,)]  # タイトルを取得。	
 		getCopyDataRows(newdatarows, datarows, startrow)  # プロブレム欄の記事列を整形。
 		return newdatarows
@@ -468,8 +469,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	if contextmenuname=="cell":  # セルのとき
-		karute = getSectionName(sheet, selection)  # セル固有の定数を取得。
-		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
+		consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
 			return EXECUTE_MODIFIED
 		commons.cutcopypasteMenuEntries(addMenuentry)
@@ -482,8 +483,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 # 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
 # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
-		karute = getSectionName(sheet, selection)  # 選択範囲の最初のセルの定数を取得。
-		sectionname = karute.sectionname  # クリックしたセルの区画名を取得。			
+		consts = getConsts(sheet, selection)  # 選択範囲の最初のセルの定数を取得。
+		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
 		if sectionname in ("A",) or selection[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
 			return EXECUTE_MODIFIED
 		if sectionname in ("C",):
@@ -509,13 +510,13 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-		karute = getSectionName(sheet, selection)
-		splittedrow = karute.splittedrow
-		bluerow = karute.bluerow
-		skybluerow = karute.skybluerow
-		redrow = karute.redrow
-		sharpcolumn = karute.sharpcolumn
-		articlecolumn = karute.articlecolumn
+		consts = getConsts(sheet, selection)
+		splittedrow = consts.splittedrow
+		bluerow = consts.bluerow
+		skybluerow = consts.skybluerow
+		redrow = consts.redrow
+		sharpcolumn = consts.sharpcolumn
+		articlecolumn = consts.articlecolumn
 		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
 			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
 			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
@@ -561,13 +562,13 @@ def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点と
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
 	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	karute = getSectionName(sheet, cell)  # セル固有の定数を取得。
-	sectionname = karute.sectionname  # クリックしたセルの区画名を取得。
+	consts = getConsts(sheet, cell)  # セル固有の定数を取得。
+	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
 		return
 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
-		datarange = sheet[karute.splittedrow:karute.bluerow, karute.sharpcolumn:7] if sectionname=="C" else sheet[karute.skybluerow+1:karute.redrow, karute.sharpcolumn:7]  # タイトル行を除く。
+		datarange = sheet[consts.splittedrow:consts.bluerow, consts.sharpcolumn:7] if sectionname=="C" else sheet[consts.skybluerow+1:consts.redrow, consts.sharpcolumn:7]  # タイトル行を除く。
 		doc = controller.getModel()  # ドキュメントモデルを取得。
 		problemranges = getProblemRanges(doc, datarange, cellrange)  # 問題ごとのセル範囲コレクションを取得。
 		for i in problemranges:

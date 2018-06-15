@@ -1,13 +1,13 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import os, unohelper
+from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
 from com.sun.star.datatransfer import UnsupportedFlavorException
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
-from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH  # enum
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.awt import MessageBoxButtons  # 定数
@@ -108,7 +108,7 @@ def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)
 	else:
 		sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
 		karutesheet = sheets[idtxt]  # カルテシートを取得。  
-		karuteconsts = karute.Karute(karutesheet)	
+		karuteconsts = karute.getConsts(karutesheet)	
 		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
 		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
 		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
@@ -121,7 +121,7 @@ def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, dateva
 	else:	
 		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-		keikaconsts = keika.Keika(keikasheet)
+		keikaconsts = keika.getConsts(keikasheet)
 		keikasheet[keikaconsts.daterow, keikaconsts.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
 		keika.setDates(doc, keikasheet, keikasheet[keikaconsts.daterow, keikaconsts.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet	

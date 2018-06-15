@@ -17,7 +17,7 @@ class Ent():  # シート固有の定数設定。
 		self.keikacolumn = 5  # 経過列インデックス。
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
-def getSectionName(sheet, target):  # 区画名を取得。
+def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	M 
 	===========  # 行の固定の境界
@@ -30,46 +30,47 @@ def getSectionName(sheet, target):  # 区画名を取得。
 	A: ID列の最初の空行から下の部分。
 	"""
 	ent = Ent(sheet)  # クラスをインスタンス化。	
-	rangeaddress = target[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	if len(sheet[ent.menurow, :].queryIntersection(rangeaddress)):  # メニューセルの時。
-		sectionname = "M"
-	elif len(sheet[ent.splittedrow:ent.emptyrow, :].queryIntersection(rangeaddress)):  # スクロールする部分のうちID欄が空欄でない行。
-		sectionname = "B"	
-	else:  # ID列の最初の空行から下の部分。
-		sectionname = "A"  
-	ent.sectionname = sectionname   # 区画名
+	if selection is not None:
+		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+		if len(sheet[ent.menurow, :].queryIntersection(rangeaddress)):  # メニューセルの時。
+			sectionname = "M"
+		elif len(sheet[ent.splittedrow:ent.emptyrow, :].queryIntersection(rangeaddress)):  # スクロールする部分のうちID欄が空欄でない行。
+			sectionname = "B"	
+		else:  # ID列の最初の空行から下の部分。
+			sectionname = "A"  
+		ent.sectionname = sectionname   # 区画名
 	return ent
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "ﾘｽﾄに戻る"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	target = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	sheet = target.getSpreadsheet()
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	sheet = selection.getSpreadsheet()
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
-		if target.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(sheet, target, commons.createBorders())  # 枠線の作成。
+				drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-				ent = getSectionName(sheet, target)
+				ent = getConsts(sheet, selection)
 				sectionname	= ent.sectionname	
-				celladdress = target.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # targetの行と列のインデックスを取得。
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。
 				if sectionname=="M":
-					return mousePressedWSectionM(doc, sheet, ent, target, c)			
+					return mousePressedWSectionM(doc, sheet, ent, selection, c)			
 				elif sectionname=="B":
 					systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					return mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, target, r, c)
+					return mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, selection, r, c)
 				elif sectionname=="A":  # ID列が空欄の時。キーボードからの入力は想定しない。
 					sortRows(sheet, ent, c)  # 昇順にソート。
 					return False  # セル編集モードにしない。	
 	return True  # セル編集モードにする。	
-def mousePressedWSectionM(doc, sheet, ent, target, c):
+def mousePressedWSectionM(doc, sheet, ent, selection, c):
 	if c>ent.keikacolumn:  # 経過列より右の時。
-		txt = target.getString()
+		txt = selection.getString()
 		if txt=="ﾘｽﾄに戻る":
 			controller = doc.getCurrentController()  # コントローラの取得。
 			sheets = doc.getSheets()
@@ -82,9 +83,9 @@ def sortRows(sheet, ent, c, *, reverse=None):
 	datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
 	datarows.sort(key=lambda x:x[c], reverse=reverse)  # 各行を列インデックスcでソート。
 	datarange.setDataArray(datarows)  # シートに代入する。	
-def mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, target, r, c):
+def mousePressedWSectionB(doc, sheet, systemclipboard, transliteration, ent, selection, r, c):
 	if c==ent.idcolumn:  # ID列の時。
-		systemclipboard.setContents(commons.TextTransferable(target.getString()), None)  # クリップボードにIDをコピーする。
+		systemclipboard.setContents(commons.TextTransferable(selection.getString()), None)  # クリップボードにIDをコピーする。
 	elif c==ent.kanacolumn:  # カナ名列の時。
 		idtxt, dummy, kanatxt = sheet[r, :ent.kanacolumn+1].getDataArray()[0]
 		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
@@ -112,7 +113,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 		drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
 def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする行列全体の外枠線を描く。
 	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	ent = getSectionName(sheet, cell)
+	ent = getConsts(sheet, cell)
 	sectionname = ent.sectionname	
 	if sectionname in ("M", "A"):
 		return	
@@ -129,15 +130,15 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
-	target = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	ent = getSectionName(sheet, target)  # セル固有の定数を取得。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	ent = getConsts(sheet, selection)  # セル固有の定数を取得。
 	sectionname = ent.sectionname  # クリックしたセルの区画名を取得。		
 	if sectionname in ("M", ):  # 固定行より上の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
-	rangeaddress = target.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
+	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
 	startrow = rangeaddress.StartRow
 	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
-		if target.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
@@ -177,7 +178,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	selection = controller.getSelection()  # 選択範囲を取得。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 	r = rangeaddress.StartRow
-	ent = Ent(sheet)  # シート固有の値を取得。
+	ent = getConsts(sheet)  # シート固有の値を取得。
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	if entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
