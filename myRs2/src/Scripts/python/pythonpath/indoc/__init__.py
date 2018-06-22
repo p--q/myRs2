@@ -1,1 +1,1 @@
-# ここの関数はimportできない。
+# ここの関数はimportできない。tdocimport.pyにはこのファイルが必須。
