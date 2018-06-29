@@ -1,0 +1,1 @@
+# ここの関数はimportできない。tdocimport.pyにはこのファイルが必須。
