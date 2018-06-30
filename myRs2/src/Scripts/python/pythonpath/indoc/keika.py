@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, dialogs
+from indoc import commons, historydialogyaku
 from com.sun.star.awt import MouseButton, MessageBoxButtons, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
@@ -36,6 +36,8 @@ def getConsts(sheet, selection=None):  # 区画名を取得。
 	-----------  # 薬品列の最下行の一つ下の行。
 	G  ||  H
 	
+	# J: C,E,Gの薬名列より左。
+	
 	"""
 	consts = Keika(sheet)
 	if selection is not None:
@@ -66,6 +68,8 @@ def getConsts(sheet, selection=None):  # 区画名を取得。
 				sectionname = "H"
 			else:
 				sectionname = "I"
+		if sectionname in ("C", "E", "G") and len(sheet[splittedrow:, :consts.yakucolumn].queryIntersection(rangeaddress)):
+			sectionname = "J"
 		consts.sectionname = sectionname  # 区画名
 	return consts  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
@@ -99,6 +103,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
 				yakucolumn = consts.yakucolumn
 				txt = selection.getString()  # クリックしたセルの文字列を取得。	
+				celladdress = selection.getCellAddress()  # ターゲットのセルアドレスを取得。
+				r, c = celladdress.Row, celladdress.Column
 				if sectionname=="A":
 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
@@ -181,14 +187,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 					return False  # セル編集モードにしない。	
 				elif sectionname=="B":
-					celladdress = selection.getCellAddress()
-					r = celladdress.Row  # ダブルクリックしたセルの行インデックスを取得。
 					items = []
 					if r==0:  # 月を入力。
 						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
-						c = celladdress.Column  # ダブルクリックしたセルの列インデックスを取得。
 						datevalue = int(sheet[consts.daterow, c].getValue())
 						m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 						selection.setString(txtCycle(["", "{}月".format(m)], txt))
@@ -211,8 +214,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
 					return False  # セル編集モードにしない。	
 				elif sectionname in ("C", "E", "G"):
-					celladdress = selection.getCellAddress()  # ターゲットのセルアドレスを取得。
-					r, c = celladdress.Row, celladdress.Column
 					if c==yakucolumn:  # 薬名列の時。
 						return True  # セル編集モードにする。
 					elif c==yakucolumn+1:  # 用法列の時。
@@ -228,7 +229,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							
 							pass
 						else:
-							selection.setString("持続")						
+							selection.setString("持続")			
 					return False  # セル編集モードにしない。	
 				elif sectionname in ("D", "F"):
 					if txt:
@@ -237,7 +238,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						pass
 					else:
 						selection.setString("止")								
-					return False  # セル編集モードにしない。		
+					return False  # セル編集モードにしない。	
+				elif sectionname in ("J",):
+					header = sheet[1, c].getString()  # 行インデックス1のセルの文字列を取得。
+					controller.select(sheet[r, yakucolumn])  # 薬名列のセルを選択。
+					historydialogyaku.createDialog(xscriptcontext, enhancedmouseevent, header)  # 履歴ダイアログを表示。クリックした位置の下に表示。入力するとシートを下にスクロールする。		
+					return False  # セル編集モードにしない。	
 	return True  # セル編集モードにする。
 def txtCycle(items, txt):
 	items.append(items[0])  # 最初の要素を最後の要素に追加する。
@@ -458,13 +464,13 @@ def drowBorders(sheet, cellrange, borders):  # ターゲットを交点とする
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders	
 	rangeaddress = cellrange.getRangeAddress()  # セル範囲アドレスを取得。
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-	if sectionname in ("A", "G", "H", "I"):  # 線を消すだけ。
+	if sectionname in ("A", "H", "I"):  # 線を消すだけ。
 		return
-	if sectionname in ("D", "F"):  # 縦横線を引く。
+	if sectionname in ("D", "F", "J"):  # 縦横線を引く。
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
 	elif sectionname in ("B",):  # 縦線のみ引く。
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。				
-	elif sectionname in ("C", "E"):  # 横線のみ引く。		
+	elif sectionname in ("C", "E", "G"):  # 横線のみ引く。		
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
 	cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
