@@ -5,7 +5,7 @@ from indoc import dialogcommons
 from com.sun.star.accessibility import AccessibleRole  # 定数
 from com.sun.star.awt import XActionListener, XMenuListener, XMouseListener, XWindowListener, XTextListener, XItemListener
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, PopupMenuDirection, PosSize, ScrollBarOrientation  # 定数
-from com.sun.star.awt import Rectangle, Selection  # Struct
+from com.sun.star.awt import Point, Rectangle, Selection  # Struct
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import NamedValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
@@ -17,7 +17,7 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
-	dialogpoint = dialogcommons.getDialogPoint(doc, enhancedmouseevent)  # クリックした位置のメニューバーの高さ分下の位置を取得。単位ピクセル。一部しか表示されていないセルのときはNoneが返る。
+	dialogpoint = getDialogPoint(doc, enhancedmouseevent)  # X座標は固定列の右に表示する。クリックした位置のメニューバーの高さ分下の位置を取得。単位ピクセル。一部しか表示されていないセルのときはNoneが返る。
 	if not dialogpoint:  # クリックした位置が取得出来なかった時は何もしない。
 		return
 	txt = doc.getCurrentSelection().getString()  # 選択セルの文字列を取得。
@@ -358,3 +358,63 @@ def scrollDown(gridcontrol):  # グリッドコントロールを下までスク
 				child.setValue(0)  # 一旦0にしないといけない？
 				child.setValue(child.getMaximum())  # 最大値にスクロールさせる。
 				break				
+def getDialogPoint(doc, enhancedmouseevent):  # クリックした位置x yのタプルで返す。但し、一部しか見えてないセルの場合はNoneが返る。TaskCreatorのRectangleには画面の左角からの座標を渡すが、ウィンドウタイトルバーは含まれない。
+	controller = doc.getCurrentController()  # 現在のコントローラを取得。
+	docframe = controller.getFrame()  # フレームを取得。
+	containerwindow = docframe.getContainerWindow()  # コンテナウィドウの取得。
+	accessiblecontextparent = containerwindow.getAccessibleContext().getAccessibleParent()  # コンテナウィンドウの親AccessibleContextを取得する。フレームの子AccessibleContextになる。
+	accessiblecontext = accessiblecontextparent.getAccessibleContext()  # AccessibleContextを取得。
+	for i in range(accessiblecontext.getAccessibleChildCount()): 
+		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()
+		if childaccessiblecontext.getAccessibleRole()==49:  # ROOT_PANEの時。
+			rootpanebounds = childaccessiblecontext.getBounds()  # Yアトリビュートがウィンドウタイトルバーの高さになる。
+			break 
+	else:
+		return  # ウィンドウタイトルバーのAccessibleContextが取得できなかった時はNoneを返す。
+	componentwindow = docframe.getComponentWindow()  # コンポーネントウィンドウを取得。
+	border = controller.getBorder()  # 行ヘッダの幅と列ヘッダの高さの取得のため。
+	accessiblecontext = componentwindow.getAccessibleContext()  # コンポーネントウィンドウのAccessibleContextを取得。
+	for i in range(accessiblecontext.getAccessibleChildCount()):  # 子AccessibleContextについて。
+		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()  # 子AccessibleContextのAccessibleContext。
+		if childaccessiblecontext.getAccessibleRole()==51:  # SCROLL_PANEの時。
+			for j in range(childaccessiblecontext.getAccessibleChildCount()):  # 孫AccessibleContextについて。 
+				grandchildaccessiblecontext = childaccessiblecontext.getAccessibleChild(j).getAccessibleContext()  # 孫AccessibleContextのAccessibleContext。
+				if grandchildaccessiblecontext.getAccessibleRole()==84:  # DOCUMENT_SPREADSHEETの時。これが枠。
+					bounds = grandchildaccessiblecontext.getBounds()  # 枠の位置と大きさを取得(SCROLL_PANEの左上角が原点)。
+					if bounds.X==border.Left and bounds.Y==border.Top:  # SCROLL_PANEに対する相対座標が行ヘッダと列ヘッダと一致する時は左上枠。
+						
+						
+						sourcepointonscreen =  grandchildaccessiblecontext.getLocationOnScreen()  # 左上枠の左上角の点を取得(画面の左上角が原点)。
+						x = sourcepointonscreen.X + bounds.Width  # 固定列の左端のX座標を取得。
+						y = sourcepointonscreen.Y + bounds.Height + enhancedmouseevent.Y + rootpanebounds.Y  # クリックした位置からメニューバーの高さ分下の位置の画面の左上角からのYの取得									
+						return x, y								
+						
+						
+						
+						
+# 						for k, subcontroller in enumerate(controller):  # 各枠のコントローラについて。インデックスも取得する。
+
+# 							subcontroller = controller[1]
+# 							
+# 							cellrange = subcontroller.getReferredCells()  # 見えているセル範囲を取得。一部しかみえていないセルは含まれない。
+# 							if len(cellrange.queryIntersection(enhancedmouseevent.Target.getRangeAddress())):  # ターゲットが含まれるセル範囲コレクションが返る時その枠がクリックした枠。「ウィンドウの分割」では正しいiは必ずしも取得できない。
+# 								sourcepointonscreen =  grandchildaccessiblecontext.getLocationOnScreen()  # 左上枠の左上角の点を取得(画面の左上角が原点)。
+# # 								sourcepointonscreen = Point(X=sourcepointonscreen.X, Y=sourcepointonscreen.Y+bounds.Height)  # 左下枠の時。
+# 								
+# 								x = sourcepointonscreen.X + bounds.Width
+# 								
+# 								
+# 								
+# 								y = sourcepointonscreen.Y + bounds.Height + enhancedmouseevent.Y + rootpanebounds.Y  # クリックした位置からメニューバーの高さ分下の位置の画面の左上角からのYの取得									
+# 								return x, y								
+								
+								
+# 								if k==1:  # 左下枠の時。
+# 									sourcepointonscreen = Point(X=sourcepointonscreen.X, Y=sourcepointonscreen.Y+bounds.Height)
+# 								elif k==2:  # 右上枠の時。
+# 									sourcepointonscreen = Point(X=sourcepointonscreen.X+bounds.Width, Y=sourcepointonscreen.Y)
+# 								elif k==3:  # 右下枠の時。
+# 									sourcepointonscreen = Point(X=sourcepointonscreen.X+bounds.Width, Y=sourcepointonscreen.Y+bounds.Height)
+# 								x = sourcepointonscreen.X + enhancedmouseevent.X  # クリックした位置の画面の左上角からのXの取得。
+# 								y = sourcepointonscreen.Y + enhancedmouseevent.Y + rootpanebounds.Y  # クリックした位置からメニューバーの高さ分下の位置の画面の左上角からのYの取得									
+# 								return x, y
