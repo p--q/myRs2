@@ -17,7 +17,7 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
-	*dialogpoint, vscrollbar = getDialogPoint(doc, enhancedmouseevent)  # X座標は固定列の右に表示する。クリックした位置のメニューバーの高さ分下の位置を取得。単位ピクセル。一部しか表示されていないセルのときはNoneが返る。
+	dialogpoint = getDialogPoint(doc, enhancedmouseevent)  # X座標は固定列の右に表示する。クリックした位置のメニューバーの高さ分下の位置を取得。単位ピクセル。一部しか表示されていないセルのときはNoneが返る。
 	if not dialogpoint:  # クリックした位置が取得出来なかった時は何もしない。
 		return
 	txt = doc.getCurrentSelection().getString()  # 選択セルの文字列を取得。
@@ -38,9 +38,9 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 	controlcontainerprops = {"PositionX": 0, "PositionY": 0, "Width": XWidth(gridprops), "Height": YHeight(buttonprops, m), "BackgroundColor": 0xF0F0F0}  # コントロールコンテナの基本プロパティ。幅は右端のコントロールから取得。高さはコントロール追加後に最後に設定し直す。		
 	maTopx = dialogcommons.createConverters(containerwindow)  # ma単位をピクセルに変換する関数を取得。
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
-	mouselistener = MouseListener(xscriptcontext, vscrollbar)
+	mouselistener = MouseListener(xscriptcontext)
 	menulistener = MenuListener(controlcontainer)  # コンテクストメニューにつけるリスナー。
-	actionlistener = ActionListener(xscriptcontext, vscrollbar)  # ボタンコントロールにつけるリスナー。
+	actionlistener = ActionListener(xscriptcontext)  # ボタンコントロールにつけるリスナー。
 	items = ("選択行を削除", 0, {"setCommand": "delete"}),\
 			("全行を削除", 0, {"setCommand": "deleteall"})  # グリッドコントロールにつける右クリックメニュー。
 	mouselistener.gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items, {"addMenuListener": menulistener})  # 右クリックでまず呼び出すポップアップメニュー。 
@@ -171,10 +171,9 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 	def disposing(self, eventobject):  
 		pass
 class ActionListener(unohelper.Base, XActionListener):
-	def __init__(self, xscriptcontext, vscrollbar):
+	def __init__(self, xscriptcontext):
 		self.xscriptcontext = xscriptcontext
 		self.transliteration = fullwidth_halfwidth(xscriptcontext)
-		self.vscrollbar = vscrollbar
 	def actionPerformed(self, actionevent):  
 		cmd = actionevent.ActionCommand
 		if cmd=="enter":
@@ -197,7 +196,7 @@ class ActionListener(unohelper.Base, XActionListener):
 					selection.setString(txt)  # 選択セルに代入。
 					global DATAROWS
 					DATAROWS = datarows								
-				nexttxt = toNextCell(doc, selection, self.vscrollbar)  # 下のセルを選択してその値を返す。シートも1行分スクロールする。	
+				nexttxt = toNextCell(doc, selection)  # 下のセルを選択してその値を返す。
 				edit1.setText(nexttxt)  # テキストボックスコントロールにセルの内容を取得。
 				edit1.setFocus()  # テキストボックスコントロールをフォーカスする。
 				textlength = len(nexttxt)  # テキストボックスコントロール内の文字列の文字数を取得。
@@ -206,10 +205,9 @@ class ActionListener(unohelper.Base, XActionListener):
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
-	def __init__(self, xscriptcontext, vscrollbar): 	
+	def __init__(self, xscriptcontext): 	
 		self.xscriptcontext = xscriptcontext
 		self.gridpopupmenu = None
-		self.vscrollbar = vscrollbar
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		griddatamodel = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModelを取得。
@@ -231,7 +229,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 						return
 					rowdata = griddatamodel.getRowData(j)  # グリッドコントロールで選択している行のすべての列をタプルで取得。
 					selection.setString(rowdata[0])  # グリッドコントロールは1列と決めつけて、その最初の要素をセルに代入。
-					nexttxt = toNextCell(doc, selection, self.vscrollbar)  # 下のセルを選択してその値を返す。シートも1行分スクロールする。
+					nexttxt = toNextCell(doc, selection)  # 下のセルを選択してその値を返す。
 					edit1 = gridcontrol.getContext().getControl("Edit1")  # テキストボックスコントロールを取得。				
 					edit1.setText(nexttxt)  # テキストボックスコントロールにセルの内容を取得。			
 		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。
@@ -250,14 +248,12 @@ class MouseListener(unohelper.Base, XMouseListener):
 		pass
 	def disposing(self, eventobject):
 		pass
-def toNextCell(doc, selection, vscrollbar):  # 下のセルを選択してその値を返す。シートも1行分スクロールする。
+def toNextCell(doc, selection):  # 下のセルを選択してその値を返す。
 	controller = doc.getCurrentController()  # 現在のコントローラを取得。	
 	sheet = controller.getActiveSheet()
 	celladdress = selection.getCellAddress()
 	nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
 	controller.select(nextcell)  # 下のセルを選択。
-	newvalue = vscrollbar.getCurrentValue() + 1
-	vscrollbar.setCurrentValue(newvalue)  # シートを下にスクロール
 	return nextcell.getString()  # 下のセルの文字列を返す。
 class MenuListener(unohelper.Base, XMenuListener):
 	def __init__(self, controlcontainer):
@@ -368,31 +364,19 @@ def getDialogPoint(doc, enhancedmouseevent):  # クリックした位置x yの�
 	for i in range(accessiblecontext.getAccessibleChildCount()): 
 		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()
 		if childaccessiblecontext.getAccessibleRole()==49:  # ROOT_PANEの時。
-			rootpanebounds = childaccessiblecontext.getBounds()  # Yアトリビュートがウィンドウタイトルバーの高さになる。
-			break 
-	else:
-		return  # ウィンドウタイトルバーのAccessibleContextが取得できなかった時はNoneを返す。
-	componentwindow = docframe.getComponentWindow()  # コンポーネントウィンドウを取得。
-	border = controller.getBorder()  # 行ヘッダの幅と列ヘッダの高さの取得のため。
-	accessiblecontext = componentwindow.getAccessibleContext()  # コンポーネントウィンドウのAccessibleContextを取得。
-	for i in range(accessiblecontext.getAccessibleChildCount()):  # 子AccessibleContextについて。
-		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()  # 子AccessibleContextのAccessibleContext。
-		if childaccessiblecontext.getAccessibleRole()==51:  # SCROLL_PANEの時。
-			flgs = [False, False]  # ループを抜けるフラグ。
-			for j in range(childaccessiblecontext.getAccessibleChildCount()):  # 孫AccessibleContextについて。 
-				grandchildaccessiblecontext = childaccessiblecontext.getAccessibleChild(j).getAccessibleContext()  # 孫AccessibleContextのAccessibleContext。
-				accessiblerole = grandchildaccessiblecontext.getAccessibleRole()
-				if accessiblerole==84:  # DOCUMENT_SPREADSHEETの時。これが枠。
-					bounds = grandchildaccessiblecontext.getBounds()  # 枠の位置と大きさを取得(SCROLL_PANEの左上角が原点)。
-					if bounds.X==border.Left and bounds.Y==border.Top:  # SCROLL_PANEに対する相対座標が行ヘッダと列ヘッダと一致する時は左上枠。
-						sourcepointonscreen =  grandchildaccessiblecontext.getLocationOnScreen()  # 左上枠の左上角の点を取得(画面の左上角が原点)。
-						x = sourcepointonscreen.X + enhancedmouseevent.X  # クリックしたX座標を取得。		
-						y = sourcepointonscreen.Y + bounds.Height + enhancedmouseevent.Y + rootpanebounds.Y + border.Top*3  # クリックした位置からシートのヘッダー3行下にダイアログを表示。							
-						flgs[0] = True
-				elif accessiblerole==50:  # スクロールバーの時。
-					bounds = grandchildaccessiblecontext.getBounds()  # 位置と大きさを取得(SCROLL_PANEの左上角が原点)。
-					if bounds.X!=0:  # X座標が0でないときは縦スクロールバー。
-						vscrollbar = grandchildaccessiblecontext  # 縦スクロールバーを取得。
-						flgs[1] = True
-				if all(flgs):
-					return x, y, vscrollbar  # 縦スクロールバーも返す。
+			componentwindow = docframe.getComponentWindow()  # コンポーネントウィンドウを取得。
+			border = controller.getBorder()  # 行ヘッダの幅と列ヘッダの高さの取得のため。
+			accessiblecontext = componentwindow.getAccessibleContext()  # コンポーネントウィンドウのAccessibleContextを取得。
+			for i in range(accessiblecontext.getAccessibleChildCount()):  # 子AccessibleContextについて。
+				childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()  # 子AccessibleContextのAccessibleContext。
+				if childaccessiblecontext.getAccessibleRole()==51:  # SCROLL_PANEの時。
+					for j in range(childaccessiblecontext.getAccessibleChildCount()):  # 孫AccessibleContextについて。 
+						grandchildaccessiblecontext = childaccessiblecontext.getAccessibleChild(j).getAccessibleContext()  # 孫AccessibleContextのAccessibleContext。
+						accessiblerole = grandchildaccessiblecontext.getAccessibleRole()
+						if accessiblerole==84:  # DOCUMENT_SPREADSHEETの時。これが枠。
+							bounds = grandchildaccessiblecontext.getBounds()  # 枠の位置と大きさを取得(SCROLL_PANEの左上角が原点)。
+							if bounds.X==border.Left and bounds.Y==border.Top:  # SCROLL_PANEに対する相対座標が行ヘッダと列ヘッダと一致する時は左上枠。
+								sourcepointonscreen =  grandchildaccessiblecontext.getLocationOnScreen()  # 左上枠の左上角の点を取得(画面の左上角が原点)。
+								x = sourcepointonscreen.X + enhancedmouseevent.X + border.Left*10  # 行ヘッダの倍数分右にずらす。  
+								y = sourcepointonscreen.Y + bounds.Height + enhancedmouseevent.Y  # ウィンドウタイトルバーの高さの調節をしない。			
+								return x, y

@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, unohelper, glob
-from indoc import commons, keika, ent
 from itertools import chain
+from indoc import commons, keika, ent, datedialog
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.sheet import CellFlags  # 定数
@@ -83,20 +83,18 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(sheet, selection, commons.createBorders())  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-				functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 				consts = getConsts(sheet, selection)
 				sectionname	= consts.sectionname	
 				if sectionname=="M":
+					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
+					functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 					return mousePressedWSectionM(doc, sheet, functionaccess, consts, selection)			
 				elif not selection.getPropertyValue("CellBackColor") in (-1, commons.COLORS["cyan10"]):  # 背景色がないか薄緑色でない時以外何もしない。
 					return False  # セル編集モードにしない。
 				elif sectionname=="B":
-					systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					return mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, consts, selection)
+					return mousePressedWSectionB(xscriptcontext, enhancedmouseevent, consts)
 				elif sectionname=="D":
 					return mousePressedWSectionD(sheet, consts, selection)
 				elif sectionname=="A":
@@ -182,7 +180,14 @@ def mousePressedWSectionM(doc, sheet, functionaccess, consts, selection):
 	elif txt=="退院ﾘｽﾄ":
 		controller.setActiveSheet(sheets["退院"])
 	return False  # セル編集モードにしない。	
-def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, transliteration, consts, selection):
+def mousePressedWSectionB(xscriptcontext, enhancedmouseevent, consts):
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	sheet = selection.getSpreadsheet()
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	createFormatKey = commons.formatkeyCreator(doc)
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheets = doc.getSheets()  # シートコレクションを取得。	
@@ -224,22 +229,7 @@ def mousePressedWSectionB(doc, sheet, systemclipboard, functionaccess, translite
 		else:
 			return True  # セル編集モードにする。		
 	elif c==consts.datecolumn:  # 入院日列の時。
-		if keikatxt:  # 経過列がすでにある時。
-			return True  # セル編集モードにする。
-		else:
-			todaydatevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-			if datevalue:  # すでに日付が入っている時。
-				items = [todaydatevalue-1, todaydatevalue-2, todaydatevalue, todaydatevalue+1]
-				items.append(items[0])  # 最初の要素を最後の要素に追加する。
-				dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
-				if datevalue in dic:
-					datevalue = dic[datevalue]
-				else:
-					return True  # セル編集モードにする。
-			else:
-				datevalue = todaydatevalue
-			selection.setValue(datevalue)
-			selection.setPropertyValue("NumberFormat", createFormatKey('YYYY/MM/DD'))
+		datedialog.createDialog(xscriptcontext, enhancedmouseevent, "入院日", "YYYY/MM/DD")		
 	elif c==consts.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		if keikatxt and newsheetname in sheets:  # 経過列がすでにあり、かつ、経過シートがある時。。		
