@@ -45,19 +45,19 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			sheet = selection.getSpreadsheet()
-			VARS.setSheet(sheet)
+			VARS.setSheet(selection.getSpreadsheet())
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(selection)  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-				rangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
-				if len(sheet[VARS.menurow, :VARS.checkstartcolumn].queryIntersection(rangeaddress)):  # メニューセルの時。
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
 					return wClickMenu(xscriptcontext, enhancedmouseevent)
-				elif rangeaddress.StartRow<VARS.splittedrow or rangeaddress.StartRow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
+				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
 					return False # 何もしない。
-				elif rangeaddress.StartColumn<VARS.checkstartcolumn:  # チェック列より左の時。
+				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
 					return wClickIDCol(xscriptcontext, enhancedmouseevent)
-				elif rangeaddress.StartColumn<VARS.memostartcolumn:  # チェック列の時。
+				elif c<VARS.memostartcolumn:  # チェック列の時。
 					return wClickCheckCol(xscriptcontext, enhancedmouseevent)
 	return True  # セル編集モードにする。	
 def wClickMenu(xscriptcontext, enhancedmouseevent):
@@ -498,17 +498,18 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 			return False
 	return detachSheet
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
-	pos = selection[0, 0].getRangeAddress()  # 選択範囲の左上端のセル範囲アドレスを取得。セルアドレスは不可。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 	sheet = VARS.sheet
-	if len(sheet[VARS.menurow, :VARS.checkstartcolumn].queryIntersection(pos)):  # メニューセルの時。
+	if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。
 		return  # 何もしない。
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のセル範囲アドレスを取得。
-	if rangeaddress.StartRow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 区切り行の時。
+	if r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 区切り行の時。
 		return  # 罫線を引き直さない。
-	if rangeaddress.StartRow>VARS.splittedrow-1:  # 分割行以下の時。
+	if r>VARS.splittedrow-1:  # 分割行以下の時。
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く
-	if VARS.checkstartcolumn-1<rangeaddress.EndColumn<VARS.memostartcolumn:  # メモ列より左の時。
+	if VARS.checkstartcolumn-1<c<VARS.memostartcolumn:  # チェック列の時。
 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。
 	selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。

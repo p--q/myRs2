@@ -4,18 +4,18 @@
 from datetime import date, datetime, timedelta
 from itertools import chain
 from indoc import commons
-from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
-from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
-from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
-from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
-from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
+from com.sun.star.sheet import CellFlags  # 定数
+from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
+from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.table import CellVertJustify2  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT, RIGHT  # enum
+from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Karute():  # シート固有の定数設定。
-	def __init__(self, sheet):
+	def __init__(self):
 		self.splittedrow = 2  # 分割行インデックス。
 		self.sharpcolumn = 1  # #列インデックス。
 		self.datecolumn = 2  # Date列インデックス。
@@ -24,78 +24,74 @@ class Karute():  # シート固有の定数設定。
 		self.splittedcolumn = 10  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
-		
-		
+	def setSheet(self, sheet): # 逐次変化する値。	
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
 		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
 		self.bluerow = next(gene)  # 青3行インデックス。
 		self.skybluerow = next(gene)  # スカイブルー行インデックス。
 		self.redrow = next(gene)  # 赤3行インデックス。		
-		
-		
-		
-		
-def getConsts(sheet, selection=None):  # 区画名を取得。
-	"""
-	A  ||  B
-	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
-	C  ||  D
-	-----------  # Date列の文字列があるセルの背景色が青3の行。
-	E  ||  F
-	-----------  # Date列の文字列があるセルの背景色がスカイブルーの行。
-	G  ||  H
-	-----------  # Date列の文字列があるセルの背景色が赤3の行。
-	I  ||  J
-	"""
-	consts = Karute(sheet)  # クラスをインスタンス化。	
-	if selection is not None:
-		splittedrow = consts.splittedrow
-		splittedcolumn = consts.splittedcolumn
-		bluerow = consts.bluerow
-		skybluerow = consts.skybluerow
-		redrow = consts.redrow
-		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-		if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "A"
-		elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "B"
-		elif len(sheet[:bluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "C"
-		elif len(sheet[:bluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "D"
-		elif len(sheet[:skybluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "E"
-		elif len(sheet[:skybluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "F"	
-		elif len(sheet[:redrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "G"
-		elif len(sheet[:redrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-			sectionname = "H"	
-		elif len(sheet[redrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
-			sectionname = "I"  
-		else:
-			sectionname = "J" 
-		consts.sectionname = sectionname   # 区画名	
-	return consts  
+VARS = Karute()		
+# def getConsts(sheet, selection=None):  # 区画名を取得。
+# 	"""
+# 	A  ||  B
+# 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
+# 	C  ||  D
+# 	-----------  # Date列の文字列があるセルの背景色が青3の行。
+# 	E  ||  F
+# 	-----------  # Date列の文字列があるセルの背景色がスカイブルーの行。
+# 	G  ||  H
+# 	-----------  # Date列の文字列があるセルの背景色が赤3の行。
+# 	I  ||  J
+# 	"""
+# 	consts = Karute(sheet)  # クラスをインスタンス化。	
+# 	if selection is not None:
+# 		splittedrow = consts.splittedrow
+# 		splittedcolumn = consts.splittedcolumn
+# 		bluerow = consts.bluerow
+# 		skybluerow = consts.skybluerow
+# 		redrow = consts.redrow
+# 		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
+# 		if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+# 			sectionname = "A"
+# 		elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+# 			sectionname = "B"
+# 		elif len(sheet[:bluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
+# 			sectionname = "C"
+# 		elif len(sheet[:bluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
+# 			sectionname = "D"
+# 		elif len(sheet[:skybluerow, :splittedcolumn].queryIntersection(rangeaddress)): 
+# 			sectionname = "E"
+# 		elif len(sheet[:skybluerow, splittedcolumn:].queryIntersection(rangeaddress)): 
+# 			sectionname = "F"	
+# 		elif len(sheet[:redrow, :splittedcolumn].queryIntersection(rangeaddress)): 
+# 			sectionname = "G"
+# 		elif len(sheet[:redrow, splittedcolumn:].queryIntersection(rangeaddress)): 
+# 			sectionname = "H"	
+# 		elif len(sheet[redrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
+# 			sectionname = "I"  
+# 		else:
+# 			sectionname = "J" 
+# 		consts.sectionname = sectionname   # 区画名	
+# 	return consts  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 	doc = xscriptcontext.getDocument()
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	consts = getConsts(sheet)  # クラスをインスタンス化。	
+	VARS.setSheet(sheet)
 	cellrange = sheet["A1:M1"]  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	datarow = list(cellrange.getDataArray()[0])  # 行をリストで取得。
-	datarow[consts.datecolumn] = "一覧へ"
-	datarow[consts.subjectcolumn] = "経過へ"
-	datarow[consts.splittedcolumn] = "COPY"
-	datarow[consts.splittedcolumn+1] = "退院ｻﾏﾘ"
-	datarow[consts.splittedcolumn+2] = "#分離"
-	sheet[0, consts.splittedcolumn+1].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
+	datarow[VARS.datecolumn] = "一覧へ"
+	datarow[VARS.subjectcolumn] = "経過へ"
+	datarow[VARS.splittedcolumn] = "COPY"
+	datarow[VARS.splittedcolumn+1] = "退院ｻﾏﾘ"
+	datarow[VARS.splittedcolumn+2] = "#分離"
+	sheet[0, VARS.splittedcolumn+1].setPropertyValue("CellBackColor", -1)  # 退院ｻﾏﾘボタンの背景色をクリアする。
 	cellrange.setDataArray((datarow,))  # 行をシートに戻す。
 	# コピー日時セルの色を設定。
-	copieddatecell = sheet[0, consts.articlecolumn]  # コピー日時セルを取得。
+	copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。
 	copieddatetxt = copieddatecell.getString()  # コピー日時セルの文字列を取得。
 	if copieddatetxt:
-		copieddatetime = datetime.strptime(copieddatetxt, consts.dateformat)  # コピーした日時を取得。
+		copieddatetime = datetime.strptime(copieddatetxt, VARS.dateformat)  # コピーした日時を取得。
 		now = datetime.now()  # 現在の日時を取得。
 		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
 			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
@@ -103,22 +99,22 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
 	dateformat = "****%Y年%m月%d日(%a)****"
-	daterange = sheet[consts.bluerow, consts.articlecolumn]  # 本日の記事の日付セルを取得。
+	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	if articledate!=todaydate:  # 今日の日付でない時。
-		todayarticle = sheet[consts.bluerow+1:consts.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
-		datarows = todayarticle[:, consts.sharpcolumn:consts.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
+		todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
+		datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
 		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		if txt:  # 記事の文字列があるときのみ。
 			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
-			stringlength = consts.stringlength  # 1セルあたりの文字数。
+			stringlength = VARS.stringlength  # 1セルあたりの文字数。
 			newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
-			dest_start_ridx = consts.redrow + 1  # 移動先の開始行インデックス。
+			dest_start_ridx = VARS.redrow + 1  # 移動先の開始行インデックス。
 			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
-			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, consts.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, VARS.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
 			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
 			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
 			dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
@@ -126,18 +122,21 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
 			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
 		daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
-		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (consts.datecolumn, consts.subjectcolumn, consts.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
+		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.subjectcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	sheet = selection.getSpreadsheet()
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	controller = doc.getCurrentController()  # コントローラの取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+			sheet = selection.getSpreadsheet()
+			VARS.setSheet(sheet)
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(controller, sheet, selection, commons.createBorders())  # 枠線の作成。
+				drowBorders(selection)  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+				controller = doc.getCurrentController()  # コントローラの取得。				
+				
+				
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 				consts = getConsts(sheet, selection)  # セル固有の定数を取得。
@@ -564,27 +563,30 @@ def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題�
 	cursor = sheet.createCursorByRange(problemrange)  # セルカーサーを作成		
 	cursor.expandToEntireRows()  # セル範囲を行全体に拡大。		
 	return cursor.getRangeAddress()  # 移動前に移動元の問題リストのセル範囲アドレスを取得しておく。
-def drowBorders(controller, sheet, cellrange, borders):  # cellrangeを交点とする行列全体の外枠線を描く。
-	noneline, tableborder2, topbottomtableborder, leftrighttableborder = borders  # 枠線を取得。	
-	cell = cellrange[0, 0]  # セル範囲の左上端のセルで判断する。
-	rangeaddress = cell.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-	consts = getConsts(sheet, cell)  # セル固有の定数を取得。
-	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
-	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
-		return
-	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
-		datarange = sheet[consts.splittedrow:consts.bluerow, consts.sharpcolumn:7] if sectionname=="C" else sheet[consts.skybluerow+1:consts.redrow, consts.sharpcolumn:7]  # タイトル行を除く。
-		doc = controller.getModel()  # ドキュメントモデルを取得。
-		problemranges = getProblemRanges(doc, datarange, cellrange)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:
-			cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
-			cursor.expandToEntireRows()  # セル範囲を行全体に拡大。	
-			cursor.setPropertyValue("TableBorder2", topbottomtableborder) # プロブレムの上下に枠線を引く。
-	elif sectionname in ("D", "F", "H"):
-		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
-		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+def drowBorders(selection):  # cellrangeを交点とする行列全体の外枠線を描く。
+	pos = selection[0, 0].getRangeAddress() # 選択範囲の左上端のセル範囲アドレスを取得。セルアドレスは不可。
+# 	sheet = VARS.sheet
+# 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()  # 枠線を取得。	
+# 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+# 	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。
+# 	if 
+# 	
+# 
+# 	
+# 	if sectionname in ("A", "B", "E", "I"):  # 枠線を消すだけ。
+# 		return
+# 	if sectionname in ("C", "G"):  # 同一プロブレムの上下に枠線を引く。
+# 		datarange = sheet[consts.splittedrow:consts.bluerow, consts.sharpcolumn:7] if sectionname=="C" else sheet[consts.skybluerow+1:consts.redrow, consts.sharpcolumn:7]  # タイトル行を除く。
+# 		doc = controller.getModel()  # ドキュメントモデルを取得。
+# 		problemranges = getProblemRanges(doc, datarange, cellrange)  # 問題ごとのセル範囲コレクションを取得。
+# 		for i in problemranges:
+# 			cursor = sheet.createCursorByRange(i)  # セルカーサーを作成		
+# 			cursor.expandToEntireRows()  # セル範囲を行全体に拡大。	
+# 			cursor.setPropertyValue("TableBorder2", topbottomtableborder) # プロブレムの上下に枠線を引く。
+# 	elif sectionname in ("D", "F", "H"):
+# 		sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。			
+# 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+# 		cellrange.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def getProblemRanges(doc, datarange, selection):  # datarangeは問題リストの#を検索するセル範囲。
 	cellranges = getCellRanges(doc, datarange)  # 問題リストの各セル範囲を取得。
 	ranges = set(i for i in cellranges if len(i.queryIntersection(selection.getRangeAddress())))  # 選択したセル範囲と交差するプロブレムのセル範囲を集合で取得。
