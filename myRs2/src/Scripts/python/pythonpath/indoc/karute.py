@@ -24,12 +24,18 @@ class Karute():  # シート固有の定数設定。
 		self.splittedcolumn = 10  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
+		
+		
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
 		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
 		self.bluerow = next(gene)  # 青3行インデックス。
 		self.skybluerow = next(gene)  # スカイブルー行インデックス。
 		self.redrow = next(gene)  # 赤3行インデックス。		
+		
+		
+		
+		
 def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	A  ||  B

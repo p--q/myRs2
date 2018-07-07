@@ -4,16 +4,16 @@
 import os, unohelper, glob
 from itertools import chain
 from indoc import commons, keika, ent, datedialog
-from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
-from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX, ERRORBOX  # enum
+from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
-from com.sun.star.table.CellHoriJustify import LEFT  # enum
-from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
+from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
-from com.sun.star.beans import PropertyValue  # Struct
+from com.sun.star.table.CellHoriJustify import LEFT  # enum
+from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Ichiran():  # シート固有の値。
 	def __init__(self):
 		self.menurow  = 0  # メニュー行インデックス。
@@ -153,7 +153,7 @@ def wClickIDCol(xscriptcontext, enhancedmouseevent):
 			selection.setString(dic[sumitxt][0])
 			sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
 			refreshCounts()  # カウントを更新する。
-	elif c==VARS.yocolumn:  # 経過列があり、かつ、予列の時。
+	elif c==VARS.yocolumn:  # 予列の時。
 		if hospdays:  # 在院日数列が空セルでない時。
 			if yotxt:
 				selection.clearContents(CellFlags.STRING)  # 予をクリア。
@@ -191,7 +191,7 @@ def wClickIDCol(xscriptcontext, enhancedmouseevent):
 			return True  # セル編集モードにする。		
 	elif c==VARS.datecolumn:  # 入院日列の時。
 		datedialog.createDialog(xscriptcontext, enhancedmouseevent, "入院日", "YYYY/MM/DD")		
-	elif c==VARS.datecolumn+1:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
+	elif c==VARS.hospdayscolumn:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 		sheets = doc.getSheets()  # シートコレクションを取得。	
@@ -249,12 +249,12 @@ def fillColumns(xscriptcontext, enhancedmouseevent, idtxt, kanjitxt, kanatxt, da
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換
 	r = enhancedmouseevent.Target.getCellAddress().Row				
 	cellstringaddress = sheet[r, VARS.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
-	cell = sheet[r, VARS.checkstartcolumn-1]
+	cell = sheet[r, VARS.hospdayscolumn]
 	cell.setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。	
 	createFormatKey = commons.formatkeyCreator(xscriptcontext.getDocument())
 	cell.setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 
-	datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue, "経過"  # 他の列を追加。								
-	sheet[r, :VARS.checkstartcolumn-1].setDataArray((datarow,))
+	datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue  # 他の列を追加。								
+	sheet[r, :VARS.hospdayscolumn].setDataArray((datarow,))
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -329,27 +329,21 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
-	
-
-
-	
-	if sectionname in ("M", "C"):  # 固定行より上の時はコンテクストメニューを表示しない。
-		return EXECUTE_MODIFIED
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
-	startrow = rangeaddress.StartRow
-	if startrow in (consts.bluerow, consts.skybluerow, consts.redrow):  # タイトル行の時。
+	startrow, startcolumn = rangeaddress.StartRow, rangeaddress.StartColumn  # 選択範囲の左上セルだけで判断する。
+	if startrow<VARS.splittedrow or startrow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 固定行より上、またはタイトル行の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
-	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
+	elif contextmenuname=="cell":  # セルのとき。セル範囲も含む。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-			if rangeaddress.StartColumn in (consts.yocolumn,):  # 予列の時。
+			if startcolumn in (VARS.yocolumn,):  # 予列の時。
 				addMenuentry("ActionTrigger", {"Text": "退院ﾘｽﾄへ", "CommandURL": baseurl.format("entry1")}) 	
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-			elif rangeaddress.StartColumn in (consts.datecolumn+1,):  # 経過列の時。
+			elif startcolumn in (VARS.hospdayscolumn,):  # 経過列の時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
-				idtxt, dummy, kanatxt = sheet[startrow, consts.idcolumn:consts.datecolumn].getDataArray()[0]			
+				idtxt, dummy, kanatxt = sheet[startrow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]			
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
@@ -361,17 +355,17 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
-		if sectionname in ("A",):
+		if startrow>VARS.emptyrow-1:
 			commons.cutcopypasteMenuEntries(addMenuentry)
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 			commons.rowMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED
-		if startrow<consts.bluerow:  # 未入院
+		elif startrow<VARS.bluerow:  # 未入院
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry3")})  
-		elif startrow<consts.skybluerow:  # Stable
+		elif startrow<VARS.skybluerow:  # Stable
 			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry4")})
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})	
-		elif startrow<consts.redrow:  # Unstable
+		elif startrow<VARS.redrow:  # Unstable
 			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry6")})
 			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry7")}) 		
 		else:  # 新入院
@@ -387,24 +381,24 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
-def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。		
 	desktop = xscriptcontext.getDesktop()
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	VARS.setSheet(sheet)
 	selection = controller.getSelection()  # 選択範囲を取得。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 	r = rangeaddress.StartRow
-	consts = getConsts(sheet)  # シート固有の値を取得。
-	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	if entrynum<3:  # セルのコンテクストメニュー。
-		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		sheets = doc.getSheets()
-		datarow = sheet[r, consts.idcolumn:consts.datecolumn+1].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		datarow = sheet[r, VARS.idcolumn:VARS.hospdayscolumn].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
 		idtxt, dummy, kanatxt, datevalue = datarow
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。
 		k = kanatxt[0]  # 最初のカナ文字を取得。カタカナであることは入力時にチェック済。
 		kana = "ア", "カ", "サ", "タ", "ナ", "ハ", "マ", "ヤ", "ラ", "ワ"
@@ -450,27 +444,30 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
-		idtxt, dummy, kanatxt = sheet[r, consts.idcolumn:consts.datecolumn].getDataArray()[0]
+		idtxt, dummy, kanatxt = sheet[r, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 		for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
 			if i==c:  # インデックスが一致する時。
 				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
 				break
 	elif entrynum==3:  # 未入院から新入院に移動。
-		commons.toNewEntry(sheet, rangeaddress, consts.bluerow, consts.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, VARS.bluerow, VARS.emptyrow)
 	elif entrynum==4:  # StableからUnstableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, consts.skybluerow, consts.redrow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.skybluerow, VARS.redrow)
 	elif entrynum==5:  # Stableから新入院へ移動。 
-		commons.toNewEntry(sheet, rangeaddress, consts.skybluerow, consts.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, VARS.kybluerow, VARS.emptyrow)
 	elif entrynum==6:  # UnstableからStableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, consts.redrow, consts.skybluerow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.redrow, VARS.skybluerow)
 	elif entrynum==7:  # Unstableから新入院へ移動。
-		commons.toNewEntry(sheet, rangeaddress, consts.redrow, consts.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, VARS.redrow, VARS.emptyrow)
 	elif entrynum==8:  # 新入院から未入院へ移動。
-		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.bluerow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.bluerow)
 	elif entrynum==9:  # 新入院からStableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.skybluerow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.skybluerow)
 	elif entrynum==10:  # 新入院からUnstableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, consts.emptyrow, consts.redbluerow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redbluerow)
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
