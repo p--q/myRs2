@@ -102,7 +102,8 @@ def showErrorMessageBox(controller, msg):
 	componentwindow = controller.ComponentWindow
 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 	msgbox.execute()
-def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	sheets = doc.getSheets()  # シートコレクションを取得。
 	if idtxt in sheets:  # すでに経過シートがある時。
 		karutesheet = sheets[idtxt]  # カルテシートを取得。  
 	else:
@@ -111,10 +112,12 @@ def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue)
 		karuteconsts = karute.getConsts(karutesheet)	
 		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
 		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+		createFormatKey = formatkeyCreator(doc)
 		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
-def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+def getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	sheets = doc.getSheets()  # シートコレクションを取得。
 	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 	if newsheetname in sheets:  # すでに経過シートがある時。
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
