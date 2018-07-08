@@ -11,7 +11,7 @@ from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.table import CellVertJustify2  # 定数
-from com.sun.star.table.CellHoriJustify import LEFT, RIGHT  # enum
+from com.sun.star.table.CellHoriJustify import LEFT, CENTER  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Karute():  # シート固有の定数設定。
@@ -240,54 +240,54 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		sheet = VARS.sheet
 		sheet.insertCells(sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
 		sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
-	elif c==VARS.sharpcolumn:  # #列の時。
+	elif c==VARS.sharpcolumn:  # 区切列の時。
 		txt = selection.getString()  # クリックしたセルの文字列を取得。
 		if txt:
 			selection.clearContents(CellFlags.STRING)
 		else:
 			selection.setString("#")
+			selection.setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))
 	elif c==VARS.datecolumn:  # 日付列の時。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY/M/D")	
-		
-# 		if not txt:  # 空文字の時。
-# 			sheet[r, c:c+2].setDataArray((("#", ""),))  # Date列と日付列に値を代入。
-# 			selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
-# 		elif txt=="#":
-# 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-# 			functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-# 			datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。						
-# 			sheet[r, c:c+2].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
-# 			selection.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-# 			sheet[r, c+1].setPropertyValue("CharColor", commons.COLORS["white"])
-# 	elif c==VARS.datecolumn+1:  # 日付列の時。
-# 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
-# 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-# 		datevalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-# 		if txt:  # 日付列は日付シリアル値しか入っていないはず。
-# 			celldatevalue = int(selection.getValue())  # セルに入っているシリアル値を整数で取得。
-# 			if celldatevalue>datevalue-2:  # 2日前までは1日遡る。
-# 				datevalue = celldatevalue - 1	
-# 			else:
-# 				datevalue = ""
-# 		sheet[r, c-1:c+1].setDataArray(([datevalue]*2,))  # Date列と日付列に今日のシリアル値を代入。
-# 		sheet[r, c-1].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-# 		selection.setPropertyValue("CharColor", commons.COLORS["white"])		
-
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY/MM/DD")	
 	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
 		return True  # セル編集モードにする。
-	elif c==VARS.problemhistorycolumn:  # Subject列の時。
-		if not txt:  # 空文字の時。
-			selection.setString("#")
-			selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER))
-			return False  # セルを編集モードにしない。		
-		elif txt=="#":
-			selection.setString("")
-			selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
-	elif c==VARS.problemhistorycolumn:  # プロブレム履歴列インデックス。
+	elif c==VARS.problemhistorycolumn:  # プロブレム履歴列インデックスの時。
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ履歴", outputcolumn=VARS.articlecolumn)
-	elif c>VARS.articlecolumn:  # Article列の右列の時。
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
+	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY/M/D")
+		selection.setPropertyValue("CharColor", commons.COLORS["white"])
+		sheet = VARS.sheet
+		articlecell = sheet[r, VARS.articlecolumn]
+		articlecell.setString("".join([articlecell.getString(), selection.getString()]))
+	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
+		datetxt = sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
+		if datetxt:  # 文字列が取得出来た時。
+			articletxt = sheet[r, VARS.articlecolumn].getString()  # 記事セルの文字列を取得。
+			if articletxt:
+				
+				pass
+			else:
+				sheet[r, VARS.articlecolumn].setString(datetxt)
+			
+			
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。				
+			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+			transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にするモジュールをロード。				
+			
+			articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
+			if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
+				articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。
+				txts = articletxt.rsplit("｡", 2)  # 右から｡で分割。	
+				
+
+				
+				
+				
+				txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
+				if len(txts)>1:  # 。で分割出来た時。
+					
 		
 		
 		
