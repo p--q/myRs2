@@ -103,6 +103,11 @@ def showErrorMessageBox(controller, msg):
 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 	msgbox.execute()
 def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	
+	
+	
+	
+	
 	sheets = doc.getSheets()  # シートコレクションを取得。
 	if idtxt in sheets:  # すでに経過シートがある時。
 		karutesheet = sheets[idtxt]  # カルテシートを取得。  
@@ -117,6 +122,11 @@ def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
 		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
 def getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	
+	
+	
+	
+	
 	sheets = doc.getSheets()  # シートコレクションを取得。
 	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 	if newsheetname in sheets:  # すでに経過シートがある時。

@@ -52,15 +52,15 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
-					return wClickMenu(xscriptcontext, enhancedmouseevent)
+					return wClickMenu(enhancedmouseevent, xscriptcontext)
 				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
 					return False # 何もしない。
 				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
-					return wClickIDCol(xscriptcontext, enhancedmouseevent)
+					return wClickIDCol(enhancedmouseevent, xscriptcontext)
 				elif c<VARS.memostartcolumn:  # チェック列の時。
-					return wClickCheckCol(xscriptcontext, enhancedmouseevent)
+					return wClickCheckCol(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
-def wClickMenu(xscriptcontext, enhancedmouseevent):
+def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	sheet = VARS.sheet
@@ -138,7 +138,7 @@ def wClickMenu(xscriptcontext, enhancedmouseevent):
 	elif txt=="退院ﾘｽﾄ":
 		controller.setActiveSheet(sheets["退院"])
 	return False  # セル編集モードにしない。	
-def wClickIDCol(xscriptcontext, enhancedmouseevent):
+def wClickIDCol(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = VARS.sheet
 	celladdress = selection.getCellAddress()
@@ -174,8 +174,13 @@ def wClickIDCol(xscriptcontext, enhancedmouseevent):
 			doc.getCurrentController().setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
-				fillColumns(xscriptcontext, enhancedmouseevent, idtxt, kanjitxt, kanatxt, datevalue)
+				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
+				
+				
 				karutesheet = commons.getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
+				
+				
+				
 				doc.getCurrentController().setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		
@@ -199,11 +204,17 @@ def wClickIDCol(xscriptcontext, enhancedmouseevent):
 			doc.getCurrentController().setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
-				fillColumns(xscriptcontext, enhancedmouseevent, idtxt, kanjitxt, kanatxt, datevalue)
+				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
+				
+				
+				
 				keikasheet = commons.getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+				
+				
+				
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
-def wClickCheckCol(xscriptcontext, enhancedmouseevent):
+def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	c = selection.getCellAddress().Column  # selectionの行と列のインデックスを取得。		
@@ -237,7 +248,7 @@ def wClickCheckCol(xscriptcontext, enhancedmouseevent):
 	color = commons.COLORS["silver"] if "済" in newtxt else -1
 	selection.setPropertyValue("CharColor", color)			
 	return False  # セル編集モードにしない。
-def fillColumns(xscriptcontext, enhancedmouseevent, idtxt, kanjitxt, kanatxt, datevalue):
+def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue):
 	sheet = VARS.sheet
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	

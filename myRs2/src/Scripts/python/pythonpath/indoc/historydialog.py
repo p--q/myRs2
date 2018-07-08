@@ -13,7 +13,7 @@ from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import MULTI  # enum 
 from com.sun.star.lang import Locale  # Struct
 DATAROWS = []  # グリッドコントロールのデータ行、タプルのタプルやリストのタプルやリストのリスト、の可能性がある。複数クラスからアクセスするのでグローバルにしないといけない。
-def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
+def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=None, outputcolumn=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
@@ -38,7 +38,7 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 	controlcontainerprops = {"PositionX": 0, "PositionY": 0, "Width": XWidth(gridprops), "Height": YHeight(buttonprops, m), "BackgroundColor": 0xF0F0F0}  # コントロールコンテナの基本プロパティ。幅は右端のコントロールから取得。高さはコントロール追加後に最後に設定し直す。		
 	maTopx = dialogcommons.createConverters(containerwindow)  # ma単位をピクセルに変換する関数を取得。
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
-	mouselistener = MouseListener(xscriptcontext)
+	mouselistener = MouseListener(xscriptcontext, outputcolumn)
 	menulistener = MenuListener(controlcontainer)  # コンテクストメニューにつけるリスナー。
 	actionlistener = ActionListener(xscriptcontext)  # ボタンコントロールにつけるリスナー。
 	items = ("選択行を削除", 0, {"setCommand": "delete"}),\
@@ -210,8 +210,9 @@ class ActionListener(unohelper.Base, XActionListener):
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
-	def __init__(self, xscriptcontext): 	
+	def __init__(self, xscriptcontext, outputcolumn): 	
 		self.xscriptcontext = xscriptcontext
+		self.outputcolumn = outputcolumn
 		self.gridpopupmenu = None
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
@@ -233,11 +234,14 @@ class MouseListener(unohelper.Base, XMouseListener):
 					if j<0:  # 負数の時は何もしない。
 						return
 					rowdata = griddatamodel.getRowData(j)  # グリッドコントロールで選択している行のすべての列をタプルで取得。
-					selection.setString(rowdata[0])  # グリッドコントロールは1列と決めつけて、その最初の要素をセルに代入。
 					controller = doc.getCurrentController()  # 現在のコントローラを取得。			
 					sheet = controller.getActiveSheet()
 					celladdress = selection.getCellAddress()
-					nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
+					r, c = celladdress.Row, celladdress.Column
+					if self.outputcolumn is not None:  # 出力する列が指定されている時。
+						c = self.outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
+					sheet[r, c].setString(rowdata[0])  # グリッドコントロールは1列と決めつけて、その最初の要素をセルに代入。
+					nextcell = sheet[r+1, c]  # 下のセルを取得。
 					controller.select(nextcell)  # 下のセルを選択。
 					nexttxt = nextcell.getString()  # 下のセルの文字列を取得。
 					edit1 = gridcontrol.getContext().getControl("Edit1")  # テキストボックスコントロールを取得。				
