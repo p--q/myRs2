@@ -263,69 +263,68 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
 		datetxt = sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
 		if datetxt:  # 文字列が取得出来た時。
-			articletxt = sheet[r, VARS.articlecolumn].getString()  # 記事セルの文字列を取得。
-			if articletxt:
-				
-				pass
-			else:
+			articlecell = sheet[r, VARS.articlecolumn]
+			articletxt = articlecell.getString()  # 記事セルの文字列を取得。
+			if articletxt:  # 記事列のセルに文字列がある時。
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。				
+				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にするモジュールをロード。				
+				articletxt = transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
+				if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
+					articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。				
+				txts = articletxt.rsplit("｡", 1)  # 右から｡で1回分割。	
+				if len(txts)>1:  # "｡"がない時は何もしない。
+					if txts[-1]:  # 日付の直前が｡でない時。
+						articletxt = "".join((txts[0], "｡", datetxt, txts[1]))  # ｡の後ろに日付を移動させる。
+					else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
+						txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
+						if len(txts2)>1:  # ｡の後ろに日付を移動させる。
+							articletxt = "".join((txts2[0], "｡", datetxt, txts2[1], "｡"))
+				articlecell.setString(articletxt)
+			else:  # 記事列のセルが空の時。
 				sheet[r, VARS.articlecolumn].setString(datetxt)
+	return False  # セルを編集モードにしない。		
 			
 			
-			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。				
-			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-			transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にするモジュールをロード。				
-			
-			articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
-			if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
-				articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。
-				txts = articletxt.rsplit("｡", 2)  # 右から｡で分割。	
-				
 
-				
-				
-				
-				txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
-				if len(txts)>1:  # 。で分割出来た時。
-					
 		
 		
 		
-		
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。						
-		dateformat = "%Y/%-m/%-d"  # Article列にいれる日付書式。0で埋めない。
-		kijirange = sheet[r, VARS.articlecolumn:VARS.articlecolumn+2]  # Article列と過去日列のみ取得。
-		articletxt, datetxt = kijirange.getDataArray()[0]  # Articleセルと挿入済日付セルの値を取得。
-		articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
-		newdateobj = date.today()  # 今日の日付オブジェクトをまず取得。						
-		if datetxt:  # 日付が挿入済の時。
-			if articletxt.endswith(datetxt):  # Article列の最後がこのボタンで入れた日付で終わっている時。
-				dateobj = datetime.strptime(datetxt, dateformat.replace("-", "")).date()  # 日時を取得。0で埋めない-があるとValueError: '-' is a bad directiveがでる。
-				articletxt = articletxt[:-len(datetxt)]  # すでにある日付を削る。
-				if c==VARS.articlecolumn+1 and dateobj>newdateobj-timedelta(days=2):  # 過去日列かつ2日前までの時。
-					newdateobj = dateobj - timedelta(days=1)  # 1日遡る。
-				elif c==VARS.articlecolumn+2 and dateobj<newdateobj+timedelta(days=2):  # 未来日列かつ2日後までの時。	
-					newdateobj = dateobj + timedelta(days=1)  # 1日進める。
-				elif c==VARS.articlecolumn+3:  # 入替列の時。
-					txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
-					if len(txts)>1:  # ｡の後ろに日付を移動させる。
-						if txts[-1]:  # 日付の直前が｡でない時。
-							articletxt = "".join((txts[0], "｡", datetxt, txts[1]))
-							kijirange.setDataArray(((articletxt, ""),))
-						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
-							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
-							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
-								articletxt = "".join((txts2[0], "｡", datetxt, txts2[1], "｡"))
-								kijirange.setDataArray(((articletxt, ""),))		
-				else:  # 日付を削除して空文字にする。
-					kijirange.setDataArray(((articletxt, ""),))		
-		datetxt = newdateobj.strftime(dateformat)							
-		articletxt += datetxt
-		kijirange.setDataArray(((articletxt, datetxt),))						
-		sheet[r, VARS.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
+# 		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+# 		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。						
+# 		dateformat = "%Y/%-m/%-d"  # Article列にいれる日付書式。0で埋めない。
+# 		kijirange = sheet[r, VARS.articlecolumn:VARS.articlecolumn+2]  # Article列と過去日列のみ取得。
+# 		articletxt, datetxt = kijirange.getDataArray()[0]  # Articleセルと挿入済日付セルの値を取得。
+# 		articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
+# 		newdateobj = date.today()  # 今日の日付オブジェクトをまず取得。						
+# 		if datetxt:  # 日付が挿入済の時。
+# 			if articletxt.endswith(datetxt):  # Article列の最後がこのボタンで入れた日付で終わっている時。
+# 				dateobj = datetime.strptime(datetxt, dateformat.replace("-", "")).date()  # 日時を取得。0で埋めない-があるとValueError: '-' is a bad directiveがでる。
+# 				articletxt = articletxt[:-len(datetxt)]  # すでにある日付を削る。
+# 				if c==VARS.articlecolumn+1 and dateobj>newdateobj-timedelta(days=2):  # 過去日列かつ2日前までの時。
+# 					newdateobj = dateobj - timedelta(days=1)  # 1日遡る。
+# 				elif c==VARS.articlecolumn+2 and dateobj<newdateobj+timedelta(days=2):  # 未来日列かつ2日後までの時。	
+# 					newdateobj = dateobj + timedelta(days=1)  # 1日進める。
+# 				elif c==VARS.articlecolumn+3:  # 入替列の時。
+# 					txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
+# 					if len(txts)>1:  # ｡の後ろに日付を移動させる。
+# 						if txts[-1]:  # 日付の直前が｡でない時。
+# 							articletxt = "".join((txts[0], "｡", datetxt, txts[1]))
+# 							kijirange.setDataArray(((articletxt, ""),))
+# 						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
+# 							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
+# 							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
+# 								articletxt = "".join((txts2[0], "｡", datetxt, txts2[1], "｡"))
+# 								kijirange.setDataArray(((articletxt, ""),))		
+# 				else:  # 日付を削除して空文字にする。
+# 					kijirange.setDataArray(((articletxt, ""),))		
+# 		datetxt = newdateobj.strftime(dateformat)							
+# 		articletxt += datetxt
+# 		kijirange.setDataArray(((articletxt, datetxt),))						
+# 		sheet[r, VARS.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
 
-	return False  # セルを編集モードにしない。
+	
 def handleDS(functionaccess, ds, datecell, subjectcell):
 	if " " in ds:  # スペースがある時。
 		datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
