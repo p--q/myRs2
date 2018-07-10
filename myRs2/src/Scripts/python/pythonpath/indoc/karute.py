@@ -23,7 +23,7 @@ class Karute():  # シート固有の定数設定。
 		self.problemhistorycolumn = 4  # プロブレム履歴列インデックス。
 		self.articlecolumn = 5  # 記事列インデックス。
 		self.insertdatecolumn = 6  # 日付挿入インデックス。
-		self.replacedatecolumn = 7  # 日付入替インデックス。
+		self.replacedatecolumn = 7  # 日付前へ列インデックス。
 		self.phrasecolumn = 8  # 定型句インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
@@ -255,15 +255,14 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ履歴", outputcolumn=VARS.articlecolumn)
 		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY/M/D")
-		selection.setPropertyValue("CharColor", commons.COLORS["white"])
-		sheet = VARS.sheet
-		articlecell = sheet[r, VARS.articlecolumn]
-		articlecell.setString("".join([articlecell.getString(), selection.getString()]))
+		selection.setString("")  # 日付挿入列の文字列をクリア。
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY/M/D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
+		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
+		sheet = VARS.sheet
 		datetxt = sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
-		if datetxt:  # 文字列が取得出来た時。
-			articlecell = sheet[r, VARS.articlecolumn]
+		if datetxt:  # 日付文字列が取得出来た時。
+			articlecell = sheet[r, VARS.articlecolumn]  # 記事セルを取得。
 			articletxt = articlecell.getString()  # 記事セルの文字列を取得。
 			if articletxt:  # 記事列のセルに文字列がある時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -273,58 +272,27 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				articletxt = transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
 				if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
 					articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。				
-				txts = articletxt.rsplit("｡", 1)  # 右から｡で1回分割。	
-				if len(txts)>1:  # "｡"がない時は何もしない。
-					if txts[-1]:  # 日付の直前が｡でない時。
-						articletxt = "".join((txts[0], "｡", datetxt, txts[1]))  # ｡の後ろに日付を移動させる。
-					else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
-						txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
-						if len(txts2)>1:  # ｡の後ろに日付を移動させる。
-							articletxt = "".join((txts2[0], "｡", datetxt, txts2[1], "｡"))
-				articlecell.setString(articletxt)
+					txts = articletxt.rsplit("｡", 1)  # 右から｡で1回分割。	
+					if len(txts)>1:  # "｡"がない時は何もしない。
+						if txts[-1]:  # 日付の直前が｡でない時。
+							articletxt = "".join((txts[0], "｡", datetxt, " ", txts[1]))  # ｡の後ろに日付を移動させる。
+						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
+							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
+							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
+								articletxt = "".join((txts2[0], "｡", datetxt, " ", txts2[1], "｡"))
+						articlecell.setString(articletxt)
 			else:  # 記事列のセルが空の時。
-				sheet[r, VARS.articlecolumn].setString(datetxt)
+				sheet[r, VARS.articlecolumn].setString(datetxt)  # 日付文字列をセルに代入する。
+	elif c==VARS.phrasecolumn:  # 定型句列の時。
+		
+		pass
+				
+				
 	return False  # セルを編集モードにしない。		
-			
-			
-
-		
-		
-		
-# 		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-# 		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。						
-# 		dateformat = "%Y/%-m/%-d"  # Article列にいれる日付書式。0で埋めない。
-# 		kijirange = sheet[r, VARS.articlecolumn:VARS.articlecolumn+2]  # Article列と過去日列のみ取得。
-# 		articletxt, datetxt = kijirange.getDataArray()[0]  # Articleセルと挿入済日付セルの値を取得。
-# 		articletxt = articletxt and transliteration.transliterate(articletxt, 0, len(articletxt), [])[0]  # 半角に変換。
-# 		newdateobj = date.today()  # 今日の日付オブジェクトをまず取得。						
-# 		if datetxt:  # 日付が挿入済の時。
-# 			if articletxt.endswith(datetxt):  # Article列の最後がこのボタンで入れた日付で終わっている時。
-# 				dateobj = datetime.strptime(datetxt, dateformat.replace("-", "")).date()  # 日時を取得。0で埋めない-があるとValueError: '-' is a bad directiveがでる。
-# 				articletxt = articletxt[:-len(datetxt)]  # すでにある日付を削る。
-# 				if c==VARS.articlecolumn+1 and dateobj>newdateobj-timedelta(days=2):  # 過去日列かつ2日前までの時。
-# 					newdateobj = dateobj - timedelta(days=1)  # 1日遡る。
-# 				elif c==VARS.articlecolumn+2 and dateobj<newdateobj+timedelta(days=2):  # 未来日列かつ2日後までの時。	
-# 					newdateobj = dateobj + timedelta(days=1)  # 1日進める。
-# 				elif c==VARS.articlecolumn+3:  # 入替列の時。
-# 					txts = articletxt.rsplit("｡", 1)  # 右から｡で分割。	
-# 					if len(txts)>1:  # ｡の後ろに日付を移動させる。
-# 						if txts[-1]:  # 日付の直前が｡でない時。
-# 							articletxt = "".join((txts[0], "｡", datetxt, txts[1]))
-# 							kijirange.setDataArray(((articletxt, ""),))
-# 						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
-# 							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
-# 							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
-# 								articletxt = "".join((txts2[0], "｡", datetxt, txts2[1], "｡"))
-# 								kijirange.setDataArray(((articletxt, ""),))		
-# 				else:  # 日付を削除して空文字にする。
-# 					kijirange.setDataArray(((articletxt, ""),))		
-# 		datetxt = newdateobj.strftime(dateformat)							
-# 		articletxt += datetxt
-# 		kijirange.setDataArray(((articletxt, datetxt),))						
-# 		sheet[r, VARS.articlecolumn+1].setPropertyValue("CharColor", commons.COLORS["white"])
-
-	
+def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
+	articlecell.setString("".join([articlecell.getString(), selection.getString()]))  # 新規日付を代入。
 def handleDS(functionaccess, ds, datecell, subjectcell):
 	if " " in ds:  # スペースがある時。
 		datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
@@ -435,99 +403,98 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	selection = controller.getSelection()
 	sheet = controller.getActiveSheet()
 	VARS.setSheet(sheet)
-# 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている時。
 	drowBorders(xscriptcontext, selection)  # 枠線の作成。
-# def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
-# 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-# 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-# 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-# 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-# 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-# 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-# 	del contextmenu[:]  # contextmenu.clear()は不可。
-# 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-# 	if contextmenuname=="cell":  # セルのとき
-# 		consts = getConsts(sheet, selection)  # セル固有の定数を取得。
-# 		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
-# 		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
-# 			return EXECUTE_MODIFIED
-# 		commons.cutcopypasteMenuEntries(addMenuentry)
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
-# # 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# # 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
-# # 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-# # 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
-# 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
-# 		consts = getConsts(sheet, selection)  # 選択範囲の最初のセルの定数を取得。
-# 		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
-# 		if sectionname in ("A",) or selection[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
-# 			return EXECUTE_MODIFIED
-# 		if sectionname in ("C",):
-# 			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
-# 			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")}) 
-# 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})   
-# 		elif sectionname in ("G",):
-# 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  
-# 			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})	
-# 		commons.cutcopypasteMenuEntries(addMenuentry)
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		commons.rowMenuEntries(addMenuentry)
-# 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
-# 		pass
-# 	elif contextmenuname=="sheettab":  # シートタブの時。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
-# 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	controller = doc.getCurrentController()  # コントローラの取得。
-# 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-# 	selection = controller.getSelection()
-# 	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
-# 		consts = getConsts(sheet, selection)
-# 		splittedrow = consts.splittedrow
-# 		bluerow = consts.bluerow
-# 		skybluerow = consts.skybluerow
-# 		redrow = consts.redrow
-# 		sharpcolumn = consts.sharpcolumn
-# 		articlecolumn = consts.articlecolumn
-# 		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
-# 			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
-# 			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-# 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-# 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-# 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-# 				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-# 		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
-# 			dest_start_ridx = skybluerow + 1  # 移動先開始行インデックス。
-# 			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-# 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-# 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-# 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-# 				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
-# 		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
-# 			dest_start_ridx = skybluerow + 1  # 移動先開始行インデックス。
-# 			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-# 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-# 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-# 				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-# 		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
-# 			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
-# 			problemranges = getProblemRanges(doc, sheet[skybluerow+1:redrow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-# 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-# 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-# 				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-# 				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-# 		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
-# 			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
-# 			problemranges = getProblemRanges(doc, sheet[skybluerow+1:redrow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-# 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-# 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-# 				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	if contextmenuname=="cell":  # セルのとき
+		consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
+		if sectionname in ("A", "B"):  # 固定行より上の時はコンテクストメニューを表示しない。
+			return EXECUTE_MODIFIED
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+# 			addMenuentry("ActionTrigger", {"Text": "To Green", "CommandURL": baseurl.format("entry1")}) 
+# 		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
+# 			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")}) 
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+		consts = getConsts(sheet, selection)  # 選択範囲の最初のセルの定数を取得。
+		sectionname = consts.sectionname  # クリックしたセルの区画名を取得。			
+		if sectionname in ("A",) or selection[0, 0].getPropertyValue("CellBackColor")!=-1:  # 背景色のあるときは表示しない。
+			return EXECUTE_MODIFIED
+		if sectionname in ("C",):
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry2")})  
+			addMenuentry("ActionTrigger", {"Text": "過去ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry3")}) 
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+			addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry1")})   
+		elif sectionname in ("G",):
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄへ移動", "CommandURL": baseurl.format("entry4")})  
+			addMenuentry("ActionTrigger", {"Text": "現ﾘｽﾄにｺﾋﾟｰ", "CommandURL": baseurl.format("entry5")})  
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})	
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader":  # 列ヘッダーの時。
+		pass
+	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	selection = controller.getSelection()
+	if len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 列全体が選択されている場合もあるので行全体が選択されていることを確認する。
+		consts = getConsts(sheet, selection)
+		splittedrow = consts.splittedrow
+		bluerow = consts.bluerow
+		skybluerow = consts.skybluerow
+		redrow = consts.redrow
+		sharpcolumn = consts.sharpcolumn
+		articlecolumn = consts.articlecolumn
+		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
+			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
+			dest_start_ridx = skybluerow + 1  # 移動先開始行インデックス。
+			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
+		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
+			dest_start_ridx = skybluerow + 1  # 移動先開始行インデックス。
+			problemranges = getProblemRanges(doc, sheet[splittedrow:bluerow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
+			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[skybluerow+1:redrow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
+			dest_start_ridx = bluerow  # 移動先開始行インデックス。	
+			problemranges = getProblemRanges(doc, sheet[skybluerow+1:redrow, sharpcolumn:articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
