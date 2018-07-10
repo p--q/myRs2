@@ -17,14 +17,14 @@ from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enu
 class Karute():  # シート固有の定数設定。
 	def __init__(self):
 		self.splittedrow = 2  # 分割行インデックス。
-		self.sharpcolumn = 1  # 区切列インデックス。
+		self.sharpcolumn = 1  # 行区切列インデックス。
 		self.datecolumn = 2  # 日付列インデックス。
 		self.problemcolumn = 3  # プロブレム列インデックス。
-		self.problemhistorycolumn = 4  # プロブレム履歴列インデックス。
+		self.phrasecolumn = 4  # 定型句列インデックス。
 		self.articlecolumn = 5  # 記事列インデックス。
-		self.insertdatecolumn = 6  # 日付挿入インデックス。
-		self.replacedatecolumn = 7  # 日付前へ列インデックス。
-		self.phrasecolumn = 8  # 定型句インデックス。
+		self.historycolumn = 6  # 履歴インデックス。
+		self.insertdatecolumn = 7  # 日付挿入インデックス。
+		self.replacedatecolumn = 8  # 日付前へ列インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
@@ -182,7 +182,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
 		createFormatKey = commons.formatkeyCreator(doc)		
 		sheet[VARS.splittedrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-		sheet[VARS.splittedrow:VARS.bluerow, VARS.subjectcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
+		sheet[VARS.splittedrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
 	elif txt=="問題ﾘｽﾄへ変換":
 		cellranges = sheet[VARS.redrow+1:, VARS.articlecolumn].queryContentCells(CellFlags.STRING)  # Article列の文字列が入っているセルに限定して抽出。
 		if len(cellranges):  # セル範囲が取得出来た時。
@@ -251,8 +251,8 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY/MM/DD")	
 	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
 		return True  # セル編集モードにする。
-	elif c==VARS.problemhistorycolumn:  # プロブレム履歴列インデックスの時。
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ履歴", outputcolumn=VARS.articlecolumn)
+	elif c==VARS.phrasecolumn:  # 定型句列インデックスの時。
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumn)
 		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
 		selection.setString("")  # 日付挿入列の文字列をクリア。
@@ -281,14 +281,26 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
 								articletxt = "".join((txts2[0], "｡", datetxt, " ", txts2[1], "｡"))
 						articlecell.setString(articletxt)
-			else:  # 記事列のセルが空の時。
-				sheet[r, VARS.articlecolumn].setString(datetxt)  # 日付文字列をセルに代入する。
-	elif c==VARS.phrasecolumn:  # 定型句列の時。
+	elif c==VARS.historycolumn:  # 履歴列の時。
+		
+		
 		
 		pass
 				
 				
-	return False  # セルを編集モードにしない。		
+	return False  # セルを編集モードにしない。	
+def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#2018/5/7心エコー:LV wall function normal、とあるのを処理する。
+	sheet = VARS.sheet
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+	datarow = sheet[selection.getCellAddress().Row, :VARS.articlecolumn+1].getDataArray()[0]
+	problemtxt = datarow[VARS.problemcolumn]
+	if problemtxt.startswith("#"):
+		datarow[VARS.sharpcolumn] = "#"
+		problemtxt = problemtxt.replace("#", "")
+	
+	
+	
+
 def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
