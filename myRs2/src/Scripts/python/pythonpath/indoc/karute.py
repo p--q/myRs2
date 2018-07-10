@@ -289,7 +289,7 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				
 				
 	return False  # セルを編集モードにしない。	
-def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#2018/5/7心エコー:LV wall function normal、とあるのを処理する。
+def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#2018/5/7 心エコー:LV wall function normal、とあるのを処理する。
 	sheet = VARS.sheet
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	datarow = sheet[selection.getCellAddress().Row, :VARS.articlecolumn+1].getDataArray()[0]
