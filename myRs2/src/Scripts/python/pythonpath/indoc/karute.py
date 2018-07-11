@@ -282,25 +282,29 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 								articletxt = "".join((txts2[0], "｡", datetxt, " ", txts2[1], "｡"))
 						articlecell.setString(articletxt)
 	elif c==VARS.historycolumn:  # 履歴列の時。
-		
-		
-		
-		pass
-				
-				
+		problemtxt = VARS.sheet[r, VARS.problemcolumn].getString()
+		if not problemtxt:
+			problemtxt = "履歴"
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
 	return False  # セルを編集モードにしない。	
-def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#2018/5/7 心エコー:LV wall function normal、とあるのを処理する。
-	sheet = VARS.sheet
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
-	datarow = sheet[selection.getCellAddress().Row, :VARS.articlecolumn+1].getDataArray()[0]
+def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	datarow = ["" for dummy in range(len(VARS.articlecolumn))]
 	problemtxt = datarow[VARS.problemcolumn]
-	if problemtxt.startswith("#"):
-		datarow[VARS.sharpcolumn] = "#"
-		problemtxt = problemtxt.replace("#", "")
-	
-	
-	
-
+	if problemtxt.startswith("#"):  # #から始まっている時。
+		datarow[VARS.sharpcolumn] = "#"  # 行区切列に#を代入。
+		problemtxt = problemtxt[1:]  # 先頭文字を削る。
+	if problemtxt.startswith("today"):  # todayで始まっている時。
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
+		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+		datarow[VARS.datecolumn] = int(functionaccess.callFunction("TODAY", ()))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
+		problemtxt = problemtxt[len("today"):]  # todayを削る。
+	if ":" in problemtxt:
+		datarow[VARS.problemcolumn], datarow[VARS.articlecolumn] = problemtxt.split(":", 1)
+	else:
+		datarow[VARS.articlecolumn] = problemtxt
+	VARS.sheet[selection.getCellAddress().Row, :VARS.articlecolumn+1].setDataArray((datarow,))
 def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
