@@ -93,104 +93,129 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet[daterow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	sheet = selection.getSpreadsheet()
-	VARS.setSheet(sheet)
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+			VARS.setSheet(selection.getSpreadsheet())
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(selection)  # 枠線の作成。
-# 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-# 				
-# 				
-# 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 				controller = doc.getCurrentController()  # コントローラの取得。
-# 				consts = getConsts(sheet, selection)  # セル固有の定数を取得。
-# 				sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
-# 				yakucolumn = consts.yakucolumn
-# 				txt = selection.getString()  # クリックしたセルの文字列を取得。	
-# 				celladdress = selection.getCellAddress()  # ターゲットのセルアドレスを取得。
-# 				r, c = celladdress.Row, celladdress.Column
-# 				if sectionname=="A":
-# 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。						
-# 					sheets = doc.getSheets()  # シートコレクションを取得。
-# 					if txt=="一覧へ":
-# 						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
-# 					elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
-# 						datarow = sheet[1, yakucolumn:consts.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
-# 						idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
-# 						idtxt = idcelltxts[0]  # 最初の要素を取得。
-# 						if idtxt.isdigit():  # IDが数値のみの時。					
-# 							sheets = doc.getSheets()
-# 							if idtxt in sheets:  # ID名のシートがあるとき。
-# 								controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
-# 							else:
-# 								if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
-# 									kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
-# 									datevalue = datarow[-1]
-# 									karutesheet = commons.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
-# 									controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
-# 								else:
-# 									commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
-# 						else:
-# 							commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
-# 					elif txt=="薬品整理":  # クリックするたびに終了順、昇順に並び替える。黒行の上のみ。
-# 						if consts.splittedrow>consts.blackrow:  # 分割行から黒行より上に行がある時のみ。
-# 							datarange = sheet[consts.splittedrow:consts.blackrow, :]  # 黒行より上の行のセル範囲を取得。
-# 							controller.select(datarange)  # ソートするセル範囲を取得。
-# 							if selection.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
-# 								selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # ボタンの背景色を付ける。				
-# 								props = PropertyValue(Name="Col1", Value=yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
-# 							else:  # ボタンの背景色がある時、終了順でソート。終了列インデックスを先頭列に代入しておく。
-# 								datarows = []  # 終了行インデックスを入れる行のリスト。
-# 								for i in range(consts.blackrow-consts.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
-# 									cellranges = datarange[i, consts.splittedcolumn:].queryContentCells(CellFlags.STRING)  # 文字列のあるセル範囲コレクションを取得。
-# 									if len(cellranges):  # セル範囲が取得出来た時。
-# 										datarows.append((cellranges.getRangeAddresses()[-1].EndColumn,))  # 最終列インデックスを取得。
-# 									else:
-# 										datarows.append((1,))  # 色セルがない行は1にして上に持ってくる。0にするとFalseになってしまう。
-# 								datarange[:, 0].setDataArray(datarows)  # 開始列インデックスをシートに代入。
-# 								datarange[:, 0].setPropertyValue("CharColor", commons.COLORS["white"])  # 先頭列の文字色を白色にする。
-# 								selection.setPropertyValue("CellBackColor", -1)  # ボタンの背景色を消す。		
-# 								props = PropertyValue(Name="Col1", Value=1),  # Col1の番号は優先順位。Valueはインデックス+1。 
-# 							dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-# 							dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
-# 							controller.select(selection)  # ボタンを選択し直す。	
-# 					elif txt=="薬品名抽出":
-# 						firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (yakucolumn+1, yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
-# 						if firstrow<consts.emptyrow:
-# 							transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-# 							transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
-# 							datarows = sheet[firstrow:consts.emptyrow, yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
-# 							sep = "*sep*"  # 区切り文字。
-# 							concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
-# 							transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
-# 							rowtxts = concatenetedtxt.split(sep)  # 区切り文字で分割。
-# 							rowtxtslength = len(rowtxts)
-# 							newdatarows = []
-# 							for i, rowtxt in enumerate(rowtxts):  # 行の相対インデックスとともにイテレートする。
-# 								if rowtxt.endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
-# 									if rowtxt in ("ﾍﾟﾝﾆｰﾄﾞﾙ", "ﾋﾞﾀﾒｼﾞﾝ", "ﾌﾞﾄﾞｳ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
-# 										continue									
-# 									for j in range(i+1, i+4):  # 3行下の行まで。
-# 										if j<rowtxtslength:  # j行が存在する時。
-# 											if "1日間" in rowtxts[j]:  # j行に"1日間"がある時。
-# 												if j+1<rowtxtslength:  # j+1行が存在する時。
-# 													if not "日間" in rowtxts[j+1]:  # j+1行に"日間"がない時。
-# 														break  
-# 												else:  # "1日間"で終わっている時。
-# 													break	
-# 										else:
-# 											break
-# 									else:  # breakされなかった時。
-# 										if not rowtxt in newdatarows:  # まだ追加していない要素の時のみ。
-# 											newdatarows.append((rowtxt,))  # その行を取得。
-# 							sheets[firstrow:consts.emptyrow, yakucolumn:consts.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
-# 							sheets[firstrow:firstrow+len(newdatarows), yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
-# 					elif txt[:8].isdigit():  # 最初8文字が数値の時。						
-# 						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-# 						systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
-# 					return False  # セル編集モードにしない。	
+			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+				if r<VARS.splittedrow:  # 分割行より上、の時。
+					if c<VARS.splittedcolumn:  # 分割列より左、の時。
+						return wClickMenu(enhancedmouseevent, xscriptcontext)
+					else: 
+						return wClickUpperRight(enhancedmouseevent, xscriptcontext)
+				elif r!=VARS.blackrow:  # 黒行でない時。
+					if r>VARS.splittedcolumn-1:  # 分割行含む右列。
+						return wClickBottomRight(enhancedmouseevent, xscriptcontext)
+					elif r==VARS.yakucolumn:  # 薬名列の時。
+						return True  # セル編集モードにする。
+					else:	
+						return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
+				return False  # セル編集モードにしない。
+def wClickMenu(enhancedmouseevent, xscriptcontext):
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	sheets = doc.getSheets()  # シートコレクションを取得。	
+	sheet = VARS.sheet	
+	controller = doc.getCurrentController()  # コントローラの取得。	
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	txt = selection.getString()	
+	if txt=="一覧へ":
+		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+	elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
+		datarow = sheet[1, VARS.yakucolumn:VARS.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
+		idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
+		idtxt = idcelltxts[0]  # 最初の要素を取得。
+		if idtxt.isdigit():  # IDが数値のみの時。					
+			if idtxt in sheets:  # ID名のシートがあるとき。
+				controller.setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
+			else:
+				if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
+					kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
+					datevalue = datarow[-1]
+					karutesheet = commons.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
+					controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
+				else:
+					commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
+		else:
+			commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
+	elif txt=="薬品整理":  # クリックするたびに終了順、昇順に並び替える。黒行の上のみ。
+		if VARS.splittedrow>VARS.blackrow:  # 分割行から黒行より上に行がある時のみ。
+			datarange = sheet[VARS.splittedrow:VARS.blackrow, :]  # 黒行より上の行のセル範囲を取得。
+			controller.select(datarange)  # ソートするセル範囲を取得。
+			if selection.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
+				selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # ボタンの背景色を付ける。				
+				props = PropertyValue(Name="Col1", Value=VARS.yakucolumn+1),  # Col1の番号は優先順位。Valueはインデックス+1。 			
+			else:  # ボタンの背景色がある時、終了順でソート。終了列インデックスを先頭列に代入しておく。
+				datarows = []  # 終了行インデックスを入れる行のリスト。
+				for i in range(VARS.blackrow-VARS.splittedrow):  # 分割行インデックスから、黒行の上までの相対インデックスを取得。
+					cellranges = datarange[i, VARS.splittedcolumn:].queryContentCells(CellFlags.STRING)  # 文字列のあるセル範囲コレクションを取得。
+					if len(cellranges):  # セル範囲が取得出来た時。
+						datarows.append((cellranges.getRangeAddresses()[-1].EndColumn,))  # 最終列インデックスを取得。
+					else:
+						datarows.append((1,))  # 色セルがない行は1にして上に持ってくる。0にするとFalseになってしまう。
+				datarange[:, 0].setDataArray(datarows)  # 開始列インデックスをシートに代入。
+				datarange[:, 0].setPropertyValue("CharColor", commons.COLORS["white"])  # 先頭列の文字色を白色にする。
+				selection.setPropertyValue("CellBackColor", -1)  # ボタンの背景色を消す。		
+				props = PropertyValue(Name="Col1", Value=1),  # Col1の番号は優先順位。Valueはインデックス+1。 
+			dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+			dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
+			controller.select(selection)  # ボタンを選択し直す。	
+	elif txt=="薬品名抽出":
+		firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (VARS.yakucolumn+1, VARS.yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
+		if firstrow<VARS.emptyrow:
+			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+			transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
+			datarows = sheet[firstrow:VARS.emptyrow, VARS.yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
+			sep = "*sep*"  # 区切り文字。
+			concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
+			transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
+			rowtxts = concatenetedtxt.split(sep)  # 区切り文字で分割。
+			rowtxtslength = len(rowtxts)
+			newdatarows = []
+			for i, rowtxt in enumerate(rowtxts):  # 行の相対インデックスとともにイテレートする。
+				if rowtxt.endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
+					if rowtxt in ("ﾍﾟﾝﾆｰﾄﾞﾙ", "ﾋﾞﾀﾒｼﾞﾝ", "ﾌﾞﾄﾞｳ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
+						continue									
+					for j in range(i+1, i+4):  # 3行下の行まで。
+						if j<rowtxtslength:  # j行が存在する時。
+							if "1日間" in rowtxts[j]:  # j行に"1日間"がある時。
+								if j+1<rowtxtslength:  # j+1行が存在する時。
+									if not "日間" in rowtxts[j+1]:  # j+1行に"日間"がない時。
+										break  
+								else:  # "1日間"で終わっている時。
+									break	
+						else:
+							break
+					else:  # breakされなかった時。
+						if not rowtxt in newdatarows:  # まだ追加していない要素の時のみ。
+							newdatarows.append((rowtxt,))  # その行を取得。
+			sheets[firstrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
+			sheets[firstrow:firstrow+len(newdatarows), VARS.yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
+	elif txt[:8].isdigit():  # 最初8文字が数値の時。						
+		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
+	return False  # セル編集モードにしない。	
+def wClickUpperRight(enhancedmouseevent, xscriptcontext):
+	
+	
+	pass
+def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
+	
+	
+	pass
+def wClickBottomRight(enhancedmouseevent, xscriptcontext):
+	
+	
+	pass
+
+
+
+
+
 # 				elif sectionname=="B":
 # 					items = []
 # 					if r==0:  # 月を入力。
@@ -249,7 +274,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 # 					controller.select(sheet[r, yakucolumn])  # 薬名列のセルを選択。
 # 					historydialogyaku.createDialog(xscriptcontext, enhancedmouseevent, header)  # 履歴ダイアログを表示。クリックした位置の下に表示。入力するとシートを下にスクロールする。		
 # 					return False  # セル編集モードにしない。	
-	return True  # セル編集モードにする。
+# 	return True  # セル編集モードにする。
 def txtCycle(items, txt):
 	items.append(items[0])  # 最初の要素を最後の要素に追加する。
 	dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
