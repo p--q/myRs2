@@ -175,12 +175,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
 				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
-				
-				
 				karutesheet = commons.getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
-				
-				
-				
 				doc.getCurrentController().setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
 				return True  # セル編集モードにする。		
