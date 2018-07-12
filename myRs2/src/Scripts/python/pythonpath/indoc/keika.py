@@ -203,7 +203,7 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-	items = []
+# 	items = []
 	if r==VARS.daterow-1:  # 行インデックス0の時。月を入力。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -219,20 +219,20 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		
 		
 		
-	elif r==2:	
-		items = ["", "○", "尿"]			
-		horijustify	= CENTER
-	elif r==3:
-		items = ["", "胸Xp", "腹ｴ", "心ｴ"]
-		horijustify	= LEFT
-	if items:
-		if txt in items:  # セルの内容にある時。
-			txt = txtCycle(items, txt)	
-			selection.setString(txt)
-	if txt:  # 文字がある時。
-		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-	else:
-		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
+# 	elif r==2:	
+# 		items = ["", "○", "尿"]			
+# 		horijustify	= CENTER
+# 	elif r==3:
+# 		items = ["", "胸Xp", "腹ｴ", "心ｴ"]
+# 		horijustify	= LEFT
+# 	if items:
+# 		if txt in items:  # セルの内容にある時。
+# 			txt = txtCycle(items, txt)	
+# 			selection.setString(txt)
+# 	if txt:  # 文字がある時。
+# 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+# 	else:
+# 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
 	return False  # セル編集モードにしない。
 def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	
@@ -326,23 +326,58 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
 			celladdress = selection.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
+			if c>VARS.splittedcolumn-1:  # 分割列を含む右の時。
+				if r>VARS.daterow:  # 日付行より下の時。
+					txt = selection.getString()
+					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
+					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+					transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))						
+					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+					if txt!=txt2:
+						selection.setString(txt2)
+					
+					
+					
+					
+					
+					horijustify	= LEFT if len(txt)>1 else CENTER
+					if r<VARS.splittedrow:  # 分割行より上の時。
+						if txt:  # セルに文字列がある時。
+							selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+						else:
+							selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 			
-		
-			sheet = selection.getSpreadsheet()
 			
-			
-			
-			
-			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
-			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
-			if not sectionname in ("A",):  # 領域A以外の時。
-				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
-				txt = selection.getString()  # セルの文字列を取得。	
-				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-				selection.setString(txt)
+# 			import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+# 			
+# 			pass
+# 			
+# 			celladdress = selection.getCellAddress()
+# 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+# 			if VARS.daterow<r<VARS.splittedrow and c>VARS.splittedcolumn-1:
+# 				txt = selection.getString():  # 
+# 				
+# 				if selection.getString():  # セルに文字がある時。
+# 					selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+# 				else:
+# 					selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。				
+# 		
+# 			sheet = selection.getSpreadsheet()
+# 			
+# 			
+# 			
+# 			
+# 			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
+# 			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
+# 			if not sectionname in ("A",):  # 領域A以外の時。
+# 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+# 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+# 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+# 				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
+# 				txt = selection.getString()  # セルの文字列を取得。	
+# 				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
+# 				selection.setString(txt)
 			break
 # def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 # 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
