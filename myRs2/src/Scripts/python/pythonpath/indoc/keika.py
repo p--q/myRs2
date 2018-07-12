@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, historydialogyaku
+from indoc import commons, staticdialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
@@ -21,7 +21,7 @@ class Keika():  # シート固有の定数設定。
 		self.daterow = 1  # 日付行インデックス。
 		self.splittedrow = 4  # 分割行インデックス。
 		self.yakucolumn = 5  # 薬名列インデックス。
-		self.splittedcolumn = 9  # 分割列インデックス。
+		self.splittedcolumn = 9  # 分割列インcccfewfweデックス。
 	def setSheet(self, sheet):
 		self.sheet = sheet
 		cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
@@ -200,9 +200,40 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 	return False  # セル編集モードにしない。	
 def wClickUpperRight(enhancedmouseevent, xscriptcontext):
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	celladdress = selection.getCellAddress()
+	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+	items = []
+	if r==VARS.daterow-1:  # 行インデックス0の時。月を入力。
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
+		datevalue = int(VARS.sheet[VARS.daterow, c].getValue())
+		m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
+		selection.setString("{}月".format(m))
+	elif r==VARS.daterow+1:  # 日付行の下の時。
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString())
 	
-	
-	pass
+
+		
+		
+		
+		
+	elif r==2:	
+		items = ["", "○", "尿"]			
+		horijustify	= CENTER
+	elif r==3:
+		items = ["", "胸Xp", "腹ｴ", "心ｴ"]
+		horijustify	= LEFT
+	if items:
+		if txt in items:  # セルの内容にある時。
+			txt = txtCycle(items, txt)	
+			selection.setString(txt)
+	if txt:  # 文字がある時。
+		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+	else:
+		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
+	return False  # セル編集モードにしない。
 def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	
 	
@@ -275,10 +306,10 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 # 					historydialogyaku.createDialog(xscriptcontext, enhancedmouseevent, header)  # 履歴ダイアログを表示。クリックした位置の下に表示。入力するとシートを下にスクロールする。		
 # 					return False  # セル編集モードにしない。	
 # 	return True  # セル編集モードにする。
-def txtCycle(items, txt):
-	items.append(items[0])  # 最初の要素を最後の要素に追加する。
-	dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
-	return dic[txt]
+# def txtCycle(items, txt):  # items: 循環させる文字列のリスト、txt: 現在の文字列。
+# 	items.append(items[0])  # 最初の要素を最後の要素に追加する。
+# 	dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
+# 	return dic[txt]
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -288,25 +319,31 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(selection)  # 枠線の作成。
+def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
+	changes = changesevent.Changes	
+	for change in changes:
+		if change.Accessor=="cell-change":  # セルの値が変化した時。
+			selection = change.ReplacedElement  # 値を変更したセルを取得。	
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
+			
 		
-
-# def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
-# 	changes = changesevent.Changes	
-# 	for change in changes:
-# 		if change.Accessor=="cell-change":  # セルの値が変化した時。
-# 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
-# 			sheet = selection.getSpreadsheet()
-# 			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
-# 			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
-# 			if not sectionname in ("A",):  # 領域A以外の時。
-# 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-# 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-# 				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
-# 				txt = selection.getString()  # セルの文字列を取得。	
-# 				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-# 				selection.setString(txt)
-# 			break
+			sheet = selection.getSpreadsheet()
+			
+			
+			
+			
+			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
+			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
+			if not sectionname in ("A",):  # 領域A以外の時。
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
+				txt = selection.getString()  # セルの文字列を取得。	
+				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
+				selection.setString(txt)
+			break
 # def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 # 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 # 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
