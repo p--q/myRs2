@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, staticdialog
+from indoc import commons, historydialog, staticdialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
@@ -29,52 +29,6 @@ class Keika():  # シート固有の定数設定。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in (commons.COLORS["black"],))
 		self.blackrow = next(gene)  # 黒行インデックスを取得。	
 VARS = Keika()		
-# def getConsts(sheet, selection=None):  # 区画名を取得。
-# 	"""
-# 	A  ||  B
-# 	===========  # 行の固定の境界。||は列の固定の境界。境界の行と列はそれぞれ下、右に含む。
-# 	C  ||  D
-# 	I-----------  # 黒行。この行は含まない。
-# 	E  ||  F
-# 	-----------  # 薬品列の最下行の一つ下の行。
-# 	G  ||  H
-# 	
-# 	# J: C,E,Gの薬名列より左。
-# 	
-# 	"""
-# 	consts = Keika(sheet)
-# 	if selection is not None:
-# 		splittedrow = consts.splittedrow
-# 		splittedcolumn = consts.splittedcolumn
-# 		blackrow = consts.blackrow
-# 		emptyrow = consts.emptyrow
-# 		rangeaddress = selection[0, 0].getRangeAddress()  # ターゲットのセル範囲アドレスを取得。セルアドレスは不可。
-# 		sectionname = ""
-# 		if splittedrow<blackrow:
-# 			if len(sheet[splittedrow:blackrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-# 				sectionname = "C"			
-# 			elif len(sheet[splittedrow:blackrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-# 				sectionname = "D"			
-# 		elif blackrow+1<emptyrow:
-# 			if len(sheet[blackrow+1:emptyrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-# 				sectionname = "E"				
-# 			elif len(sheet[blackrow+1:emptyrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-# 				sectionname = "F"	
-# 		if not sectionname:		
-# 			if len(sheet[:splittedrow, :splittedcolumn].queryIntersection(rangeaddress)): 
-# 				sectionname = "A"	
-# 			elif len(sheet[:splittedrow, splittedcolumn:].queryIntersection(rangeaddress)): 
-# 				sectionname = "B"					
-# 			elif len(sheet[emptyrow:, :splittedcolumn].queryIntersection(rangeaddress)): 
-# 				sectionname = "G"					
-# 			elif len(sheet[emptyrow:, splittedcolumn:].queryIntersection(rangeaddress)): 
-# 				sectionname = "H"
-# 			else:
-# 				sectionname = "I"
-# 		if sectionname in ("C", "E", "G") and len(sheet[splittedrow:, :consts.yakucolumn].queryIntersection(rangeaddress)):
-# 			sectionname = "J"
-# 		consts.sectionname = sectionname  # 区画名
-# 	return consts  
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
@@ -107,9 +61,9 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					else: 
 						return wClickUpperRight(enhancedmouseevent, xscriptcontext)
 				elif r!=VARS.blackrow:  # 黒行でない時。
-					if r>VARS.splittedcolumn-1:  # 分割行含む右列。
+					if c>VARS.splittedcolumn-1:  # 分割行含む右列。
 						return wClickBottomRight(enhancedmouseevent, xscriptcontext)
-					elif r==VARS.yakucolumn:  # 薬名列の時。
+					elif c==VARS.yakucolumn:  # 薬名列の時。
 						return True  # セル編集モードにする。
 					else:	
 						return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
@@ -203,113 +157,47 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-# 	items = []
-	if r==VARS.daterow-1:  # 行インデックス0の時。月を入力。
+	if r==VARS.daterow-1:  # 日付行の直上の時。月を入力。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
 		datevalue = int(VARS.sheet[VARS.daterow, c].getValue())
 		m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 		selection.setString("{}月".format(m))
-	elif r==VARS.daterow+1:  # 日付行の下の時。
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString())
-	
-
-		
-		
-		
-		
-# 	elif r==2:	
-# 		items = ["", "○", "尿"]			
-# 		horijustify	= CENTER
-# 	elif r==3:
-# 		items = ["", "胸Xp", "腹ｴ", "心ｴ"]
-# 		horijustify	= LEFT
-# 	if items:
-# 		if txt in items:  # セルの内容にある時。
-# 			txt = txtCycle(items, txt)	
-# 			selection.setString(txt)
-# 	if txt:  # 文字がある時。
-# 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-# 	else:
-# 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
-	return False  # セル編集モードにしない。
+	elif r==VARS.daterow+1:
+		defaultrows = "", "○", "尿"
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
+	elif r==VARS.daterow+2:
+		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
+	return False  # セル編集モードにしない。		
+def callback_wClickUpperRight(mouseevent, xscriptcontext):	
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	txt = selection.getString()
+	if txt:  # セルに文字列がある時。
+		horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+	else:
+		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
-	
-	
-	pass
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	c = selection.getCellAddress().Column  # selectionの列のインデックスを取得。		
+	if c<VARS.yakucolumn:
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString(), [], VARS.yakucolumn)
+	else:
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString())
+	return False  # セル編集モードにしない。
 def wClickBottomRight(enhancedmouseevent, xscriptcontext):
-	
-	
-	pass
-
-
-
-
-
-# 				elif sectionname=="B":
-# 					items = []
-# 					if r==0:  # 月を入力。
-# 						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-# 						functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
-# 						datevalue = int(sheet[consts.daterow, c].getValue())
-# 						m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
-# 						selection.setString(txtCycle(["", "{}月".format(m)], txt))
-# 						return False  # セル編集モードにしない。
-# 					elif r==1:  # 日付行の時。
-# 						return False  # セル編集モードにしない。
-# 					elif r==2:	
-# 						items = ["", "○", "尿"]			
-# 						horijustify	= CENTER
-# 					elif r==3:
-# 						items = ["", "胸Xp", "腹ｴ", "心ｴ"]
-# 						horijustify	= LEFT
-# 					if items:
-# 						if txt in items:  # セルの内容にある時。
-# 							txt = txtCycle(items, txt)	
-# 							selection.setString(txt)
-# 					if txt:  # 文字がある時。
-# 						selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-# 					else:
-# 						selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。
-# 					return False  # セル編集モードにしない。	
-# 				elif sectionname in ("C", "E", "G"):
-# 					if c==yakucolumn:  # 薬名列の時。
-# 						return True  # セル編集モードにする。
-# 					elif c==yakucolumn+1:  # 用法列の時。
-# 						if txt:
-# # 							dialogs.createDialog(xscriptcontext)
-# 
-# 							pass
-# 						else:
-# 							selection.setString("分3")
-# 					elif c==yakucolumn+2:  # 回数列の時。
-# 						if txt:
-# 							
-# 							
-# 							pass
-# 						else:
-# 							selection.setString("持続")			
-# 					return False  # セル編集モードにしない。	
-# 				elif sectionname in ("D", "F"):
-# 					if txt:
-# 						
-# 						
-# 						pass
-# 					else:
-# 						selection.setString("止")								
-# 					return False  # セル編集モードにしない。	
-# 				elif sectionname in ("J",):
-# 					header = sheet[1, c].getString()  # 行インデックス1のセルの文字列を取得。
-# 					controller.select(sheet[r, yakucolumn])  # 薬名列のセルを選択。
-# 					historydialogyaku.createDialog(xscriptcontext, enhancedmouseevent, header)  # 履歴ダイアログを表示。クリックした位置の下に表示。入力するとシートを下にスクロールする。		
-# 					return False  # セル編集モードにしない。	
-# 	return True  # セル編集モードにする。
-# def txtCycle(items, txt):  # items: 循環させる文字列のリスト、txt: 現在の文字列。
-# 	items.append(items[0])  # 最初の要素を最後の要素に追加する。
-# 	dic = {items[i]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。
-# 	return dic[txt]
+	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "投薬", callback=callback_wClickBottomRight)
+	return False  # セル編集モードにしない。
+def callback_wClickBottomRight(mouseevent, xscriptcontext):	
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	txt = selection.getString()
+	if txt=="止":
+		r = selection.getCellAddress().Row		
+		if r>VARS.blackrow:  # 黒行より下の時。
+			rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+			commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -319,7 +207,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(selection)  # 枠線の作成。
-def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。		
+def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	changes = changesevent.Changes	
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
@@ -334,186 +222,153 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
 					transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))						
 					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if txt!=txt2:
+					if txt!=txt2:  # 変換前と異なる時はセルに代入。
 						selection.setString(txt2)
-					
-					
-					
-					
-					
-					horijustify	= LEFT if len(txt)>1 else CENTER
+					horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
 					if r<VARS.splittedrow:  # 分割行より上の時。
 						if txt:  # セルに文字列がある時。
 							selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
 						else:
 							selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
-			
-			
-# 			import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-# 			
-# 			pass
-# 			
-# 			celladdress = selection.getCellAddress()
-# 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-# 			if VARS.daterow<r<VARS.splittedrow and c>VARS.splittedcolumn-1:
-# 				txt = selection.getString():  # 
-# 				
-# 				if selection.getString():  # セルに文字がある時。
-# 					selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-# 				else:
-# 					selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。				
-# 		
-# 			sheet = selection.getSpreadsheet()
-# 			
-# 			
-# 			
-# 			
-# 			consts = getConsts(sheet, selection)  # 経過シート固有の定数を取得。
-# 			sectionname = consts.sectionname  # クリックしたセルの区画名を取得。
-# 			if not sectionname in ("A",):  # 領域A以外の時。
-# 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-# 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-# 				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))					
-# 				txt = selection.getString()  # セルの文字列を取得。	
-# 				txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-# 				selection.setString(txt)
+					else:
+						if txt:
+							selection.setPropertyValues("HoriJustify", horijustify)
 			break
-# def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
-# 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-# 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-# 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-# 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-# 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-# 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-# 	del contextmenu[:]  # contextmenu.clear()は不可。
-# 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-# 	consts = getConsts(sheet, selection)  # セル固有の定数を取得。
-# 	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。		
-# 	if contextmenuname=="cell":  # セルのとき		
-# 		if sectionname in ("A",):
-# 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 				txt = selection.getString()
-# 				if txt=="薬品整理":
-# 					addMenuentry("ActionTrigger", {"Text": "同薬品抽出", "CommandURL": baseurl.format("entry1")}) 
-# 					addMenuentry("ActionTrigger", {"Text": "同薬品結合", "CommandURL": baseurl.format("entry2")}) 
-# 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# 		elif sectionname in ("B",):
-# 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-# 				celladdress = selection.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-# 				r = celladdress.Row
-# 				if r==consts.daterow:  # 日付行の時。
-# 					if selection.getValue():  # セルに値があるとき。
-# 						addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
-# 				elif r==consts.daterow+2:  # 処置行の時。
-# 					commons.cutcopypasteMenuEntries(addMenuentry)
-# 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# 		elif sectionname in ("D", "F"):
-# 			addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
-# 			
-# 			addMenuentry("ActionTrigger", {"Text": "翌火へ", "CommandURL": baseurl.format("entry11")})
-# 			addMenuentry("ActionTrigger", {"Text": "翌金へ", "CommandURL": baseurl.format("entry12")})
-# 			
-# 			addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry13")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
-# 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-# 			commons.cutcopypasteMenuEntries(addMenuentry)
-# 		elif sectionname in ("C", "E", "G", "H"):	
-# 			commons.cutcopypasteMenuEntries(addMenuentry)
-# 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
-# 		if sectionname in ("I",):
-# 			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# 		elif sectionname in ("C",):
-# 			addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry15")})  
-# 			addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry16")}) 
-# 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		elif sectionname in ("E",):	
-# 			addMenuentry("ActionTrigger", {"Text": "黒行上へ", "CommandURL": baseurl.format("entry17")})  
-# 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 			addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry18")})  
-# 			addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry19")}) 
-# 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		commons.cutcopypasteMenuEntries(addMenuentry)
-# 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-# 		commons.rowMenuEntries(addMenuentry)
-# 	elif contextmenuname=="colheader" and len(selection[:, 0].getColumns())==len(sheet[:, 0].getColumns()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
-# 		if sectionname in ("B",):
-# 			if len(selection[0, :].getColumns())==1 and selection[0, 0].getCellAddress().Column>consts.splittedcolumn:  # 選択列数が1つだけ、かつ、固定列より右の時。
-# 				if selection[consts.blackrow, 0].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 選択範囲の黒行のセルの背景色が黒色の時。
-# 					addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
-# 				else:
-# 					addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
-# 	elif contextmenuname=="sheettab":  # シートタブの時。
-# 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
-# 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
-# def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	controller = doc.getCurrentController()  # コントローラの取得。
-# 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-# 	selection = controller.getSelection()
-# 	consts = getConsts(sheet, selection)	
-# 	if entrynum==1:  # 同薬品抽出
-# 		
-# 		
-# 		pass
-# 	elif entrynum==2:  # 同薬品結合
-# 		
-# 		
-# 		
-# 		pass
-# 	elif entrynum==5:  # 日付追加。selectionは単一セル。	
-# 		setDates(doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
-# 		if int(selection.getString())!=1:  # 日付が１日でない時。
-# 			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
-# 			r, c = celladdress.Row, celladdress.Column
-# 			if c!=consts.splittedcolumn:  # 固定列でないとき。
-# 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
-# 	elif entrynum==10:  # 処方。selectionは単一セルか複数セル。
-# 		
-# 		
-# 		pass		
-# 	elif entrynum==11:  # 翌月まで。selectionは単一セルか複数セル。
-# 		pass		
-# 	
-# 	
-# 	elif 14<entrynum<20:
-# 		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
-# 		blackrow = consts.blackrow
-# 		emptyrow = consts.emptyrow
-# 		if entrynum==15:  # 使用中最上行へ
-# 			commons.toOtherEntry(sheet, rangeaddress, blackrow, blackrow+1)
-# 		elif entrynum==16:  # 使用中最下行へ
-# 			commons.toNewEntry(sheet, rangeaddress, blackrow, emptyrow) 
-# 		elif entrynum==17:  # 黒行上へ
-# 			commons.toOtherEntry(sheet, rangeaddress, emptyrow, blackrow)  
-# 		elif entrynum==18:  # 使用中最上行へ
-# 			commons.toOtherEntry(sheet, rangeaddress, emptyrow, blackrow+1)
-# 		elif entrynum==19:  # 使用中最下行へ
-# 			commons.toNewEntry(sheet, rangeaddress, blackrow, emptyrow) 
-# 	elif entrynum in (20, 21):	
-# 		if entrynum==20:  # 退院翌日
-# 			selection[consts.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける。
-# 		elif entrynum==21:  # 退院取消
-# 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-# 			dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-# 			docframe = controller.getFrame()
-# 			c = selection[0, 0].getCellAddress().Column  # 選択セル範囲の一番上のセルの列インデックスを取得。
-# 			controller.select(sheet[consts.splittedrow:, c-1])  # 選択列の左の列を選択。
-# 			dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # コピー。
-# 			controller.select(sheet[consts.splittedrow:, c])  # 元の列を選択し直す。
-# 			nvs = ("Flags", "T"),\
-# 				("FormulaCommand", 0),\
-# 				("SkipEmptyCells", False),\
-# 				("Transpose", False),\
-# 				("AsLink", False),\
-# 				("MoveMode", 4)
-# 			props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
-# 			dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
-# 			componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
-# 			keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
-# 			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-# 			toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
-# 			toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	consts = getConsts(sheet, selection)  # セル固有の定数を取得。
+	sectionname = consts.sectionname  # クリックしたセルの区画名を取得。		
+	if contextmenuname=="cell":  # セルのとき		
+		if sectionname in ("A",):
+			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				txt = selection.getString()
+				if txt=="薬品整理":
+					addMenuentry("ActionTrigger", {"Text": "同薬品抽出", "CommandURL": baseurl.format("entry1")}) 
+					addMenuentry("ActionTrigger", {"Text": "同薬品結合", "CommandURL": baseurl.format("entry2")}) 
+			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+		elif sectionname in ("B",):
+			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				celladdress = selection.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
+				r = celladdress.Row
+				if r==consts.daterow:  # 日付行の時。
+					if selection.getValue():  # セルに値があるとき。
+						addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry5")}) 
+				elif r==consts.daterow+2:  # 処置行の時。
+					commons.cutcopypasteMenuEntries(addMenuentry)
+			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+		elif sectionname in ("D", "F"):
+			addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry10")})
+			
+			addMenuentry("ActionTrigger", {"Text": "翌火へ", "CommandURL": baseurl.format("entry11")})
+			addMenuentry("ActionTrigger", {"Text": "翌金へ", "CommandURL": baseurl.format("entry12")})
+			
+			addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry13")})  # 	回数列が空欄の時は金まで、それ以外は火まで。
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+			commons.cutcopypasteMenuEntries(addMenuentry)
+		elif sectionname in ("C", "E", "G", "H"):	
+			commons.cutcopypasteMenuEntries(addMenuentry)
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+		if sectionname in ("I",):
+			return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+		elif sectionname in ("C",):
+			addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry15")})  
+			addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry16")}) 
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		elif sectionname in ("E",):	
+			addMenuentry("ActionTrigger", {"Text": "黒行上へ", "CommandURL": baseurl.format("entry17")})  
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+			addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry18")})  
+			addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry19")}) 
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		commons.rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader" and len(selection[:, 0].getColumns())==len(sheet[:, 0].getColumns()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+		if sectionname in ("B",):
+			if len(selection[0, :].getColumns())==1 and selection[0, 0].getCellAddress().Column>consts.splittedcolumn:  # 選択列数が1つだけ、かつ、固定列より右の時。
+				if selection[consts.blackrow, 0].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 選択範囲の黒行のセルの背景色が黒色の時。
+					addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
+				else:
+					addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
+	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	selection = controller.getSelection()
+	consts = getConsts(sheet, selection)	
+	if entrynum==1:  # 同薬品抽出
+		
+		
+		pass
+	elif entrynum==2:  # 同薬品結合
+		
+		
+		
+		pass
+	elif entrynum==5:  # 日付追加。selectionは単一セル。	
+		setDates(doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
+		if int(selection.getString())!=1:  # 日付が１日でない時。
+			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
+			r, c = celladdress.Row, celladdress.Column
+			if c!=consts.splittedcolumn:  # 固定列でないとき。
+				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
+	elif entrynum==10:  # 処方。selectionは単一セルか複数セル。
+		
+		
+		pass		
+	elif entrynum==11:  # 翌月まで。selectionは単一セルか複数セル。
+		pass		
+	
+	
+	elif 14<entrynum<20:
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		blackrow = consts.blackrow
+		emptyrow = consts.emptyrow
+		if entrynum==15:  # 使用中最上行へ
+			commons.toOtherEntry(sheet, rangeaddress, blackrow, blackrow+1)
+		elif entrynum==16:  # 使用中最下行へ
+			commons.toNewEntry(sheet, rangeaddress, blackrow, emptyrow) 
+		elif entrynum==17:  # 黒行上へ
+			commons.toOtherEntry(sheet, rangeaddress, emptyrow, blackrow)  
+		elif entrynum==18:  # 使用中最上行へ
+			commons.toOtherEntry(sheet, rangeaddress, emptyrow, blackrow+1)
+		elif entrynum==19:  # 使用中最下行へ
+			commons.toNewEntry(sheet, rangeaddress, blackrow, emptyrow) 
+	elif entrynum in (20, 21):	
+		if entrynum==20:  # 退院翌日
+			selection[consts.splittedrow:, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける。
+		elif entrynum==21:  # 退院取消
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+			dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+			docframe = controller.getFrame()
+			c = selection[0, 0].getCellAddress().Column  # 選択セル範囲の一番上のセルの列インデックスを取得。
+			controller.select(sheet[consts.splittedrow:, c-1])  # 選択列の左の列を選択。
+			dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # コピー。
+			controller.select(sheet[consts.splittedrow:, c])  # 元の列を選択し直す。
+			nvs = ("Flags", "T"),\
+				("FormulaCommand", 0),\
+				("SkipEmptyCells", False),\
+				("Transpose", False),\
+				("AsLink", False),\
+				("MoveMode", 4)
+			props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
+			dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+			componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
+			keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
+			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
+			toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
+			toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
 def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
