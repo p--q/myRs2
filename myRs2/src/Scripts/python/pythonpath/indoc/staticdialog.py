@@ -246,13 +246,15 @@ class MouseListener(unohelper.Base, XMouseListener):
 					r, c = celladdress.Row, celladdress.Column
 					if outputcolumn is not None:  # 出力する列が指定されている時。
 						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
-					if optioncontrolcontainer.getControl("CheckBox1").getState():  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
+					flg = optioncontrolcontainer.getControl("CheckBox1").getState()  # セルに追記、のチェックの状態を取得。
+					if flg:  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
 						sheet[r, c].setString("".join([selection.getString(), rowdata[0]]))  # セルに追記する。
 					else:
 						sheet[r, c].setString(rowdata[0])  # セルに代入。
-						controller.select(sheet[r+1, c])  # 下のセルを選択。	
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(mouseevent, xscriptcontext)					
+						callback(mouseevent, xscriptcontext)						
+					if not flg:	
+						controller.select(sheet[r+1, c])  # 下のセルを選択。	
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):

@@ -185,19 +185,43 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	if c<VARS.yakucolumn:
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString(), [], VARS.yakucolumn)
 	else:
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString())
+		defaultrows = []
+		if c==VARS.yakucolumn+1:  # 用法列。
+			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "外用"
+		elif c==VARS.yakucolumn+2:  # 回数列。
+			defaultrows = "持続", "1回", "2回", "3回", "1回1吸入", "1回2吸入"
+		elif c==VARS.yakucolumn+3:  # 限定列。
+			defaultrows = "隔日", "月木", "月水金(透析日のみ)", "火木土(透析日のみ)", "月水金日(透析日以外)", "火木土日(透析日以外)", "月水金土(透析日前日以外)", "火木土日(透析日前日以外)"
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
+def callback_wClickBottomLeft(enhancedmouseevent, xscriptcontext):
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	txt = selection.getString()	
+	if txt:  # セルに文字列がある時。
+		horijustify	= LEFT if len(txt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
+		selection.setPropertyValue("HoriJustify", horijustify)  
 def wClickBottomRight(enhancedmouseevent, xscriptcontext):
-	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "投薬", callback=callback_wClickBottomRight)
+	defaultrows = "止", "変", "朝", "昼", "夕", "寝"
+	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "処方", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
 def callback_wClickBottomRight(mouseevent, xscriptcontext):	
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()
-	if txt=="止":
-		r = selection.getCellAddress().Row		
+	celladdress = selection.getCellAddress()
+	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+	if txt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
+		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+		VARS.sheet[r, c+1:].clearContents(511)
 		if r>VARS.blackrow:  # 黒行より下の時。
 			rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 			commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
+# 	elif txt in ("消",):  # 代入したセルを含めてその右を全て消す。
+# 		VARS.sheet[r, c:].clearContents(511)
+	elif txt in ("朝", "昼", "夕", "寝"):
+		
+		pass  # 色を用法から決定、曜日を限定から取得。
+		
+		
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -322,10 +346,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
 	elif entrynum==10:  # 処方。selectionは単一セルか複数セル。
 		rangeaddress = selection.getRangeAddress()
-		dates = sheet[VARS.daterow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].getDataArray()[0]
-		usages = sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.yakucolumn+1:VARS.splittedcolumn].getDataArray()
+		dates = sheet[VARS.daterow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].getDataArray()[0]  # 選択範囲の日付シリアル値のリスト。float。
+		usages = sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.yakucolumn+1:VARS.splittedcolumn].getDataArray()  # (用法、回数、限定)のタプル。
 		for usage in usages:
+			yoho, dummy, gentei = usage
+			color = "lime" if yoho else "magenta3"  # 用法列がない時は点滴と考える。
 			
+
+				
 			
 			pass
 		
