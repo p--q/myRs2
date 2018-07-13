@@ -348,7 +348,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		rangeaddress = selection.getRangeAddress()
 		dates = sheet[VARS.daterow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].getDataArray()[0]  # 選択範囲の日付シリアル値のリスト。float。
 		usages = sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.yakucolumn+1:VARS.splittedcolumn].getDataArray()  # (用法、回数、限定)のタプル。
-		for usage in usages:
+		for i, usage in enumerate(usages):  # 各行について。
 			yoho, dummy, gentei = usage
 			color = "lime" if yoho else "magenta3"  # 用法列がない時は点滴と考える。
 			
