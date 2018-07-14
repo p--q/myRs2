@@ -345,22 +345,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection)
 	elif entrynum==11:  # 7日間。selectionは単一セルか複数セル。
 		rangeaddress = selection.getRangeAddress()
-# 		colorizeCellRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+7])		
+		colorizeSelectionRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+7])		
 	elif entrynum==12:  # 翌週まで。selectionは単一セルか複数セル。
-		rangeaddress = selection.getRangeAddress()
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-		weekdayval = int(functionaccess.callFunction("WEEKDAY", (sheet[VARS.daterow, rangeaddress.StartRow].getValue(),)))  # 選択範囲の最初の日付のシリアル値から曜日の数字を取得。日曜日=1。
-		
-		
-		
-		
-		w = 6 if sheet[rangeaddress.StartRow, VARS.yakucolumn+1].getString() else 3  # 用法列に文字列がなければ点滴とする。点滴は火曜日、それ以外は金曜日まで引く。
-		
-		endc = rangeaddress.StartColumn + w - weekdayval +7
-		
-# 		colorizeCellRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:endc])		
+		colorizeSelectionRange(xscriptcontext, selection, "w")
 	elif entrynum==13:  # 翌月まで。selectionは単一セルか複数セル。
 		
 		pass
@@ -408,7 +395,10 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
 		toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
-def colorizeSelectionRange(xscriptcontext, selection):
+def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endcが与えられている時はselectionは選択行だけが意味を持つ。
+	rangeaddress = selection.getRangeAddress()
+	startc = rangeaddress.StartColumn
+	endc = rangeaddress.EndColumn
 	sheet = VARS.sheet
 	selection.clearContents(511)  # 範囲をすべてクリアする。
 	celladdress = selection[0, 0].getCellAddress()  # 選択セル左上端セルのアドレスを取得。
@@ -417,33 +407,41 @@ def colorizeSelectionRange(xscriptcontext, selection):
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
 	weekdayval = int(functionaccess.callFunction("WEEKDAY", (sheet[VARS.daterow, c].getValue(),)))  # 選択範囲の最初の日付のシリアル値から曜日の数字を取得。日曜日=1。
-	rangeaddress = selection.getRangeAddress()
 	yakurows = sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()  # (薬名、用法、回数、限定)のタプル。
 	naifukurangeaddress = []
 	tentekirangeaddress = []
 	table = str.maketrans("日月火水木金土", "1234567")  # 曜日をシート関数WEEKDAY()の戻り値の数字に変換するテーブル。
-	startc = rangeaddress.StartColumn
 	for i, yakurow in enumerate(yakurows, start=r):  # 各行について
 		yaku, yoho, dummy, gentei = yakurow
 		if yaku and i!=VARS.blackrow:
+			if end is not None:
+				w = 6 if yoho else 3  # 内服は金曜日、点滴は火曜日で終わる。
+				if end=="w":  # 翌週の時。
+					endc = startc + 7 + w - weekdayval			
+				elif end=="m":  # 翌月の時。
+					
+					
+					pass
+			
+			
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。
 				cols = []
 				if genteidigit.isdigit():  # 全て数字に変換できたときは、日月火水木金土しかない時。			
-					cols = (j for j in range(startc, rangeaddress.EndColumn+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit)  # 日曜日=1から始まる。
+					cols = (j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit)  # 日曜日=1から始まる。
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
-					cols = range(startc, rangeaddress.EndColumn+1)[::k]
+					cols = range(startc, endc+1)[::k]
 				if yoho:
 					naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)	
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)
 			else:
 				if yoho:
-					naifukurangeaddress.append(sheet[i, startc:rangeaddress.EndColumn+1].getRangeAddress())
+					naifukurangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())
 				else:  # 用法列がない時は点滴と考える。
-					tentekirangeaddress.append(sheet[i, startc:rangeaddress.EndColumn+1].getRangeAddress())	
+					tentekirangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	if naifukurangeaddress:
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
