@@ -200,13 +200,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
 				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
-				
-				
-				
 				keikasheet = commons.getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
-				
-				
-				
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
 def wClickCheckCol(enhancedmouseevent, xscriptcontext):
@@ -359,7 +353,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry11")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if startrow>VARS.emptyrow-1:
 			commons.cutcopypasteMenuEntries(addMenuentry)
@@ -474,6 +468,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.skybluerow)
 	elif entrynum==10:  # 新入院からUnstableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redbluerow)
+	elif entrynum==11:  # クリア。書式設定とオブジェクト以外を消去。
+		selection.clearContents(511)  # 範囲をすべてクリアする。
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):

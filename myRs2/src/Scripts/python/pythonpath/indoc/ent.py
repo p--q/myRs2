@@ -17,6 +17,8 @@ class Ent():  # シート固有の定数設定。
 		self.keikacolumn = 5  # 経過列インデックス。
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
+
+
 def getConsts(sheet, selection=None):  # 区画名を取得。
 	"""
 	M 

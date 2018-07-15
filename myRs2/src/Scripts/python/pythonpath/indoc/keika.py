@@ -258,6 +258,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
 		drowBorders(selection)  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	changes = changesevent.Changes	
@@ -317,9 +318,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "以後消去", "CommandURL": baseurl.format("entry14")})
-			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
-			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
-			commons.cutcopypasteMenuEntries(addMenuentry)	
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
+				commons.cutcopypasteMenuEntries(addMenuentry)	
+			else:
+				commons.cutcopypasteMenuEntries(addMenuentry)					
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 				
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
@@ -367,8 +372,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。
-		rangeaddress = selection.getRangeAddress()
-		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:].clearContents(511)
+		componentwindow = controller.ComponentWindow			
+		msg = "選択セルから右をすべてクリアしますか?"
+		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
+		if msgbox.execute()==MessageBoxResults.OK:		
+			rangeaddress = selection.getRangeAddress()
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:].clearContents(511)
 	elif 14<entrynum<20:
 		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 		if entrynum==15:  # 黒行上から使用中最上行へ

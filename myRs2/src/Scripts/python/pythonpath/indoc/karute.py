@@ -134,7 +134,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		getCopyDataRows, formatArticleColumn, formatProblemList, copyCells = createCopyFuncs(xscriptcontext)
 		c = formatArticleColumn(sheet[VARS.bluerow+1:VARS.skybluerow, VARS.sharpcolumn:VARS.articlecolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
 		datarows = sheet[VARS.bluerow:VARS.skybluerow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
-		copydatarows = [(datarows[0][5],)]  # 本日の記事の日付を取得。
+		copydatarows = [(datarows[0][4],)]  # 本日の記事の日付を取得。
 		deletedrowcount = getCopyDataRows(copydatarows, datarows[1:], VARS.bluerow+1)  # 削除された行数。
 		if deletedrowcount>0:  # 削除した行があるとき。
 			startrow = VARS.skybluerow - deletedrowcount
@@ -334,7 +334,7 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
 	def _getRowTxt(datarow):  # 1行の列を連結して文字列を返す。
-		sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[3], datarow[5]  # #列、日付列、Subject列、記事列を取得。
+		sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[2], datarow[4]  # #列、日付列、Subject列、記事列を取得。
 		if datecol and isinstance(datecol, float):  # 日付列がfloat型のとき。
 			datecol = "{} ".format("/".join([str(int(functionaccess.callFunction(i, (datecol,)))) for i in ("YEAR", "MONTH", "DAY")]))  # シリアル値をシート関数で年/月/日の文字列にする。引数のdatecolはfloatのままでよい。
 		if subjectcol and subjectcol!="#":   # Subject列、かつ、#でないとき
@@ -366,7 +366,7 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 		datarows = datarange.getDataArray()  # datarangeの行のタプルを取得。
 		datarows = [[_fullwidth_halfwidth(j) for j in i] for i in datarows]  # 取得した行のタプルを半角にする。		
 		datarange.setDataArray(datarows)  # datarangeに代入し直す。
-		articlecells = [str(i[5]) for i in datarows]  # 記事列の行を文字列にして1次元リストで取得。
+		articlecells = [str(i[4]) for i in datarows]  # 記事列の行を文字列にして1次元リストで取得。
 		newarticlerows = []  # 記事列代入するための行のリスト。
 		cellranges = getCellRanges(xscriptcontext.getDocument(), datarange, datarows)  # #ごとのセル範囲コレクションを取得。
 		sheet = VARS.sheet
@@ -437,7 +437,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-			addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry6")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			return EXECUTE_MODIFIED  # コンテクストメニューを表示しない。
@@ -497,6 +497,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
 			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
 			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+	elif entrynum==6:  # クリア。書式設定とオブジェクト以外を消去。
+		selection.clearContents(511)  # 範囲をすべてクリアする。
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
