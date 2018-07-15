@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import os, unohelper
-from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
+from indoc import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
 from com.sun.star.datatransfer import UnsupportedFlavorException
@@ -54,12 +54,10 @@ def getModule(sheetname):  # シート名に応じてモジュールを振り分
 		return keika
 	elif sheetname=="一覧":
 		return ichiran
-# 	elif sheetname=="予定":
-# 		return yotei
+	elif sheetname=="予定":
+		return yotei
 	elif sheetname=="退院":
 		return ent
-# 	elif sheetname=="履歴":
-# 		return rireki
 	return None  # モジュールが見つからなかった時はNoneを返す。
 class TextTransferable(unohelper.Base, XTransferable):
 	def __init__(self, txt):  # クリップボードに渡す文字列を受け取る。
