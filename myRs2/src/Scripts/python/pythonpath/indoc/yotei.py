@@ -42,7 +42,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		daycount = VARS.templatestartcolumn - VARS.datecolumn  # 右上限はテンプレート列までにする。
 	weekdays = "日", "月", "火", "水", "木", "金", "土"  # シートでは日=1であることに注意。
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-	weekdayidx = int(functionaccess.callFunction("WEEKDAY", (todayvalue,))) - 1   # 今日の曜日をインデックスで取得。
+	weekday = int(functionaccess.callFunction("WEEKDAY", (todayvalue,)))   # 今日の曜日をインデックスで取得。
+	weekdayidx = weekday - 1  # weekdaysに対するインデックス。
 	templates = sheet[VARS.daterow:VARS.emptyrow, VARS.templatestartcolumn+1:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を日付行から取得。
 	datarows = [[i for i in range(todayvalue, todayvalue+daycount)],\
 					[weekdays[i%7] for i in range(weekdayidx, weekdayidx+daycount)]]  # 日付行と曜日行を作成。
@@ -50,25 +51,26 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	if todaycolumn<VARS.firstemptycolumn:
 		datarows.extend(sheet[VARS.daterow+2:VARS.emptyrow, todaycolumn:VARS.firstemptycolumn].getDataArray())  # 今日の日付の列以降の行を取得。
 	else:
-		datarows.extend([] for dummy in range(VARS.emptyrow-(VARS.daterow+2)))
-	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datecolumn+diff以降は2行目以降の要素はない。
-		y = datarows[1][i]  # 曜日の文字列を取得。
+		datarows.extend([] for dummy in range(VARS.emptyrow-(VARS.daterow+2)))  # コピーすべき列がない時は空行を追加する。
+	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
+	graycellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。		
+	silvercellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。	
+	magentacellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。	
+	
 		
-	# 土曜日と日曜日の文字色を設定。
-	# 祝日の背景色を設定。
-			
+	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datecolumn+diff以降は2行目以降の要素はない。
+		yobi = datarows[1][i]  # 曜日の文字列を取得。
 		for k in range(len(templates[0])):  # テンプレートの列インデックスをイテレート。
-			if y in templates[1][k]:  # 曜日が一致する時。
+			if yobi in templates[1][k]:  # 曜日が一致する時。
 				w = templates[0][k]  # 週数行の値を取得。
 				if w.endswith("w"):  # wで終わる時は週番号。
-					d = int(functionaccess.callFunction("DAY", (datarows[0][i],)))  # 月の何日目から取得。
-					if int(w[:-1])!=int(d/7)+1:  # 週番号が一致しない時。
-						
-						8/7と8/14がかかる。
-						
+					d = int(functionaccess.callFunction("DAY", (datarows[0][i],)))  # 月の何日目か取得。
+					if int(w[:-1])!=-(-d//7):  # 週番号が一致しない時。-(-d//7)切り上げ。
 						continue  # 週番号が一致しない時は次のループに行く。
 				elif w.endswith("d"):  # dで終わる時は月のd日目。
 					if int(w[:-1])!=int(functionaccess.callFunction("DAY", (datarows[0][i],))):  # d日目でない時。
+# 					if int(w[:-1])!=d:  # d日目でない時。
 						continue  # d日目ではない時は次のループに行く。
 				elif isinstance(w, float):  # float型の時は日付シリアル値。
 					if datarows[0][i]!=int(w):  # 日付が一致しない時は次の列に行く。
@@ -80,167 +82,51 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 					else:
 						datarows[j].append(templates[j][k])	
 						
-					# datarows[j][i]をみてセルの背景色の設定。	
+						
+					# datarows[j][i]をみてセルの背景色の設定。		
+						
+				break  # datarowsの次の列に行く。
+						
+					
+
+
 					
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)	
 	
-	endedgecolumn = VARS.datecolumn+daycount					
+	endedgecolumn = VARS.datecolumn + daycount					
 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endedgecolumn].clearContents(511)  # 内容を削除。
 	sheet[VARS.daterow:VARS.emptyrow, VARS.datecolumn:endedgecolumn].setDataArray(datarows)
-						
-	# 土曜日と日曜日の文字色を設定。
-	# 祝日の背景色を設定。
-	
-	
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	createFormatKey = commons.formatkeyCreator(doc)	
 	sheet[VARS.daterow, VARS.datecolumn:endedgecolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  
 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endedgecolumn].setPropertyValue("HoriJustify", CENTER)  
-	
-	
-	
-	
-# 	datevalues = [i for i in range(todayvalue, todayvalue+daycount)]
-# 	sheet[VARS.daterow:VARS.daterow+2, VARS.datecolumn:endcolumnedge].setDataArray((datevalues,)*2)
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	createFormatKey = commons.formatkeyCreator(doc)	
-# 	sheet[VARS.daterow, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('D'))  
-# 	sheet[VARS.daterow+1, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('AAA'))  
-# 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endcolumnedge].setPropertyValue("HoriJustify", CENTER)  		
-# 	
-# 	
-# 	
-# 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-# 	weekdayval = int(functionaccess.callFunction("WEEKDAY", (todayvalue,)))  # 今日の曜日の番号を取得。日=1。
-# 	weekdaydic = {1: "日", 2: "月", 3: "火", 4: "水", 5: "木", 6: "金", 7: "土"}
-# 	
-# 	
-# 	templatedatarows = []
-	
-	
-	
-	
-	
-	
-	
-# 	todaycolumn = VARS.datecolumn + diff  # 移動前の今日の日付列。
-# 	dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	controller = doc.getCurrentController()  # コントローラの取得。
-# 	docframe = controller.getFrame()
-# 	controller.select(sheet[VARS.daterow-1:VARS.emptyrow, todaycolumn:VARS.firstemptycolumn])  # 今日以降の列を選択。
-# 	dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 日付行を含めてカット。		
-# 	controller.select(sheet[VARS.daterow-1, VARS.datecolumn])  # 日付列の先頭セルを選択。
-# 	dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。
-
-	
-# 	daycount = 31  # シートに表示する日数。
-# 	sheet[VARS.daterow-1:VARS.daterow+2, VARS.datecolumn:VARS.settingstartcolumn].clearContents(511)  # 日付行の内容を削除。
-# 	if VARS.datecolumn+daycount>VARS.settingstartcolumn:
-# 		daycount = VARS.settingstartcolumn - VARS.datecolumn
-# 	endcolumnedge = VARS.datecolumn + daycount
-# 	datevalues = [i for i in range(todayvalue, todayvalue+daycount)]
-# 	sheet[VARS.daterow:VARS.daterow+2, VARS.datecolumn:endcolumnedge].setDataArray((datevalues,)*2)
-# 	createFormatKey = commons.formatkeyCreator(doc)	
-# 	sheet[VARS.daterow, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('D'))  
-# 	sheet[VARS.daterow+1, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('AAA'))  
-# 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endcolumnedge].setPropertyValue("HoriJustify", CENTER)  		
-
-	
-	
-# 	deccolumn = endcolumnedge - diff
-# 	for i in range(deccolumn, endcolumnedge):
-# 		weekday = sheet[VARS.daterow+1, i].getString()
-		
-		
-			
-		
-		
-	
-	
-# 	if diff:  # 最初の日付が過去の時。
-# 		sheet.insertCells(sheet[0, VARS.emptycolumn].getRangeAddress(), insert_columns)  # 空列を挿入。	
-# 		sheet.removeRange(sheet[0, VARS.datecolumn:VARS.datecolumn+diff].getRangeAddress(), delete_columns)
-# def setDates(xscriptcontext, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。
-# 	sheet = VARS.sheet
-# 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 	createFormatKey = commons.formatkeyCreator(doc)	
-# 	colors = commons.COLORS
-# 	holidays = commons.HOLIDAYS
-# 	daycount = 31  # シートに入力する日数。
-# 	sheet[VARS.daterow-1:VARS.daterow+2, VARS.datecolumn:VARS.settingstartcolumn].clearContents(511)  # 日付行の内容を削除。
-# 	if VARS.datecolumn+daycount>VARS.settingstartcolumn:
-# 		daycount = VARS.settingstartcolumn - VARS.datecolumn
-# 	endcolumnedge = VARS.datecolumn + daycount
-# 	datevalues = [i for i in range(datevalue, datevalue+daycount)]
-# 	sheet[VARS.daterow:VARS.daterow+2, VARS.datecolumn:endcolumnedge].setDataArray((datevalues,)*2)
-# 	sheet[VARS.daterow, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('D'))  
-# 	sheet[VARS.daterow+1, VARS.datecolumn:endcolumnedge].setPropertyValue("NumberFormat", createFormatKey('AAA'))  
-# 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endcolumnedge].setPropertyValue("HoriJustify", CENTER)  
-# 	
-# 	
-# 	
-# 	
-# 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-# 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-# 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-# 	weekdayval = int(functionaccess.callFunction("WEEKDAY", (datevalue,)))
-# 	
-# 	
-# 	
-# 	setRangesProperty(doc, range(, endcolumnedge, 7), ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
-
-
-
-# 	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-# 	sheetcellranges.addRangeAddresses([sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。
-# 	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-# 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
-
-	
-	
-# 	celladdress = cell.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-# 	r, c = celladdress.Row, celladdress.Column
-# 	sheet[:r+1, c:].clearContents(511)  # 開始列より右の日付行の内容を削除。
-# 	endcolumn = c + daycount + 1
-# 	endcolumn = endcolumn if endcolumn<1024 else 1023  # 列インデックスの上限1023。
-# 	sheet[r, c:endcolumn].setDataArray(([i for i in range(datevalue, datevalue+daycount+1)],))  # 日時シリアル値を経過シートに入力。
-# 	sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
-# 	y, m, d = map(int, sheet[r, c].getString().split("/"))  # 年、月、日を整数型で取得。
-# 	weekday, days = calendar.monthrange(y, m)  # 月曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
-# 	weekday = (weekday+(d-1)%7) % 7  # dの曜日番号を取得。1日からの7の余りと1日の余りを加えた7の余りがdの曜日番号。
-# 	n = 6  # 日曜日の曜日番号。
-# 	sunsset = set(range(c+(n-weekday)%7, endcolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
-# 	setRangesProperty(doc, sheet, r, sunsset, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
-# 	n = 5  # 土曜日の曜日番号。
-# 	setRangesProperty(doc, sheet, r, range(c+(n-weekday)%7, endcolumn, 7), ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
-# 	holidayset = set()  # 祝日の列インデックスを入れる集合。
-# 	days = days - d + 1  # 翌月1日までの日数を取得。
-# 	mr = r - 1  # 月を代入する行のインデックス。
-# 	mc = c  # 1日を表示する列のインデックス。最初の月のみ開始日になる。
-# 	if y in holidays:  # 祝日一覧のキーがある時。
-# 		holidayset.update(mc+i-d for i in holidays[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。
-# 	while True:
-# 		sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
-# 		mc += days  # 次月1日の列に進める。
-# 		if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
-# 			ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
-# 			y, m = map(int, ymd.split("/")[:2])  # 年と月を取得。
-# 			if y in holidays:  # 祝日一覧のキーがある時。
-# 				holidayset.update(mc+i-1 for i in holidays[y][m-1] if mc+i-1<endcolumn)  # 祝日の列インデックスの集合を取得。
-# 			weekday, days = calendar.monthrange(y, m)  # 1日の曜日と月の日数を取得。
-# 		else:
-# 			break	
-# 	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
-# 	setRangesProperty(doc, sheet, r, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。	
-# 	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。	
-# 
-# 
-# def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
-# 	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-# 	sheetcellranges.addRangeAddresses([VARS.sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。
-# 	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-# 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
+	n = 1  # 日曜日の曜日番号。
+	sunsset = set(range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
+	setRangesProperty(doc, sunsset, ("CharColor", commons.COLORS["red3"]))  # 日曜日の文字色を設定。	
+	n = 7  # 土曜日の曜日番号。
+	setRangesProperty(doc, range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7), ("CharColor", commons.COLORS["skyblue"]))  # 土曜日の文字色を設定。	
+	holidayset = set()  # 祝日の列インデックスを入れる集合。
+	y, m, d = [int(functionaccess.callFunction(i, (todayvalue,))) for i in ("YEAR", "MONTH", "DAY")]
+	sheet[VARS.daterow-1, VARS.datecolumn].setString("{}月".format(m))
+	if y in commons.HOLIDAYS:  # 祝日一覧のキーがある時。
+		holidayset.update(VARS.datecolumn+i-d for i in commons.HOLIDAYS[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。		
+	nextmdatevalue = todayvalue
+	while True:
+		nextmdatevalue = int(functionaccess.callFunction("EOMONTH", (nextmdatevalue, 0))) + 1  # 翌月1日のシリアル値を取得。
+		nextmcolumn = VARS.datecolumn + nextmdatevalue - todayvalue
+		if nextmcolumn>endedgecolumn-1:
+			break
+		y, m = [int(functionaccess.callFunction(i, (nextmdatevalue,))) for i in ("YEAR", "MONTH")]
+		sheet[VARS.daterow-1, VARS.datecolumn+nextmdatevalue-todayvalue].setString("{}月".format(m))
+		if y in commons.HOLIDAYS:  # 祝日一覧のキーがある時。
+			holidaycolumns = (VARS.datecolumn+nextmdatevalue-todayvalue+i-1 for i in commons.HOLIDAYS[y][m-1])
+			holidayset.update(i for i in holidaycolumns if i<endedgecolumn)  # 祝日の列インデックスの集合を取得。		
+	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
+	setRangesProperty(doc, holidayset, ("CellBackColor", commons.COLORS["red3"]))  # 祝日の背景色を設定。	
+def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
+	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+	sheetcellranges.addRangeAddresses([VARS.sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。
+	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
 	if contextmenuname=="cell":  # セルのとき
 		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
