@@ -24,7 +24,8 @@ COLORS = {\
 		"red3": 0xFF0000,\
 		"violet": 0x9999FF,\
 		"cyan10": 0xCCFFFF,\
-		"white": 0xFFFFFF}  # 色の16進数。	
+		"white": 0xFFFFFF,\
+		"gray7": 0x666666}  # 色の16進数。	
 HOLIDAYS = {\
 		2018:((1,2,3,8),(11,12),(21,),(29,30),(3,4,5),(),(16,),(11,),(17,23,24),(8,),(3,23),(23,24,28,29,30,31)),\
 		2019:((1,2,3,14),(11,),(21,),(29,),(3,4,5,6),(),(15,),(11,12),(16,23),(14,),(3,4,23),(23,28,29,30,31)),\
@@ -145,12 +146,11 @@ def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が�
 	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
 	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
 	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。		
-	
-	
-	
-	
-	
-	
+# 	
+# 	
+# 	
+# 	
+# 以下コンテクストメニュー
 def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	i = 0  # インデックスを初期化する。
 	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。
