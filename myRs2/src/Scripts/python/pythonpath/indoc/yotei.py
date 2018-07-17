@@ -7,6 +7,8 @@ from com.sun.star.sheet.CellDeleteMode import COLUMNS as delete_columns  # enum
 from com.sun.star.sheet.CellInsertMode import COLUMNS as insert_columns  # enum
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER  # enum
+from com.sun.star.beans import PropertyValue # Struct
+from com.sun.star.sheet import ConditionOperator2  # 定数
 class Schedule():  # シート固有の定数設定。
 	def __init__(self):
 		self.menurow = 0  # メニュー行。
@@ -105,18 +107,43 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
 	setRangesProperty(doc, holidayset, ("CellBackColor", commons.COLORS["red3"]))  # 祝日の背景色を設定。	
 
+# 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	
+	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
+			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
+	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+	sheetcellranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)
+	conditionalformat = sheetcellranges.getPropertyValue("ConditionalFormat")
+	conditionalformat.clear()
+	stylenames = "gray7", "silver", "magenta3"
+	stylefamilies = doc.getStyleFamilies()
+	cellstyles = stylefamilies["CellStyles"]
+	for stylename in stylenames:
+		if not stylename in cellstyles:
+			newstyle = doc.createInstance("com.sun.star.style.CellStyle")
+			cellstyles[stylename] = newstyle
+			newstyle.setPropertyValue("CellBackColor", commons.COLORS[stylename])
+			
+			
+			
+	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
+					PropertyValue(Name="Formula1", Value="x"),\
+					PropertyValue(Name="StyleName", Value="gray7")
+	conditionalformat.addNew(propertyvalues)
 
-	stylefamilies = doc.getstylefamilies()
-	"StyleX", "StyleSlash", "StyleChar"
+	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
+					PropertyValue(Name="Formula1", Value="/"),\
+					PropertyValue(Name="StyleName", Value="silver")
+	conditionalformat.addNew(propertyvalues)
 
-
-
-
-
+# 	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
+# 					PropertyValue(Name="Formula1", Value="x"),\
+# 					PropertyValue(Name="StyleName", Value="magenta3")
+# 	conditionalformat.addNew(propertyvalues)
 
 def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
 	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	sheetcellranges.addRangeAddresses([VARS.sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。
+	sheetcellranges.addRangeAddresses((VARS.sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
 	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
