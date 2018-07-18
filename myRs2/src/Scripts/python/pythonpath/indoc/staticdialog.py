@@ -9,7 +9,7 @@ from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import NamedValue  # Struct
 from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import MULTI  # enum 
-def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
+def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
@@ -29,7 +29,8 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 	items = ("セル入力で閉じる", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": False}),\
 			("オプション表示", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": False})  # グリッドコントロールのコンテクストメニュー。XMenuListenerのmenuevent.MenuIdでコードを実行する。
 	gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items, {"addMenuListener": menulistener})  # 右クリックでまず呼び出すポップアップメニュー。 
-	mouselistener = MouseListener(xscriptcontext, gridpopupmenu)
+	args = gridpopupmenu, xscriptcontext, outputcolumn, callback  # gridpopupmenuは先頭でないといけない。
+	mouselistener = MouseListener(args)
 	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。
 	gridmodel = gridcontrol1.getModel()  # グリッドコントロールモデルの取得。
 	gridcolumn = gridmodel.getPropertyValue("ColumnModel")  # DefaultGridColumnModel
@@ -40,6 +41,8 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, defaultrows=No
 		datarows = [i if isinstance(i, (list, tuple)) else (i,) for i in defaultrows]  # defaultrowsの要素をリストかタプルでなければタプルに変換する。
 	if datarows:  # 行のリストが取得出来た時。
 		griddatamodel.addRows(("",)*len(datarows), datarows)  # グリッドに行を追加。	
+	else:
+		datarows = []  # Noneのままではあとで処理できないので空リストを入れる。
 	controlcontainerwindowlistener = ControlContainerWindowListener(controlcontainer)		
 	controlcontainer.addWindowListener(controlcontainerwindowlistener)  # コントロールコンテナの大きさを変更するとグリッドコントロールの大きさも変更するようにする。
 	textboxprops = {"PositionX": 0, "PositionY": m, "Height": h}  # テクストボックスコントロールのプロパティ。
@@ -157,9 +160,12 @@ class ActionListener(unohelper.Base, XActionListener):
 				griddatamodel.addRow("", (txt,))
 				self.datarows.append((txt,))	
 			return	
-		if not selectedrowindexes:
-			return  # 選択行がない時はここで終わる。
-		if cmd=="up":  # 先頭行や連続していない複数行を選択している時はボタンを無効にしてある。
+		if not selectedrowindexes:  # 選択行がない時。
+			if griddatamodel.RowCount==1:  # 1行だけの時。
+				selectedrowindexes = [0]  # 1行目を選択していることにする。
+			else:
+				return  # 選択行がない時はここで終わる。
+		if cmd=="up" and selectedrowindexes[0]>0:  # 先頭行や連続していない複数行を選択している時はボタンを無効にしてあるはずだが、選択したまま移動すると無効にならない。
 			j = selectedrowindexes[0]  # 選択行の先頭行インデックスを取得。
 			datarowsToMove = self.datarows[j:selectedrowindexes[-1]+1]  # 移動させる行のリストを取得。
 			del self.datarows[j:selectedrowindexes[-1]+1]  # 移動させる行を削除。
@@ -169,7 +175,7 @@ class ActionListener(unohelper.Base, XActionListener):
 			griddatamodel.addRows(("",)*len(self.datarows), self.datarows)  # グリッドに行を追加。
 			firstrow = j - 1  # 選択開始行を取得。
 			[self.gridcontrol.selectRow(i) for i in range(firstrow, firstrow+len(selectedrowindexes))]
-		elif cmd=="down":  # 最終行や連続していない複数行を選択している時はボタンを無効にしてある。
+		elif cmd=="down" and selectedrowindexes[-1]<griddatamodel.RowCount-1:  # 最終行や連続していない複数行を選択している時はボタンを無効にしてあるはずだが、選択したまま移動すると無効にならない。
 			j = selectedrowindexes[-1]  # 選択行の最終行インデックスを取得。
 			datarowsToMove = self.datarows[selectedrowindexes[0]:j+1]  # 移動させる行のリストを取得。
 			self.datarows.insert(j+2, "dummy")  # 置換される要素を挿入。
@@ -191,12 +197,12 @@ class ActionListener(unohelper.Base, XActionListener):
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
-	def __init__(self, xscriptcontext, gridpopupmenu): 	
-		self.xscriptcontext = xscriptcontext
-		self.gridpopupmenu = gridpopupmenu
+	def __init__(self, args): 	
+		self.gridpopupmenu, *self.args = args  # gridpopupmenuはCloseListenerで使うので、別にする。
 		self.optioncontrolcontainer = None
 		self.dialogframe = None
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
+		xscriptcontext, outputcolumn, callback = self.args
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		optioncontrolcontainer = self.optioncontrolcontainer
 		if mouseevent.Buttons==MouseButton.LEFT:
@@ -226,25 +232,33 @@ class MouseListener(unohelper.Base, XMouseListener):
 				if griddatamodel.RowCount==1:  # 1行しかない時はまた発火できるように選択を外す。
 					gridcontrol.deselectRow(0)  # 選択行の選択を外す。選択していない行を指定すると永遠ループになる。
 			elif mouseevent.ClickCount==2:  # ダブルクリックの時。
-				doc = self.xscriptcontext.getDocument()
+				doc = xscriptcontext.getDocument()
 				selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 				if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
 					griddata = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModelを取得。
-					rowdata = griddata.getRowData(gridcontrol.getCurrentRow())  # グリッドコントロールで選択している行のすべての列をタプルで取得。
-					if optioncontrolcontainer.getControl("CheckBox1").getState():  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
-						selection.setString("".join([selection.getString(), rowdata[0]]))  # セルに追記する。
+					j = gridcontrol.getCurrentRow()  # 選択行がない時は-1が返る。
+					if j<0:
+						return
+					rowdata = griddata.getRowData(j)  # グリッドコントロールで選択している行のすべての列をタプルで取得。
+					controller = doc.getCurrentController()  # 現在のコントローラを取得。			
+					sheet = controller.getActiveSheet()
+					celladdress = selection.getCellAddress()
+					r, c = celladdress.Row, celladdress.Column
+					if outputcolumn is not None:  # 出力する列が指定されている時。
+						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
+					flg = optioncontrolcontainer.getControl("CheckBox1").getState()  # セルに追記、のチェックの状態を取得。
+					if flg:  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
+						sheet[r, c].setString("".join([selection.getString(), rowdata[0]]))  # セルに追記する。
 					else:
-						selection.setString(rowdata[0])  # セルに代入。
-						controller = doc.getCurrentController()  # 現在のコントローラを取得。			
-						sheet = controller.getActiveSheet()
-						celladdress = selection.getCellAddress()
-						nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
-						controller.select(nextcell)  # 下のセルを選択。	
-				gridpopupmenu = self.gridpopupmenu		
-				for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
-					itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+						sheet[r, c].setString(rowdata[0])  # セルに代入。
+					if callback is not None:  # コールバック関数が与えられている時。
+						callback(mouseevent, xscriptcontext)						
+					if not flg:	
+						controller.select(sheet[r+1, c])  # 下のセルを選択。	
+				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
+					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):
-						if gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
+						if self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
 							self.dialogframe.close(True)
 							break
 		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。

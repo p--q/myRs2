@@ -4,6 +4,8 @@
 import unohelper  # オートメーションには必須(必須なのはuno)。
 from indoc.commons import getModule # 相対インポートはできない。
 from com.sun.star.awt import XEnhancedMouseClickHandler
+from com.sun.star.awt import MessageBoxButtons  # 定数
+from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.document import XDocumentEventListener
 from com.sun.star.sheet import XActivationEventListener
 from com.sun.star.ui import XContextMenuInterceptor
@@ -19,6 +21,7 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
 	except:
 		import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。		
+		raise  # これがないとLibreOfficeのエラーダイアログがでてこない。
 def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
 	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 

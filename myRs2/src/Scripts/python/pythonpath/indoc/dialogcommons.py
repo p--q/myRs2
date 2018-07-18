@@ -38,7 +38,7 @@ def getSavedData(doc, rangename):  # configシートのragenameからデータ�
 				try:
 					return json.loads(txt)  # pyunoオブジェクトは変換できない。
 				except json.JSONDecodeError:
-					import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。
+					import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。		
 	return None  # 保存された行が取得できない時はNoneを返す。
 def getSelectedRowIndexes(gridcontrol):  # グリッドコントロールの選択行インデックスを返す。昇順で返す。負数のインデックスがある時は要素をクリアする。
 	selectedrowindexes = list(gridcontrol.getSelectedRows())  # 選択行のインデックスをリストで取得。

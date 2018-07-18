@@ -11,7 +11,7 @@ from com.sun.star.lang import Locale  # Struct
 from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import SINGLE  # enum 
-def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, formatstring=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。formatstringは代入セルの書式。
+def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。formatstringは代入セルの書式。
 	dateformat = "%Y/%m/%d(%a)"  # 日付書式。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -30,7 +30,7 @@ def createDialog(xscriptcontext, enhancedmouseevent, dialogtitle, formatstring=N
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
 	items = ("セル入力で閉じる", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": True}),  # グリッドコントロールのコンテクストメニュー。XMenuListenerのmenuevent.MenuIdでコードを実行する。
 	gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items)  # 右クリックでまず呼び出すポップアップメニュー。 
-	args = xscriptcontext, dateformat, formatstring
+	args = xscriptcontext, dateformat, formatstring, outputcolumn, callback
 	mouselistener = MouseListener(gridpopupmenu, args)
 	gridcontrolwidth = gridprops["Width"]  # gridpropsは消費されるので、グリッドコントロールの幅を取得しておく。
 	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。
@@ -152,7 +152,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		self.gridpopupmenu = gridpopupmenu  # CloseListenerでも使用する。
 		self.dialogframe = None
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
-		xscriptcontext, dateformat, formatstring = self.args
+		xscriptcontext, dateformat, formatstring, outputcolumn, callback = self.args
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		if mouseevent.Buttons==MouseButton.LEFT:
 			if mouseevent.ClickCount==2:  # ダブルクリックの時。
@@ -162,15 +162,20 @@ class MouseListener(unohelper.Base, XMouseListener):
 					rowindexes = dialogcommons.getSelectedRowIndexes(gridcontrol)  # グリッドコントロールの選択行インデックスを返す。昇順で返す。負数のインデックスがある時は要素をクリアする。
 					if rowindexes:
 						datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, rowindexes[0])  # 選択行の日付文字列を取得。
-						selectedday = datetime.strptime(datetxt, dateformat)  # 現在の最初のdatetimeオブジェクトを取得。	
-						selection.setFormula(selectedday.isoformat())  # セルに式として代入。			
-						numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
+						selectedday = datetime.strptime(datetxt, dateformat)  # 現在の最初のdatetimeオブジェクトを取得。		
+						if outputcolumn is not None:  # 出力する列が指定されている時。
+							sheet = selection.getSpreadsheet()
+							selection = sheet[selection.getCellAddress().Row, outputcolumn]  # 同じ行の指定された列のセルを取得。						
+						selection.setFormula(selectedday.isoformat())  # セルに式として代入。
 						if formatstring is not None:  # 書式が与えられている時。
-							locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。。 
+							numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
+							locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。
 							formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
 							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
 								formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。
-						selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
+							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 											
+						if callback is not None:  # コールバック関数が与えられている時。
+							callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):

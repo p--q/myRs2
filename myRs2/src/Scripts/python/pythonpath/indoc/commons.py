@@ -1,19 +1,19 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import os, unohelper
-from indoc import ichiran, karute, keika, rireki, ent, yotei, documentevent  # 相対インポートは不可。
+from indoc import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
+from com.sun.star.awt import MessageBoxButtons  # 定数
+from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
 from com.sun.star.datatransfer import UnsupportedFlavorException
+from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
+from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
+from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.table import BorderLine2, TableBorder2 # Struct
 from com.sun.star.table import BorderLineStyle  # 定数
-from com.sun.star.i18n.TransliterationModulesNew import HALFWIDTH_FULLWIDTH  # enum
-from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
-from com.sun.star.awt import MessageBoxButtons  # 定数
 from com.sun.star.table.CellHoriJustify import LEFT  # enum
-from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
-from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 COLORS = {\
 		"lime": 0x00FF00,\
 		"magenta3": 0xFF00FF,\
@@ -24,7 +24,8 @@ COLORS = {\
 		"red3": 0xFF0000,\
 		"violet": 0x9999FF,\
 		"cyan10": 0xCCFFFF,\
-		"white": 0xFFFFFF}  # 色の16進数。	
+		"white": 0xFFFFFF,\
+		"gray7": 0x666666}  # 色の16進数。	
 HOLIDAYS = {\
 		2018:((1,2,3,8),(11,12),(21,),(29,30),(3,4,5),(),(16,),(11,),(17,23,24),(8,),(3,23),(23,24,28,29,30,31)),\
 		2019:((1,2,3,14),(11,),(21,),(29,),(3,4,5,6),(),(15,),(11,12),(16,23),(14,),(3,4,23),(23,28,29,30,31)),\
@@ -54,12 +55,10 @@ def getModule(sheetname):  # シート名に応じてモジュールを振り分
 		return keika
 	elif sheetname=="一覧":
 		return ichiran
-# 	elif sheetname=="予定":
-# 		return yotei
+	elif sheetname=="予定":
+		return yotei
 	elif sheetname=="退院":
 		return ent
-# 	elif sheetname=="履歴":
-# 		return rireki
 	return None  # モジュールが見つからなかった時はNoneを返す。
 class TextTransferable(unohelper.Base, XTransferable):
 	def __init__(self, txt):  # クリップボードに渡す文字列を受け取る。
@@ -102,28 +101,32 @@ def showErrorMessageBox(controller, msg):
 	componentwindow = controller.ComponentWindow
 	msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 	msgbox.execute()
-def getKaruteSheet(createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	sheets = doc.getSheets()  # シートコレクションを取得。
 	if idtxt in sheets:  # すでに経過シートがある時。
 		karutesheet = sheets[idtxt]  # カルテシートを取得。  
 	else:
 		sheets.copyByName("00000000", idtxt, len(sheets))  # テンプレートシートをコピーしてID名のシートにして最後に挿入。	
 		karutesheet = sheets[idtxt]  # カルテシートを取得。  
-		karuteconsts = karute.getConsts(karutesheet)	
-		karutedatecell = karutesheet[karuteconsts.splittedrow, karuteconsts.datecolumn]
+		karutevars = karute.VARS
+		karutevars.setSheet(karutesheet)	
+		karutedatecell = karutesheet[karutevars.splittedrow, karutevars.datecolumn]
 		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
+		createFormatKey = formatkeyCreator(doc)
 		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-		karutesheet[:karuteconsts.splittedrow, karuteconsts.articlecolumn].setDataArray(("",), (" ".join((idtxt, kanjitxt, kanatxt)),))  # カルテシートのコピー日時をクリア。ID名前を入力。
+		karutesheet[:karutevars.splittedrow, karutevars.articlecolumn].setDataArray((("",), (" ".join((idtxt, kanjitxt, kanatxt)),)))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
-def getKeikaSheet(doc, createFormatKey, sheets, idtxt, kanjitxt, kanatxt, datevalue):
+def getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+	sheets = doc.getSheets()  # シートコレクションを取得。
 	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 	if newsheetname in sheets:  # すでに経過シートがある時。
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 	else:	
 		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
-		keikaconsts = keika.getConsts(keikasheet)
-		keikasheet[keikaconsts.daterow, keikaconsts.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-		keika.setDates(doc, keikasheet, keikasheet[keikaconsts.daterow, keikaconsts.splittedcolumn], datevalue)  # 経過シートの日付を設定。
+		keikavars = keika.VARS
+		keikasheet[keikavars.daterow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+		keika.setDates(doc, keikasheet, keikasheet[keikavars.daterow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet	
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 使用中最下行へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。
@@ -143,12 +146,11 @@ def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が�
 	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
 	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
 	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。		
-	
-	
-	
-	
-	
-	
+# 	
+# 	
+# 	
+# 	
+# 以下コンテクストメニュー
 def menuentryCreator(menucontainer):  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	i = 0  # インデックスを初期化する。
 	def addMenuentry(menutype, props):  # i: index, propsは辞書。menutypeはActionTriggerかActionTriggerSeparator。
