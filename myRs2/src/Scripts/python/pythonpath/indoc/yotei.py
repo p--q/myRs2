@@ -111,30 +111,48 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	
 	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
 			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
-	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	sheetcellranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)
-	conditionalformat = sheetcellranges.getPropertyValue("ConditionalFormat")
-	conditionalformat.clear()
-	stylenames = "gray7", "silver", "magenta3"
-	stylefamilies = doc.getStyleFamilies()
-	cellstyles = stylefamilies["CellStyles"]
-	for stylename in stylenames:
-		if not stylename in cellstyles:
-			newstyle = doc.createInstance("com.sun.star.style.CellStyle")
-			cellstyles[stylename] = newstyle
-			newstyle.setPropertyValue("CellBackColor", commons.COLORS[stylename])
-			
-			
-			
-	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
-					PropertyValue(Name="Formula1", Value="x"),\
-					PropertyValue(Name="StyleName", Value="gray7")
-	conditionalformat.addNew(propertyvalues)
+	datarange = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+	datarange.addRangeAddresses((i.getRangeAddress() for i in ranges), False)	
+	searchdescriptor = sheet.createSearchDescriptor()
+	
 
-	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
-					PropertyValue(Name="Formula1", Value="/"),\
-					PropertyValue(Name="StyleName", Value="silver")
-	conditionalformat.addNew(propertyvalues)
+	searchdescriptor.setSearchString("x")  # 戻り値はない。
+	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+	if cellranges:
+		cellranges.setPropertyValue("CellBackColor", commons.COLORS["gray7"])
+	searchdescriptor.setSearchString("/")  # 戻り値はない。
+	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+	if cellranges:
+		cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])	
+	
+	
+	
+# 	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
+# 			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
+# 	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+# 	sheetcellranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)
+# 	conditionalformat = sheetcellranges.getPropertyValue("ConditionalFormat")
+# 	conditionalformat.clear()
+# 	stylenames = "gray7", "silver", "magenta3"
+# 	stylefamilies = doc.getStyleFamilies()
+# 	cellstyles = stylefamilies["CellStyles"]
+# 	for stylename in stylenames:
+# 		if not stylename in cellstyles:
+# 			newstyle = doc.createInstance("com.sun.star.style.CellStyle")
+# 			cellstyles[stylename] = newstyle
+# 			newstyle.setPropertyValue("CellBackColor", commons.COLORS[stylename])
+# 			
+# 			
+# 			
+# 	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
+# 					PropertyValue(Name="Formula1", Value="x"),\
+# 					PropertyValue(Name="StyleName", Value="gray7")
+# 	conditionalformat.addNew(propertyvalues)
+# 
+# 	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
+# 					PropertyValue(Name="Formula1", Value="/"),\
+# 					PropertyValue(Name="StyleName", Value="silver")
+# 	conditionalformat.addNew(propertyvalues)
 
 # 	propertyvalues = PropertyValue(Name="Operator", Value=ConditionOperator2.EQUAL),\
 # 					PropertyValue(Name="Formula1", Value="x"),\
