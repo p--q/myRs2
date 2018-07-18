@@ -42,11 +42,20 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	daycount = 31  # シートに表示する日数。
 	if VARS.datecolumn+daycount>VARS.templatestartcolumn:
 		daycount = VARS.templatestartcolumn - VARS.datecolumn  # 右上限はテンプレート列までにする。
-	weekdays = "日", "月", "火", "水", "木", "金", "土"  # シートでは日=1であることに注意。
+		
+		
+		
+		
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-	weekday = int(functionaccess.callFunction("WEEKDAY", (todayvalue,)))   # 今日の曜日をインデックスで取得。
-	weekdayidx = weekday - 1  # weekdaysに対するインデックス。
+	weekday = int(functionaccess.callFunction("WEEKDAY", (todayvalue,)))   # 今日の曜日番号を取得。
+	
+	
+	
 	templates = sheet[VARS.daterow:VARS.emptyrow, VARS.templatestartcolumn+1:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を日付行から取得。
+
+	
+	weekdays = "日", "月", "火", "水", "木", "金", "土"  # シートでは日=1であることに注意。
+	weekdayidx = weekday - 1  # weekdaysに対するインデックス。
 	datarows = [[i for i in range(todayvalue, todayvalue+daycount)],\
 					[weekdays[i%7] for i in range(weekdayidx, weekdayidx+daycount)]]  # 日付行と曜日行を作成。
 	todaycolumn = VARS.datecolumn + diff  # 移動前の今日の日付列。
@@ -54,6 +63,11 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		datarows.extend(sheet[VARS.daterow+2:VARS.emptyrow, todaycolumn:VARS.firstemptycolumn].getDataArray())  # 今日の日付の列以降の行を取得。
 	else:
 		datarows.extend([] for dummy in range(VARS.emptyrow-(VARS.daterow+2)))  # コピーすべき列がない時は空行を追加する。
+
+
+		
+		
+		
 	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datecolumn+diff以降は2行目以降の要素はない。
 		yobi = datarows[1][i]  # 曜日の文字列を取得。
 		for k in range(len(templates[0])):  # テンプレートの列インデックスをイテレート。
@@ -76,6 +90,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 					else:  # 行に要素がないインデックスの時は要素を追加する。
 						datarows[j].append(templates[j][k])	
 				break  # datarowsの次の列に行く。
+			
+			
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	endedgecolumn = VARS.datecolumn + daycount					
 	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endedgecolumn].clearContents(511)  # 内容を削除。
@@ -108,22 +124,22 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	setRangesProperty(doc, holidayset, ("CellBackColor", commons.COLORS["red3"]))  # 祝日の背景色を設定。	
 
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	
-	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
-			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
-	datarange = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	datarange.addRangeAddresses((i.getRangeAddress() for i in ranges), False)	
-	searchdescriptor = sheet.createSearchDescriptor()
-	
-
-	searchdescriptor.setSearchString("x")  # 戻り値はない。
-	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
-	if cellranges:
-		cellranges.setPropertyValue("CellBackColor", commons.COLORS["gray7"])
-	searchdescriptor.setSearchString("/")  # 戻り値はない。
-	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
-	if cellranges:
-		cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])	
+# 	
+# 	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
+# 			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
+# 	datarange = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+# 	datarange.addRangeAddresses((i.getRangeAddress() for i in ranges), False)	
+# 	searchdescriptor = sheet.createSearchDescriptor()
+# 	
+# 
+# 	searchdescriptor.setSearchString("x")  # 戻り値はない。
+# 	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+# 	if cellranges:
+# 		cellranges.setPropertyValue("CellBackColor", commons.COLORS["gray7"])
+# 	searchdescriptor.setSearchString("/")  # 戻り値はない。
+# 	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+# 	if cellranges:
+# 		cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])	
 	
 	
 	
