@@ -12,99 +12,107 @@ from com.sun.star.sheet import ConditionOperator2  # 定数
 class Schedule():  # シート固有の定数設定。
 	def __init__(self):
 		self.menurow = 0  # メニュー行。
-		self.daterow = 2  # 日付行。
-		self.datecolumn = 1  # 日付開始列。
-		self.settingcolumn = 47  # 設定開始列。
+		self.monthrow = 1  # 月行。
+		self.dayrow = 2  # 日行。
+		self.weekdayrow = 3
+		self.datarow = 4  # データ開始行。
+		self.datacolumn = 1  # データ開始列。
 	def setSheet(self, sheet):
 		self.sheet = sheet
 		cellranges = sheet[:, 0].queryContentCells(CellFlags.STRING+CellFlags.VALUE+CellFlags.DATETIME)  # 先頭列の文字列か数値が入っているセルに限定して抽出。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 先頭列の最終行インデックス+1を取得。		
-		cellranges = sheet[self.daterow+1, :].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 曜日行の文字列か数値が入っているセルに限定して抽出。
+		cellranges = sheet[self.dayrow+1, :].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 曜日行の文字列か数値が入っているセルに限定して抽出。
 		rangeaddresses = cellranges.getRangeAddresses()	
-		self.firstemptycolumn = rangeaddresses[0].EndColumn+1  # 日付行の区切れの列インデックスを取得。
-		self.templatestartcolumn = rangeaddresses[1].StartColumn
-		self.templateendcolumnedge = rangeaddresses[1].EndColumn + 1
+		self.firstemptycolumn = rangeaddresses[0].EndColumn + 1  # 日付行の区切れの列インデックスを取得。
+		self.templatestartcolumn = rangeaddresses[1].StartColumn + 1  # テンプレートの設定開始列。
+		self.templateendcolumnedge = rangeaddresses[1].EndColumn + 1  # テンプレートの終了列右。
 VARS = Schedule()
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	VARS.setSheet(sheet)
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
 	sheet["A1"].setString("ﾘｽﾄに戻る")
 	sheet["AF1"].setString("COPY")
 	sheet["AK1"].setString("強有効")
-	firstdatevalue = int(sheet[VARS.daterow, VARS.datecolumn].getValue())  # 最初の日付のシリアル値を整数で取得。
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
+	firstdatevalue = int(sheet[VARS.dayrow, VARS.datacolumn].getValue())  # 最初の日付のシリアル値を整数で取得。
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
 	diff = todayvalue - firstdatevalue
 	if not diff>0:  # 先頭日付が今日より前でない時はここで終わる。
 		return
 	daycount = 31  # シートに表示する日数。
-	if VARS.datecolumn+daycount>VARS.templatestartcolumn:
-		daycount = VARS.templatestartcolumn - VARS.datecolumn  # daycountの上限はテンプレート列までにする。
-	todaycolumn = VARS.datecolumn + diff # 移動前の今日の日付列。	
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
+	if VARS.datacolumn+daycount>VARS.templatestartcolumn:
+		daycount = VARS.templatestartcolumn - VARS.datacolumn  # daycountの上限はテンプレート列までにする。
+	todaycolumn = VARS.datacolumn + diff # 移動前の今日の日付列。	
 	if todaycolumn<VARS.firstemptycolumn:  # 今日の日付列が表示されている範囲内にある時。今日の日付を先頭に移動させる。
-		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
 		controller = doc.getCurrentController()  # コントローラの取得。
-		controller.select(sheet[VARS.daterow-1:VARS.emptyrow, todaycolumn:VARS.templatestartcolumn])  #  移動前の今日の日付列以降テンプレート列左までを選択。
 		docframe = controller.getFrame()
+		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+		controller.select(sheet[VARS.monthrow:VARS.emptyrow, todaycolumn:VARS.templatestartcolumn])  #  移動前の今日の日付列以降テンプレート列左までを選択。
 		dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # カット。	
-		controller.select(sheet[VARS.daterow-1, VARS.datecolumn])  # ペーストする左上セルを選択。
+		controller.select(sheet[VARS.monthrow, VARS.datacolumn])  # ペーストする左上セルを選択。
 		dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。	
 	weekday = int(functionaccess.callFunction("WEEKDAY", (todayvalue,)))   # 今日の曜日番号を取得。日=1。		
 	weekdays = "日", "月", "火", "水", "木", "金", "土"  # シートでは日=1であることに注意。
-	endedgecolumn = VARS.datecolumn + daycount
-	datedatarows = [[i for i in range(todayvalue, todayvalue+daycount)],\
-					[weekdays[i%7] for i in range(weekday-1, weekday-1+daycount)]]  # 日付行と曜日行を作成。
-	scheduledatarows = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:endedgecolumn].getDataArray()	
-	sheet[VARS.daterow-1:VARS.daterow+2, VARS.datecolumn:endedgecolumn].clearContents(511)  # 日付行を削除。
+	endedgecolumn = VARS.datacolumn + daycount  # データの右端列の右。
+	datarows = [["" for dummy in range(daycount)],\
+			[i for i in range(todayvalue, todayvalue+daycount)],\
+			[weekdays[i%7] for i in range(weekday-1, weekday-1+daycount)]]  # 月行、日行と曜日行を作成。
+	sheet[VARS.monthrow:VARS.datarow, VARS.datacolumn:endedgecolumn].clearContents(511)  # シートの日付行を削除。
+	datarows.extend(sheet[VARS.datarow:VARS.emptyrow, VARS.datacolumn:endedgecolumn].getDataArray())  # シートのデータ部分を取得。	
 
-	templates = sheet[VARS.daterow-1:VARS.emptyrow, VARS.templatestartcolumn+1:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を日付行の上行から取得。
-	templatecolumnlists = [[] for dummy in range(8)]
-	for i, yobi in enumerate(templates[2], start=VARS.templatestartcolumn+1):  # 曜日行を列インデックスと共にイテレート。
-		n = weekdays.index(yobi)+1 if yobi in weekdays else 0  # 曜日番号を取得。インデックス0は曜日以外のとき。
-		templatecolumnlists[n].append(i)  # 日=1から始まる曜日番号をインデックスとしてその曜日のテンプレートの列インデックスを取得。
+	templates = sheet[VARS.monthrow:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を月行から取得。
+	templatecolumnlists = [[] for dummy in range(8)]  # 曜日別の列インデックスのリストのリスト。
+	ms, ds = {}, {}  # 月指定がある時は月をキー、日指定の時は日をキー、値はテンプレートデータ行のインデックス、の辞書。
+	for c, yobi in enumerate(templates[2], start=VARS.templatestartcolumn):  # 曜日行を列インデックスと共にイテレート。
+		if yobi in weekdays:  # 曜日が一致している時。  
+			n = weekdays.index(yobi) + 1  # 曜日番号を取得。日=1にしている。
+			templatecolumnlists[n].append(c)  # 日=1から始まる曜日番号をインデックスとしてその曜日のテンプレートの列インデックスを取得。
+		else:  # 曜日の指定がない時は日指定か月日指定とする。
+			i = c - VARS.templatestartcolumn  # 列インデックスをデータ行の相対インデックスに変換。
+			tm = templates[0][i]  # テンプレート列の月を取得。
+			td = templates[1][i]  # テンプレート列の日を取得。
+			if tm:  # 月の指定がある時。
+				ms.setdefault(tm, []).append(i)  # 同じ月の列インデックスをリストで取得。
+			elif td:  # 日の指定のみの時。
+				ds[td] = i  # 日指定の列インデックスを取得。			
 
-	y, m, d = [int(functionaccess.callFunction(i, (todayvalue,))) for i in ("YEAR", "MONTH", "DAY")]
-	nextmdatevalue = todayvalue
-	firstmidx = 0  # datedatarows[0]の中の月の初日の要素のインデックス。
+
 	holidays = set()  # 祝日の列インデックスを入れる集合。
-
-	ms, ds = {}, {}
-	for i in templatecolumnlists[0]:  # 曜日指定のないテンプレートの列インデックスについて。月日か日のみが指定されているはず。
-		tm = templates[0][i]  # テンプレートの月を取得。
-		td = templates[1][i]
-		if tm:  # 月の指定がある時。
-			ms.setdefault(tm, []).append(i)
-		elif td:  # 日の指定のみの時。
-			ds[td] = i
-	excludes = []  # 処理済列インデックスのリスト。
+	excludes = set()  # 処理済列インデックスの集合。
+	y, m, d = [int(functionaccess.callFunction(i, (todayvalue,))) for i in ("YEAR", "MONTH", "DAY")]
+	nextmdatevalue = todayvalue  # 次月の初日のシリアル値を入れる変数。
+	firstmidx = 0  # datacolumnからの月の初日の相対インデックス。
+	firstdaycolumn = VARS.datacolumn  # 今月の初日の列インデックス。
+	queryTemplateColumn = createQueryTemplateColumn(datarows, templates, excludes)
 	while True:
-		firstdaycolumn = VARS.datecolumn + firstmidx  # 月の初日の列インデックス。
-		if not firstdaycolumn<endedgecolumn:  # 表示最終列を越えている時ループを抜ける。
+		if daycount-1<firstmidx:  # 次月の初日が表示最終列を越えている時、月の途中で終わっている。
+			rdays = endedgecolumn - firstdaycolumn  # 月の最終日。firstdaycolumnはまだ次月のものに更新していない。
 			if m in ms:  # テンプレートに指定のある月の時。
-				for i in ms[m]:  # テンプレートの列インデックスをイテレート。
+				for i in ms[m]:  # テンプレートの相対列インデックスをイテレート。
 					td = templates[1][i]  # 指定日を取得。
-					if td<endedgecolumn-firstdaycolumn:  # 終了日より前の時。
-						queryTemplateColumn(firstdaycolumn, td, i, scheduledatarows, templates, excludes)
+					if td<rdays:  # 終了日より前の時。
+						queryTemplateColumn(firstdaycolumn, td, i)
 			for td in ds.keys():
-				if td<endedgecolumn-firstdaycolumn:  # 終了日より前の時。
-					queryTemplateColumn(firstdaycolumn, td, ds[td], scheduledatarows, templates, excludes)			
-			break		
+				if td<rdays:  # 終了日より前の時。
+					queryTemplateColumn(firstdaycolumn, td, ds[td])			
+			break  # ループを抜ける。
+		firstdaycolumn = VARS.datacolumn + firstmidx  # 今月の初日の列インデックスを取得。
 		if m in ms:  # テンプレートに指定のある月の時。
-			for i in ms[m]:  # テンプレートの列インデックスをイテレート。
+			for i in ms[m]:  # テンプレートの相対列インデックスをイテレート。
 				td = templates[1][i]  # 指定日を取得。
 				if d-1<td:  # 開始日以降の時。
-					queryTemplateColumn(firstdaycolumn, td, i, scheduledatarows, templates, excludes)
+					queryTemplateColumn(firstdaycolumn, td, i)
 		for td in ds.keys():
-			if d<=td:
-				queryTemplateColumn(firstdaycolumn, td, ds[td], scheduledatarows, templates, excludes)
+			if d-1<td:
+				queryTemplateColumn(firstdaycolumn, td, ds[td])
 		if y in commons.HOLIDAYS:  # 年が祝日一覧のキーにある時。
 			holidays.update(map(lambda x: firstdaycolumn+x, commons.HOLIDAYS[y][m-1]))  # 祝日の日付の列インデックスを取得。
-		sheet[VARS.daterow-1, firstdaycolumn].setString("{}月".format(m))  # 月を代入。
+		datarows[0][firstmidx] = "{}月".format(m)  # 月を代入。
 		nextmdatevalue = int(functionaccess.callFunction("EOMONTH", (nextmdatevalue, 0))) + 1  # 翌月1日のシリアル値を取得。
-		firstmidx = datedatarows[0].index(nextmdatevalue)  # 1日のインデックスを取得。
+		firstmidx = nextmdatevalue - todayvalue  # 次月の初日のdatacolumnからの相対インデックスを取得。
 		if m>11:  # 12月の次は1月にする。
 			m = 1  # 次月を取得。
 			y += 1  # 年も更新する。
@@ -113,10 +121,45 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		d = 1  # 日付を更新。
 			
 			
-	for n in range(1, 8):  # 曜日番号をイテレート。
-		templatecolumns = templatecolumnlists[n]  # 曜日のテンプレートの列インデックスのリストを取得。
-		for templatecolumn in templatecolumns:
-			range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7)  			
+	for n in range(1, 8):  # 曜日番号をn=1からイテレート。
+		templatecolumns = templatecolumnlists[n]  # 同じ曜日のテンプレートの列インデックスのリストを取得。
+		for c in range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7):  # 同じ曜日の列インデックスを取得。
+			if not c in excludes:  # 処理済の列インデックス以外の時。
+				if templatecolumns>1:  # 複数列がある時は週番号指定(2wなど)列を含む。
+					for tc in templatecolumns:
+						w = templates[1][tc-VARS.templatestartcolumn]  # 週数の行の値を取得。
+						if w.endswith("w"):  # wで終わる時は週番号。		
+							d = int(functionaccess.callFunction("DAY", (datarows[1][c-VARS.datacolumn],)))  # 月の何日目か取得。		
+							if int(w[:-1])==-(-d//7):  # 週番号が一致する時。-(-d//7)切り上げ。	
+								cellranges = sheet[VARS.datarow:VARS.emptyrow, c].queryRowDifferences(sheet[VARS.daterow, tc].getCellAddress())  # テンプレートの列と異なる行のセル範囲を取得。
+								j = c - VARS.datacolumn  # 相対インデックスを取得。
+								for cell in cellranges.getCells():
+									k = cell.getCellAddress().Row - VARS.monthrow 
+									if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
+										datarows[k][j] = templates[k, i-VARS.templatestartcolumn]  # テンプレートの値を使う。								
+						elif not w:  # 空セルのときは曜日のみ指定。
+							
+							pass		
+				else:
+					
+				
+					pass
+				
+				
+				
+				
+		
+		columns = [i for i in range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7) if not i in excludes]  # 処理済の列以外の列インデックスを取得。
+		templatecolumns = templatecolumnlists[n]  # 同じ曜日のテンプレートの列インデックスのリストを取得。週番号指定(2wなど)を含む。
+		for ti in templatecolumns:
+			w = templates[1][ti]  # 週数の行の値を取得。
+			if w.endswith("w"):  # wで終わる時は週番号。
+				
+				
+				d = int(functionaccess.callFunction("DAY", (datarows[0][i],)))  # 月の何日目か取得。
+				if int(w[:-1])!=-(-d//7):  # 週番号が一致しない時。-(-d//7)切り上げ。	
+					
+					pass				
 
 		
 
@@ -126,10 +169,10 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	
 	
 	n = 7  # 土曜日の曜日番号。
-	columnindexes = range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7)   # 土曜日の列インデックスを取得。			
+	columnindexes = range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 土曜日の列インデックスを取得。			
 	setRangesProperty(doc, columnindexes, ("CharColor", commons.COLORS["skyblue"]))  # 土曜日の文字色を設定。	
 	n = 1  # 日曜日の曜日番号。
-	columnindexes = range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7)   # 日曜日の列インデックスを取得。
+	columnindexes = range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 日曜日の列インデックスを取得。
 	setRangesProperty(doc, columnindexes, ("CharColor", commons.COLORS["red3"]))  # 日曜日の文字色を設定。				
 	holidays.difference_update(columnindexes)  # 日曜日と重なっている祝日を除く。	
 	holidays = filter(lambda x: x<endedgecolumn, holidays)  # 上限を設定。
@@ -152,7 +195,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		
 		
 		
-	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datecolumn+diff以降は2行目以降の要素はない。
+	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datacolumn+diff以降は2行目以降の要素はない。
 		yobi = datarows[1][i]  # 曜日の文字列を取得。
 		for k in range(len(templates[0])):  # テンプレートの列インデックスをイテレート。
 			if yobi in templates[1][k]:  # 曜日が一致する時。
@@ -180,7 +223,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 # 		newfirstdatecolumn = VARS.firstemptycolumn - diff
 # 		newfistdatevalue = todayvalue + VARS.firstemptycolumn - todaycolumn  # 追加する最初の日付のシリアル値。
 # 	else:  # 今日の日付列が表示されている範囲内にない時は今日の日付から始める。
-# 		newfirstdatecolumn = VARS.datecolumn
+# 		newfirstdatecolumn = VARS.datacolumn
 # 		newfistdatevalue = todayvalue	
 		
 		
@@ -196,17 +239,17 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	
 	
 	
-# 	todaycolumn = VARS.datecolumn + diff  # 移動前の今日の日付列。
+# 	todaycolumn = VARS.datacolumn + diff  # 移動前の今日の日付列。
 # 	if todaycolumn<VARS.firstemptycolumn:
-# 		datarows.extend(sheet[VARS.daterow+2:VARS.emptyrow, todaycolumn:VARS.firstemptycolumn].getDataArray())  # 今日の日付の列以降の行を取得。
+# 		datarows.extend(sheet[VARS.datarow:VARS.emptyrow, todaycolumn:VARS.firstemptycolumn].getDataArray())  # 今日の日付の列以降の行を取得。
 # 	else:
-# 		datarows.extend([] for dummy in range(VARS.emptyrow-(VARS.daterow+2)))  # コピーすべき列がない時は空行を追加する。
+# 		datarows.extend([] for dummy in range(VARS.emptyrow-(VARS.datarow)))  # コピーすべき列がない時は空行を追加する。
 
 
 		
 		
 		
-# 	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datecolumn+diff以降は2行目以降の要素はない。
+# 	for i in range(len(datarows[0])):  # インデックスがVARS.firstemptycolumn-VARS.datacolumn+diff以降は2行目以降の要素はない。
 # 		yobi = datarows[1][i]  # 曜日の文字列を取得。
 # 		for k in range(len(templates[0])):  # テンプレートの列インデックスをイテレート。
 # 			if yobi in templates[1][k]:  # 曜日が一致する時。
@@ -231,30 +274,30 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			
 			
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
-	endedgecolumn = VARS.datecolumn + daycount					
-	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endedgecolumn].clearContents(511)  # 内容を削除。
-	sheet[VARS.daterow:VARS.emptyrow, VARS.datecolumn:endedgecolumn].setDataArray(datarows)
+	endedgecolumn = VARS.datacolumn + daycount					
+	sheet[VARS.monthrow:VARS.emptyrow, VARS.datacolumn:endedgecolumn].clearContents(511)  # 内容を削除。
+	sheet[VARS.daterow:VARS.emptyrow, VARS.datacolumn:endedgecolumn].setDataArray(datarows)
 	createFormatKey = commons.formatkeyCreator(doc)	
-	sheet[VARS.daterow, VARS.datecolumn:endedgecolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  
-	sheet[VARS.daterow-1:VARS.emptyrow, VARS.datecolumn:endedgecolumn].setPropertyValue("HoriJustify", CENTER)  
+	sheet[VARS.daterow, VARS.datacolumn:endedgecolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  
+	sheet[VARS.monthrow:VARS.emptyrow, VARS.datacolumn:endedgecolumn].setPropertyValue("HoriJustify", CENTER)  
 	n = 1  # 日曜日の曜日番号。
-	sunsset = set(range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
+	sunsset = set(range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
 	setRangesProperty(doc, sunsset, ("CharColor", commons.COLORS["red3"]))  # 日曜日の文字色を設定。	
 	n = 7  # 土曜日の曜日番号。
-	setRangesProperty(doc, range(VARS.datecolumn+(n-weekday)%7, endedgecolumn, 7), ("CharColor", commons.COLORS["skyblue"]))  # 土曜日の文字色を設定。	
+	setRangesProperty(doc, range(VARS.datacolumn+(n-weekday)%7, endedgecolumn, 7), ("CharColor", commons.COLORS["skyblue"]))  # 土曜日の文字色を設定。	
 	holidayset = set()  # 祝日の列インデックスを入れる集合。
 	y, m, d = [int(functionaccess.callFunction(i, (todayvalue,))) for i in ("YEAR", "MONTH", "DAY")]
-	sheet[VARS.daterow-1, VARS.datecolumn].setString("{}月".format(m))
+	sheet[VARS.monthrow, VARS.datacolumn].setString("{}月".format(m))
 	if y in commons.HOLIDAYS:  # 祝日一覧のキーがある時。
-		holidayset.update(VARS.datecolumn+i-d for i in commons.HOLIDAYS[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。		
+		holidayset.update(VARS.datacolumn+i-d for i in commons.HOLIDAYS[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。		
 	nextmdatevalue = todayvalue
 	while True:
 		nextmdatevalue = int(functionaccess.callFunction("EOMONTH", (nextmdatevalue, 0))) + 1  # 翌月1日のシリアル値を取得。
-		nextmcolumn = VARS.datecolumn + nextmdatevalue - todayvalue
+		nextmcolumn = VARS.datacolumn + nextmdatevalue - todayvalue
 		if nextmcolumn>endedgecolumn-1:
 			break
 		y, m = [int(functionaccess.callFunction(i, (nextmdatevalue,))) for i in ("YEAR", "MONTH")]
-		sheet[VARS.daterow-1, nextmcolumn].setString("{}月".format(m))
+		sheet[VARS.monthrow, nextmcolumn].setString("{}月".format(m))
 		if y in commons.HOLIDAYS:  # 祝日一覧のキーがある時。
 			holidaycolumns = (nextmcolumn+i-1 for i in commons.HOLIDAYS[y][m-1])
 			holidayset.update(i for i in holidaycolumns if i<endedgecolumn)  # 祝日の列インデックスの集合を取得。		
@@ -263,8 +306,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 # 	
-# 	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
-# 			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
+# 	ranges = sheet[VARS.datarow:VARS.emptyrow, VARS.datacolumn:VARS.firstemptycolumn],\
+# 			sheet[VARS.datarow:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
 # 	datarange = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
 # 	datarange.addRangeAddresses((i.getRangeAddress() for i in ranges), False)	
 # 	searchdescriptor = sheet.createSearchDescriptor()
@@ -281,8 +324,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	
 	
 	
-# 	ranges = sheet[VARS.daterow+2:VARS.emptyrow, VARS.datecolumn:VARS.firstemptycolumn],\
-# 			sheet[VARS.daterow+2:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
+# 	ranges = sheet[VARS.datarow:VARS.emptyrow, VARS.datacolumn:VARS.firstemptycolumn],\
+# 			sheet[VARS.datarow:VARS.emptyrow, VARS.templatestartcolumn:VARS.templateendcolumnedge]
 # 	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
 # 	sheetcellranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)
 # 	conditionalformat = sheetcellranges.getPropertyValue("ConditionalFormat")
@@ -312,19 +355,28 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 # 					PropertyValue(Name="Formula1", Value="x"),\
 # 					PropertyValue(Name="StyleName", Value="magenta3")
 # 	conditionalformat.addNew(propertyvalues)
-
-def queryTemplateColumn(firstdaycolumn, td, i, scheduledatarows, templates, excludes):
-	c = firstdaycolumn + td - 1  # 列インデックスを取得。
-	cellranges = VARS.sheet[VARS.daterow+2:VARS.emptyrow, c].queryRowDifferences(VARS.sheet[VARS.daterow, i].getCellAddress())  # テンプレートの列と異なる行のセル範囲を取得。
-	j = c - VARS.datecolumn
+def queryWeekdayColumn(firstdaycolumn, td, i)
+	cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, c].queryRowDifferences(sheet[VARS.daterow, tc].getCellAddress())  # テンプレートの列と異なる行のセル範囲を取得。
+	j = c - VARS.datacolumn  # 相対インデックスを取得。
 	for cell in cellranges.getCells():
-		k = cell.getCellAddress().Row - (VARS.daterow+2) 
-		if scheduledatarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
-			scheduledatarows[k][j] = templates[k+3, i-(VARS.templatestartcolumn+1)]  # テンプレートを使う。
-	excludes.append(c)	
+		k = cell.getCellAddress().Row - VARS.monthrow 
+		if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
+			datarows[k][j] = templates[k, i-VARS.templatestartcolumn]  # テンプレートの値を使う。		
+
+def createQueryTemplateColumn(datarows, templates, excludes):
+	def queryTemplateColumn(firstdaycolumn, td, i):
+		c = firstdaycolumn + td - 1  # 列インデックスを取得。
+		cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, c].queryRowDifferences(VARS.sheet[VARS.daterow, i].getCellAddress())  # テンプレートの列と異なる行のセル範囲を取得。
+		j = c - VARS.datacolumn  # 相対インデックスを取得。
+		for cell in cellranges.getCells():
+			k = cell.getCellAddress().Row - VARS.monthrow 
+			if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
+				datarows[k][j] = templates[k, i-VARS.templatestartcolumn]  # テンプレートの値を使う。
+		excludes.append(c)	
+	return queryTemplateColumn
 def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
 	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	cellranges.addRangeAddresses((VARS.sheet[VARS.daterow:VARS.daterow+2, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+	cellranges.addRangeAddresses((VARS.sheet[VARS.daterow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
 	if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 		cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
