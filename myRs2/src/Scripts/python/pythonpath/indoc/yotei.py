@@ -167,7 +167,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
 	if cellranges:
 		cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])	
-	searchdescriptor.SearchRegularExpression = True  # 正規表現を有効にする。
+	searchdescriptor.setPropertyValue("SearchRegularExpression", True)  # 正規表現を有効にする。
 	searchdescriptor.setSearchString("[^x/]")  # 戻り値はない。	
 	if cellranges:
 		cellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])		
