@@ -3,12 +3,13 @@
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from indoc import commons, staticdialog
 from calendar import monthrange
-from datetime import date, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
+from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
 from com.sun.star.awt import MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
+from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Schedule():  # シート固有の定数設定。
 	def __init__(self):
 		self.menurow = 0  # メニュー行。
@@ -239,12 +240,58 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return wClickCell(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
+	sheet = VARS.sheet
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
+	firstdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
+	firstdate = date(*[int(functionaccess.callFunction(i, (firstdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
+	firsttimevalue = sheet[VARS.datarow, 0].getValue()
+	firsttime = time(*[int(functionaccess.callFunction(i, (firsttimevalue,))) for i in ("HOUR", "MINUTE")])
+	
+
+	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+	times = [firsttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow)]
+
+	from datetime import datetime
+	datetime.combine(firstdate, firsttime) + timedelta(minutes=30)
+
+	outputs = []
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	txt = selection.getString()	
 	if txt=="COPY":
+		n = 14
+		dates = [firstdate+timedelta(days=i) for i in range(14)]
 		
 		
-		pass
+		for i in range(VARS.datacolumn, VARS.datacolumn):
+			cellranges = sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()	
+			fs = []	
+			for rangeaddress in cellranges.getRangeAddresses():  # getCells()ではなぜか何もイテレートされない。
+				for j in range(rangeaddress.StartRow-VARS.datarow, rangeaddress.EndRow+1-VARS.datarow):
+					
+					
+					pass
+					
+# 					fs.append("{} {}".format(headers[j], "○"))
+# 				if fs:
+# 					outputs.append()	
+# 					
+# 					if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
+# 						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。	
+		
+		
+
+# 			for r in range()
+# 		
+# 		
+# 			for j in cellranges.getRangeAddresses():
+# 				j.StartRow
+# 		
+# 
+# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+# 		print("")
+		
 	elif txt=="強有効":
 		
 		
@@ -301,35 +348,43 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 		if VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
 			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
-		selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。		
-def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
-	if contextmenuname=="cell":  # セルのとき
-		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-		del contextmenu[:]  # contextmenu.clear()は不可。
-		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-			addMenuentry("ActionTrigger", {"Text": "To blue", "CommandURL": baseurl.format("entry1")})  # listeners.pyの関数名を指定する。
-		elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 連続した複数セルの時。
-			addMenuentry("ActionTrigger", {"Text": "To red", "CommandURL": baseurl.format("entry2")})  # listeners.pyの関数名を指定する。
-		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
-	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。
-		del contextmenu[:]  # contextmenu.clear()は不可。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Cut"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Copy"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Paste"})
+		selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	VARS.setSheet(sheet)
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+	if contextmenuname=="cell":  # セルのとき		
+		if VARS.datarow-1<r<VARS.emptyrow:
+			if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+				commons.cutcopypasteMenuEntries(addMenuentry)					
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 				
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertRowsBefore"})
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteRows"}) 
-	elif contextmenuname=="colheader":  # 列ヘッダーの時。
-		pass  # contextmenuを操作しないとすべての項目が表示されない。
+		commons.rowMenuEntries(addMenuentry)
+	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+		commons.cutcopypasteMenuEntries(addMenuentry)
+		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertColumnsBefore"})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertColumnsAfter"})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:DeleteColumns"})
 	elif contextmenuname=="sheettab":  # シートタブの時。
-		del contextmenu[:]  # contextmenu.clear()は不可。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
-def contextMenuEntries(target, entrynum):  # コンテクストメニュー番号の処理を振り分ける。
-	colors = commons.COLORS
-	if entrynum==1:
-		target.setPropertyValue("CellBackColor", colors["ao"])  # 背景を青色にする。
-	elif entrynum==2:
-		target.setPropertyValue("CellBackColor", colors["aka"]) 
+	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。		
+def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。
+	sheet = controller.getActiveSheet()  # アクティブシートを取得。
+	VARS.setSheet(sheet)
+	selection = controller.getSelection()
+	if entrynum==1:  # クリア。	
+		selection.clearContents(511)  # 範囲をすべてクリアする。	
