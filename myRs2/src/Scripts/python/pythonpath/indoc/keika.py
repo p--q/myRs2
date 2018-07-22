@@ -525,10 +525,10 @@ def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日�
 	setRangesProperty(doc, sheet, r, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。	
 	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。	
 def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
-	sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	sheetcellranges.addRangeAddresses((sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-	if len(sheetcellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-		sheetcellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
+	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+	cellranges.addRangeAddresses((sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+	if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+		cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
