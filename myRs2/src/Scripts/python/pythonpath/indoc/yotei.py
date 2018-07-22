@@ -1,14 +1,14 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import commons
+from indoc import commons, staticdialog
 from calendar import monthrange
-from datetime import date, timedelta  # 日付計算はシート関数では複雑になりすぎてロジックが組めないのでこれを使う。
-from com.sun.star.awt import Key  # 定数
+from datetime import date, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
+from com.sun.star.awt import MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
-from com.sun.star.table.CellHoriJustify import CENTER  # enum
+from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
 class Schedule():  # シート固有の定数設定。
 	def __init__(self):
 		self.menurow = 0  # メニュー行。
@@ -30,8 +30,9 @@ VARS = Schedule()
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["A1"].setString("ﾘｽﾄに戻る")
-	sheet["AF1"].setString("COPY")
-	sheet["AK1"].setString("強有効")
+	sheet["C1"].setString("COPY")
+	sheet["I1"].setString("強有効")
+	sheet["O1"].setString("3wCOPY")
 	VARS.setSheet(sheet)
 	daycount = 31  # シートに表示する日数。
 	monthrow = VARS.monthrow
@@ -50,25 +51,24 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	firstdatevalue = int(sheet[VARS.dayrow, datacolumn].getValue())  # 先頭の日付のシリアル値を整数で取得。空セルの時は0.0が返る。	
 	if firstdatevalue>0:  # シリアル値が取得できた時。	
 		diff = todayvalue - firstdatevalue  # 今日の日付と先頭の日付との差を取得。
-		if diff<0:  # 先頭日付が未来の時はここで終わる。同日の時は更新する。
+		if diff>0:  # 先頭日付が過去の時。
+			todaycolumn = datacolumn + diff # 移動前の今日の日付列インデックスを取得。	
+			if diff and todaycolumn<VARS.firstemptycolumn:  # 今日の日付列が表示されている範囲内にある時。今日の日付を先頭に移動させる。先頭が今日でない時は移動させない。
+				controller = doc.getCurrentController()  # コントローラの取得。
+				docframe = controller.getFrame()
+				dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+				controller.select(sheet[monthrow:emptyrow, todaycolumn:templatestartcolumn-1])  #  移動前の今日の日付列以降テンプレート列左までを選択。
+				dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲をカット。	
+				controller.select(sheet[monthrow, datacolumn])  # ペーストする左上セルを選択。
+				dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。	
+				componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
+				keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
+				toolkit = componentwindow.getToolkit()  # ツールキットを取得。
+				toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
+				toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+				controller.select(sheet[datarow, datacolumn])			
+		elif diff<0:  # 先頭日付が未来の時はここで終わる。
 			return
-		todaycolumn = datacolumn + diff # 移動前の今日の日付列インデックスを取得。	
-		if diff and todaycolumn<VARS.firstemptycolumn:  # 今日の日付列が表示されている範囲内にある時。今日の日付を先頭に移動させる。先頭が今日でない時は移動させない。
-			controller = doc.getCurrentController()  # コントローラの取得。
-			docframe = controller.getFrame()
-			dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-			controller.select(sheet[monthrow:emptyrow, todaycolumn:templatestartcolumn-1])  #  移動前の今日の日付列以降テンプレート列左までを選択。
-			dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲をカット。	
-			controller.select(sheet[monthrow, datacolumn])  # ペーストする左上セルを選択。
-			dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。	
-			componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
-			keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
-			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-			toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
-			toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
-			controller.select(sheet[datarow, datacolumn])
-		else:
-			sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	else:
 		sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
@@ -160,7 +160,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			for j in range(rangeaddress.StartColumn-datacolumn, rangeaddress.EndColumn+1-datacolumn):
 				for k in range(rangeaddress.StartRow-monthrow, rangeaddress.EndRow+1-monthrow):
 					if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
-						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。											
+						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。													
 	sheet[monthrow:emptyrow, datacolumn:endedgecolumn].setDataArray(datarows)
 	colors = commons.COLORS
 	n = 5  # 土曜日の曜日番号。
@@ -212,11 +212,96 @@ def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列�
 	cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
 	if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 		cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
+def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
+	selection = eventobject.Source.getSelection()
+	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
+		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
+		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
+				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
+			return  # すでに枠線が書いてあったら何もしない。
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
+		drowBorders(selection)  # 枠線の作成。
+def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+			VARS.setSheet(selection.getSpreadsheet())
+			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
+				drowBorders(selection)  # 枠線の作成。
+			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+				if r==VARS.menurow:
+					return wClickMenu(enhancedmouseevent, xscriptcontext)
+				elif VARS.datarow-1<r<VARS.emptyrow:
+					if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+						return wClickCell(enhancedmouseevent, xscriptcontext)
+	return True  # セル編集モードにする。	
+def wClickMenu(enhancedmouseevent, xscriptcontext):
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	txt = selection.getString()	
+	if txt=="COPY":
 		
 		
+		pass
+	elif txt=="強有効":
 		
 		
+		pass
+	elif txt=="3wCOPY":
 		
+		
+		pass
+	return False  # セル編集モードにしない。	
+def wClickCell(enhancedmouseevent, xscriptcontext):
+	defaultrows = "2F", "3F", "強", "新", "閉", "外", "会", "手", "ｸﾘｱ", "x", "/"
+	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "予定", defaultrows, callback=callback_wClickCell)	
+	return False  # セル編集モードにしない。	
+def callback_wClickCell(mouseevent, xscriptcontext):	
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	setCellProp(selection)
+def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
+	changes = changesevent.Changes	
+	for change in changes:
+		if change.Accessor=="cell-change":  # セルの値が変化した時。
+			selection = change.ReplacedElement  # 値を変更したセルを取得。	
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+			if VARS.datarow-1<r<VARS.emptyrow:
+				if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+					setCellProp(selection)
+			break
+def setCellProp(selection):		
+	txt = selection.getString()	
+	if txt:  # セルに文字列がある時。
+		horijustify	= LEFT if len(txt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
+		selection.setPropertyValue("HoriJustify", horijustify)  
+		color = "magenta3"
+		if txt=="x":
+			color = "gray7"
+		elif txt=="/":
+			color = "silver"
+		selection.setPropertyValue("CellBackColor", commons.COLORS[color])
+		if txt=="ｸﾘｱ":
+			selection.clearContents(511)
+	else:
+		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
+def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
+	sheet = VARS.sheet
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。
+	if VARS.datarow-1<r<VARS.emptyrow:
+		if VARS.datacolumn-1<c<VARS.firstemptycolumn:
+			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.datacolumn:VARS.firstemptycolumn].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+		if VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
+		selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。		
 def notifycontextmenuexecute(addMenuentry, baseurl, contextmenu, controller, contextmenuname):			
 	if contextmenuname=="cell":  # セルのとき
 		selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
