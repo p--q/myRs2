@@ -244,53 +244,41 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-	firstdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
-	firstdate = date(*[int(functionaccess.callFunction(i, (firstdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
-	firsttimevalue = sheet[VARS.datarow, 0].getValue()
-	firsttime = time(*[int(functionaccess.callFunction(i, (firsttimevalue,))) for i in ("HOUR", "MINUTE")])
-	
+	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 
 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-	times = [firsttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow)]
 
-	from datetime import datetime
-	datetime.combine(firstdate, firsttime) + timedelta(minutes=30)
-
+	startdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
+	startdate = date(*[int(functionaccess.callFunction(i, (startdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
+	starttimevalue = sheet[VARS.datarow, 0].getValue()
+	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
+	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
+	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))
+	times = [":".join(i.isoformat().split(":")[:2]) for i in timegen]
+	
+	
 	outputs = []
+	prefix = "     "
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	txt = selection.getString()	
 	if txt=="COPY":
-		n = 14
-		dates = [firstdate+timedelta(days=i) for i in range(14)]
-		
-		
-		for i in range(VARS.datacolumn, VARS.datacolumn):
+		n = 14  # 取得する日数。
+		dategene = (startdate+timedelta(days=i) for i in range(n))
+		dates = [i.strftime("%-m/%-d(%a)") for i in dategene]
+		for i in range(VARS.datacolumn, VARS.firstemptycolumn):
 			cellranges = sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()	
-			fs = []	
 			for rangeaddress in cellranges.getRangeAddresses():  # getCells()ではなぜか何もイテレートされない。
+				fs = []	
 				for j in range(rangeaddress.StartRow-VARS.datarow, rangeaddress.EndRow+1-VARS.datarow):
+					fs.append("{}{} ○".format(prefix, times[j]))
+				if fs:
+					fs[0] = "{} {}".format(dates[i-VARS.datacolumn], fs[0])
+					outputs.extend(fs)	
+		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにIDをコピーする。							
 					
-					
-					pass
-					
-# 					fs.append("{} {}".format(headers[j], "○"))
-# 				if fs:
-# 					outputs.append()	
-# 					
-# 					if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
-# 						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。	
-		
-		
 
-# 			for r in range()
-# 		
-# 		
-# 			for j in cellranges.getRangeAddresses():
-# 				j.StartRow
-# 		
-# 
 # 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-# 		print("")
+
 		
 	elif txt=="強有効":
 		
