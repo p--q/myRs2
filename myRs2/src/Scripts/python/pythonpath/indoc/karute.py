@@ -27,7 +27,7 @@ class Karute():  # シート固有の定数設定。
 		self.replacedatecolumn = 8  # 日付前へ列インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
-		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
+		self.dateformat = "%Y/%-m/%-d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
 	def setSheet(self, sheet): # 逐次変化する値。
 		self.sheet = sheet	
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
@@ -61,7 +61,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
 			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
-	dateformat = "****%Y年%m月%d日(%a)****"
+	dateformat = "****%Y年%-m月%-d日(%a)****"
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。

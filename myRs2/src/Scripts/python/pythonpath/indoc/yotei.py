@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+import locale
 from indoc import commons, staticdialog
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
@@ -30,7 +31,7 @@ class Schedule():  # シート固有の定数設定。
 VARS = Schedule()
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	sheet["A1"].setString("ﾘｽﾄに戻る")
+	sheet["A1"].setString("一覧へ")
 	sheet["C1"].setString("COPY")
 	sheet["I1"].setString("強有効")
 	sheet["O1"].setString("3wCOPY")
@@ -67,7 +68,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 				toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
 				toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
-				controller.select(sheet[datarow, datacolumn])			
+				controller.select(sheet[emptyrow, datacolumn])			
 		elif diff<0:  # 先頭日付が未来の時はここで終わる。
 			return
 	else:
@@ -240,55 +241,62 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return wClickCell(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	txt = selection.getString()	
+	if txt=="一覧へ":
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		sheets = doc.getSheets()  # シートコレクションを取得。	
+		controller = doc.getCurrentController()  # コントローラの取得。			
+		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+		return False  # セル編集モードにしない。	
 	sheet = VARS.sheet
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
 	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-
-	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-
 	startdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
 	startdate = date(*[int(functionaccess.callFunction(i, (startdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
 	starttimevalue = sheet[VARS.datarow, 0].getValue()
 	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
-	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))
-	times = [i.strftime("%-h:mm") for i in timegen]
-	
-	
-	outputs = []
-	prefix = "     "
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	txt = selection.getString()	
+	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))  # 30分毎に枠を取得。
+	times = [i.strftime("%-H:%M") for i in timegen]
+	locale.setlocale(locale.LC_ALL, '')  # これがないとWindows10では曜日が英語になる。locale.setlocale(locale.LC_TIME, 'ja_JP.utf-8')では文字化けする。
+	outputs = [sheet[VARS.menurow, VARS.templatestartcolumn].getString()]  # 最初の文をセルから取得。
 	if txt=="COPY":
-		n = 14  # 取得する日数。
+		createScheduleToClip(systemclipboard, times, startdate, outputs)(14)					
+	elif txt=="強有効":
+		n = 14
+		searchdescriptor = sheet.createSearchDescriptor()
+		searchdescriptor.setSearchString("強")  # 戻り値はない。	
 		dategene = (startdate+timedelta(days=i) for i in range(n))
 		dates = [i.strftime("%-m/%-d(%a)") for i in dategene]
-		for i in range(VARS.datacolumn, VARS.firstemptycolumn):
-			cellranges = sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()	
-			for rangeaddress in cellranges.getRangeAddresses():  # getCells()ではなぜか何もイテレートされない。
-				fs = []	
-				for j in range(rangeaddress.StartRow-VARS.datarow, rangeaddress.EndRow+1-VARS.datarow):
-					fs.append("{}{} ○".format(prefix, times[j]))
-				if fs:
-					fs[0] = "{} {}".format(dates[i-VARS.datacolumn], fs[0])
-					outputs.extend(fs)	
-		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにIDをコピーする。							
-					
-
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-
-		
-	elif txt=="強有効":
-		
-		
-		pass
+		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
+			datarange = sheet[VARS.datarow:VARS.emptyrow, i]
+			cellranges = datarange.queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
+			searchedcellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+			if searchedcellranges:			
+				cellranges.addRangeAddresses(searchedcellranges.getRangeAddresses(), True)	# Falseにするとセル範囲を取り出す時に追加順にある。	
+			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
+			if fs:
+				outputs.extend(["", dates[i-VARS.datacolumn]])
+				outputs.extend(fs)	
+		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
 	elif txt=="3wCOPY":
-		
-		
-		pass
+		createScheduleToClip(systemclipboard, times, startdate, outputs)(21)
 	return False  # セル編集モードにしない。	
+def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
+	def scheduleToClip(n):  # n: 取得する日数。
+		dategene = (startdate+timedelta(days=i) for i in range(n))
+		dates = [i.strftime("%-m/%-d(%a)") for i in dategene]
+		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
+			cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
+			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
+			if fs:
+				outputs.extend(["", dates[i-VARS.datacolumn]])
+				outputs.extend(fs)	
+		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
+	return scheduleToClip
 def wClickCell(enhancedmouseevent, xscriptcontext):
 	defaultrows = "2F", "3F", "強", "新", "閉", "外", "会", "手", "ｸﾘｱ", "x", "/"
 	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "予定", defaultrows, callback=callback_wClickCell)	
