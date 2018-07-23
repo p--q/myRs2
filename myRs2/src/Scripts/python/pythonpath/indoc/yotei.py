@@ -254,7 +254,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
 	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))
-	times = [":".join(i.isoformat().split(":")[:2]) for i in timegen]
+	times = [i.strftime("%-h:mm") for i in timegen]
 	
 	
 	outputs = []
