@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import locale
-from indoc import commons, staticdialog
+from indoc import commons, staticdialog, ichiran, transientdialog
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
 from com.sun.star.awt import MouseButton, Key  # 定数
@@ -360,10 +360,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	if contextmenuname=="cell":  # セルのとき		
 		if VARS.datarow-1<r<VARS.emptyrow:
 			if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-				
-				
-				
-				
+				addMenuentry("ActionTrigger", {"Text": "患者一覧", "CommandURL": baseurl.format("entry2")}) 
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 				
@@ -388,3 +386,34 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	selection = controller.getSelection()
 	if entrynum==1:  # クリア。	
 		selection.clearContents(511)  # 範囲をすべてクリアする。	
+	elif entrynum==2:  # 患者一覧。
+		sheets = doc.getSheets()  # シートコレクションを取得。	
+		ichiransheet = sheets["一覧"]
+		ichiranvars = ichiran.VARS		
+		ichiranvars.setSheet(ichiransheet)
+		
+# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		
+		ichirandatarows = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1].getDataArray()
+		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
+		
+		maxlength = max(len(i[2]) for i in ichirandatarows)  # カナ列の文字数の最大値を取得。全角文字を揃えるのは難しいので半角列で揃える。
+
+# 		maxlength = len(max(ichirandatarows, key=lambda x: len(x[1]))[1])  # 漢字列の文字数の最大値を取得。
+		stringformat = "{{:>{}}} {{}} {{}}".format(maxlength)
+		defaultrows = [stringformat.format(*i[::-1]) for i in ichirandatarows]
+		
+# 		defaultrows = map(" ".join, ichirandatarows)
+		
+# 		datarange = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1]
+# 		ichirandatarows = [list(i) for i in datarange.getDataArray()]
+# 		ichirandatarows.sort(key=lambda x: x[2])  # カナ列でソート。タイトル行は空欄なので先頭に来る。
+		
+# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		
+		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, callback=None)
+
+		
+		
+		
+		

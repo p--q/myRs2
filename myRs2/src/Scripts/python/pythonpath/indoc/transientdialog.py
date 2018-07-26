@@ -11,7 +11,7 @@ from com.sun.star.frame import XFrameActionListener
 from com.sun.star.frame.FrameAction import FRAME_UI_DEACTIVATING  # enum
 from com.sun.star.util import XCloseListener
 from com.sun.star.util import MeasureUnit  # 定数
-from com.sun.star.view.SelectionType import MULTI  # enum 
+# from com.sun.star.view.SelectionType import MULTI  # enum 
 # SHEETNAME = "config"  # データを保存するシート名。
 def createDialog(xscriptcontext, dialogtitle, defaultrows, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -23,7 +23,13 @@ def createDialog(xscriptcontext, dialogtitle, defaultrows, outputcolumn=None, *,
 	m = 2  # コントロール間の間隔。
 	h = 12  # コントロールの高さ
 	XWidth, YHeight = dialogcommons.XWidth, dialogcommons.YHeight
-	gridprops = {"PositionX": 0, "PositionY": 0, "Width": 50, "Height": 50, "ShowRowHeader": False, "ShowColumnHeader": False, "SelectionModel": MULTI}  # グリッドコントロールのプロパティ。
+	gridprops = {"PositionX": 0, "PositionY": 0, "Width": 50, "Height": 50, "ShowRowHeader": False, "ShowColumnHeader": False}  # グリッドコントロールのプロパティ。
+
+	
+	
+# 	gridprops = {"PositionX": 0, "PositionY": 0, "Width": 50, "Height": len(defaultrows)*12, "ShowRowHeader": False, "ShowColumnHeader": False}  # グリッドコントロールのプロパティ。
+
+	
 	controlcontainerprops = {"PositionX": 0, "PositionY": 0, "Width": XWidth(gridprops), "Height": YHeight(gridprops), "BackgroundColor": 0xF0F0F0}  # コントロールコンテナの基本プロパティ。幅は右端のコントロールから取得。高さはコントロール追加後に最後に設定し直す。		
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
 	menulistener = MenuListener()  # コンテクストメニューにつけるリスナー。
