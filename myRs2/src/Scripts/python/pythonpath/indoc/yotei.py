@@ -397,11 +397,11 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		ichirandatarows = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1].getDataArray()
 		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
 		
-		maxlength = max(len(i[2]) for i in ichirandatarows)  # カナ列の文字数の最大値を取得。全角文字を揃えるのは難しいので半角列で揃える。
+# 		maxlength = max(len(i[2]) for i in ichirandatarows)  # カナ列の文字数の最大値を取得。全角文字を揃えるのは難しいので半角列で揃える。
 
 # 		maxlength = len(max(ichirandatarows, key=lambda x: len(x[1]))[1])  # 漢字列の文字数の最大値を取得。
-		stringformat = "{{:>{}}} {{}} {{}}".format(maxlength)
-		defaultrows = [stringformat.format(*i[::-1]) for i in ichirandatarows]
+# 		stringformat = "{{:>{}}} {{}} {{}}".format(maxlength)
+# 		defaultrows = [stringformat.format(*i[::-1]) for i in ichirandatarows]
 		
 # 		defaultrows = map(" ".join, ichirandatarows)
 		
@@ -411,6 +411,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		
 # 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 		
+		defaultrows = [" ".join(i) for i in ichirandatarows]
 		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, callback=None)
 
 		
