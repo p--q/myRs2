@@ -5,7 +5,7 @@ import os, unohelper, glob
 from itertools import chain
 from indoc import commons, keika, ent, datedialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
-from com.sun.star.awt.MessageBoxType import QUERYBOX, ERRORBOX  # enum
+from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
@@ -41,6 +41,13 @@ VARS = Ichiran()
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	annotations = sheet.getAnnotations()
+	yoteisheet = xscriptcontext.getDocument().getSheets()["予定"]
+	yoteiids = [i.getString().split(" ")[0] for i in yoteisheet.getAnnotations()]  # 予定シートのコメントにあるIDをすべて取得。
+	for i in annotations:  # すべてのコメントについて。予定シートにない予定を削除する。
+		if i.getString().endswith("面談"):
+			if not sheet[i.getPosition().Row, VARS.idcolumn].getString() in yoteiids:  # 予定シートにないIDの時。
+				i.getParent().clearContents(CellFlags.ANNOTATION)
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
@@ -288,7 +295,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。
 					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
 					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if all(map(lambda x: "ｱ"<=x<="ﾝ", txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
+					if all(map(lambda x: chr(0xFF61)<=x<=chr(0xFF9F), txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
 						selection.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
 					else:
 						msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"

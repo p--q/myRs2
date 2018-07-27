@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, historydialog, staticdialog
+from indoc import commons, historydialog, staticdialog, transientdialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
@@ -32,6 +32,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3:F4"].setDataArray((("薬品整理",), ("薬品名抽出",)))
+	sheet["I3"].setString("透析")
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
@@ -178,6 +179,20 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 							newdatarows.append((rowtxt,))  # その行を取得。
 			sheets[firstrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
 			sheets[firstrow:firstrow+len(newdatarows), VARS.yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
+	elif txt=="透析":
+		celladdress = selection.getCellAddress()
+		if selection.getPropertyValue("CharColor")==commons.COLORS["silver"]:
+			selection.setPropertyValue("CharColor", commons.COLORS["black"])
+			tosekibicell = sheet[celladdress.Row+1, celladdress.Column]
+			tosekibicell.setString("月水金")
+			tosekibicell.setPropertyValue("CharColor", commons.COLORS["black"])
+		else:
+			selection.setPropertyValue("CharColor", commons.COLORS["silver"])
+			sheet[celladdress.Row+1, celladdress.Column].setPropertyValue("CharColor", commons.COLORS["white"])
+	elif txt=="月水金":
+		selection.setString("火木土")
+	elif txt=="火木土":
+		selection.setString("月水金")
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
@@ -210,20 +225,43 @@ def callback_wClickUpperRight(mouseevent, xscriptcontext):
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	c = selection.getCellAddress().Column  # selectionの列のインデックスを取得。		
+	celladdress = selection.getCellAddress()
+	c = celladdress.Column  # selectionの列のインデックスを取得。		
+	sheet = VARS.sheet
 	if c<VARS.yakucolumn:
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString(), [], VARS.yakucolumn)
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), [], VARS.yakucolumn)
 	else:
+		r = celladdress.Row
 		defaultrows = []
 		if c==VARS.yakucolumn+1:  # 用法列。
-			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "外用"
+			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)	
 		elif c==VARS.yakucolumn+2:  # 回数列。
-			defaultrows = "持続", "1回", "2回", "3回", "1回1吸入", "1回2吸入"
+			yoho = sheet[r, VARS.yakucolumn+1].getString()
+			if yoho:
+				if yoho=="吸入":
+					defaultrows = "1吸入1日1回", "2吸入1日1回", "1吸入1日2回", "2吸入1日2回"
+				elif yoho=="外用":
+					defaultrows = "1日1回", "1日2回", "1日3回", "1日4回"
+				elif yoho=="皮下注":
+					defaultrows = "毎食前", "朝前", "夕前", "眠前"
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomLeft)
+			else:
+				defaultrows = "持続", "1回", "2回", "3回"
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)	
 		elif c==VARS.yakucolumn+3:  # 限定列。
-			defaultrows = "2日に1回", "3日に1回", "7日に1回", "月木", "月水金(透析日のみ)", "火木土(透析日のみ)", "月水金日(透析日以外)", "火木土日(透析日以外)", "月水金土(透析日前日以外)", "火木土日(透析日前日以外)"
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)
+			weekdays = "月火水木金土日"
+			defaultrows = ["2日に1回", "3日に1回", "7日に1回", "月木", "火金"]
+			if sheet[2, VARS.yakucolumn+3].getPropertyValue("CharColor")==commons.COLORS["black"]:  # 透析患者の時。
+				tosekibi = sheet[3, VARS.yakucolumn+3].getString()  # 透析日を取得。
+				table = str.maketrans(tosekibi, " "*len(tosekibi))  # 透析日を半角スペースに置換するテーブル。
+				nontosekibi = weekdays.translate(table).replace(" ", "")  # 透析日以外。
+				nontosekibizenjitu = "{}{}".format(tosekibi, "土" if tosekibi.startswith("月") else "日")  # 透析日前日以外
+				defaultrows.extend(["{}(透析日のみ)".format(tosekibi), "{}(透析日以外)".format(nontosekibi), "{}(透析日前日以外)".format(nontosekibizenjitu)])
+			defaultrows.extend(weekdays)
+			transientdialog.createDialog(xscriptcontext, sheet[1, c].getString(), defaultrows, enhancedmouseevent=enhancedmouseevent, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomLeft(enhancedmouseevent, xscriptcontext):
+def callback_wClickBottomLeft(enhancedmouseevent, xscriptcontext, fixedtxt=None):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()	
 	if txt:  # セルに文字列がある時。

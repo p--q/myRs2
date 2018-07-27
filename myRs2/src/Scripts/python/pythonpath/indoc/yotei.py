@@ -5,8 +5,9 @@ import locale
 from indoc import commons, staticdialog, ichiran, transientdialog
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
-from com.sun.star.awt import MouseButton, Key  # 定数
+from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
+from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
@@ -162,8 +163,11 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			for j in range(rangeaddress.StartColumn-datacolumn, rangeaddress.EndColumn+1-datacolumn):
 				for k in range(rangeaddress.StartRow-monthrow, rangeaddress.EndRow+1-monthrow):
 					if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
-						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。													
-	sheet[monthrow:emptyrow, datacolumn:endedgecolumn].setDataArray(datarows)
+						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。		
+	annotations = sheet.getAnnotations()  # コメントコレクションを取得。					
+	comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。											
+	sheet[monthrow:emptyrow, datacolumn:endedgecolumn].setDataArray(datarows)  # コメントが消されてしまう。
+	[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
 	colors = commons.COLORS
 	n = 5  # 土曜日の曜日番号。
 	columnindexes = range(datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 土曜日の列インデックスを取得。			
@@ -360,8 +364,9 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	if contextmenuname=="cell":  # セルのとき		
 		if VARS.datarow-1<r<VARS.emptyrow:
 			if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-				addMenuentry("ActionTrigger", {"Text": "患者一覧", "CommandURL": baseurl.format("entry2")}) 
-				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+				if selection.supportsService("com.sun.star.sheet.SheetCell") and selection.getString() in ("", "強"):  # ターゲットがセル、かつ、空セルか強セルの時。
+					addMenuentry("ActionTrigger", {"Text": "患者一覧", "CommandURL": baseurl.format("entry2")}) 
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 				
@@ -384,37 +389,71 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	VARS.setSheet(sheet)
 	selection = controller.getSelection()
+	ichiransheet = doc.getSheets()["一覧"]
 	if entrynum==1:  # クリア。	
-		selection.clearContents(511)  # 範囲をすべてクリアする。	
+		annotation = selection.getAnnotation()
+		cell = getMendanCell(annotation.getString().split(" ")[0], ichiransheet)  # コメントが消える前にIDを取得しておく。
+		selection.clearContents(511)  # 範囲をすべてクリアする。コメントも消える。
+		if cell:
+			cell.clearContents(CellFlags.ANNOTATION)
 	elif entrynum==2:  # 患者一覧。
-		sheets = doc.getSheets()  # シートコレクションを取得。	
-		ichiransheet = sheets["一覧"]
 		ichiranvars = ichiran.VARS		
 		ichiranvars.setSheet(ichiransheet)
-		
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		
 		ichirandatarows = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1].getDataArray()
 		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
-		
-# 		maxlength = max(len(i[2]) for i in ichirandatarows)  # カナ列の文字数の最大値を取得。全角文字を揃えるのは難しいので半角列で揃える。
-
-# 		maxlength = len(max(ichirandatarows, key=lambda x: len(x[1]))[1])  # 漢字列の文字数の最大値を取得。
-# 		stringformat = "{{:>{}}} {{}} {{}}".format(maxlength)
-# 		defaultrows = [stringformat.format(*i[::-1]) for i in ichirandatarows]
-		
-# 		defaultrows = map(" ".join, ichirandatarows)
-		
-# 		datarange = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1]
-# 		ichirandatarows = [list(i) for i in datarange.getDataArray()]
-# 		ichirandatarows.sort(key=lambda x: x[2])  # カナ列でソート。タイトル行は空欄なので先頭に来る。
-		
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		
 		defaultrows = [" ".join(i) for i in ichirandatarows]
-		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, callback=None)
-
-		
-		
-		
-		
+		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, fixedtxt="面", callback=callback_wClickGrid)
+def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
+	idtxt = gridcelldata.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	sheet = doc.getCurrentController().getActiveSheet()
+	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	annotations = sheet.getAnnotations()
+	for i in annotations:  # すべてのコメントについて。
+		if i.getString().startswith(idtxt):  # すでに同じIDのコメントが存在する時。
+			msg = "{}にすでに面談予定がありますがそれを取り消しますか?".format(getCelldatetime(xscriptcontext, i.getPosition()))
+			componentwindow = doc.getCurrentController().ComponentWindow
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)
+			if msgbox.execute()==MessageBoxResults.YES:	
+				cell = i.getParent()
+				cell.clearContents(511)
+				setCellProp(cell)		
+			elif msgbox.execute()==MessageBoxResults.CANCEL:
+				selection.setString("")  # 選択セルの文字列をクリア。
+				setCellProp(selection)
+				return
+	setCellProp(selection)	
+	celladdress = selection.getCellAddress()
+	annotations.insertNew(celladdress, gridcelldata)  # gridcelldataをセル注釈を挿入。
+# 	VARS.setSheet(sheet)
+	ichiransheet = doc.getSheets()["一覧"]
+	cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
+	if cell:	
+		ichiransheet.getAnnotations().insertNew(cell.getCellAddress(), "{} 面談".format(getCelldatetime(xscriptcontext, celladdress))) 
+		cell.setString("")  # 面談列の文字列をクリア。
+	else:
+		msg = "IDが一覧に見つかりません。"	
+		componentwindow = doc.getCurrentController().ComponentWindow
+		componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)	
+def getCelldatetime(xscriptcontext, celladdress):
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
+	datevalue = VARS.sheet[VARS.dayrow, celladdress.Column].getValue()
+	md = [int(functionaccess.callFunction(i, (datevalue,))) for i in ("MONTH", "DAY")]
+	timevalue = VARS.sheet[celladdress.Row, 0].getValue()
+	hm = [int(functionaccess.callFunction(i, (timevalue,))) for i in ("HOUR", "MINUTE")]	
+	return "{}/{} {}:{:0>2}".format(*md, *hm)
+def getMendanCell(idtxt, ichiransheet):
+	ichiranvars = ichiran.VARS		
+	ichiranvars.setSheet(ichiransheet)
+	searchdescriptor = ichiransheet.createSearchDescriptor()
+	searchdescriptor.setSearchString(idtxt)  # 戻り値はない。	
+	searchedcell = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn].findFirst(searchdescriptor)  # 見つからなかった時はNoneが返る。
+	if searchedcell:
+		r = searchedcell.getCellAddress().Row
+		searchdescriptor.setSearchString("面談")  # 戻り値はない。	
+		searchedcell = ichiransheet[ichiranvars.menurow, ichiranvars.checkstartcolumn:ichiranvars.memostartcolumn].findFirst(searchdescriptor)  # 見つからなかった時はNoneが返る。
+		if searchedcell:
+			c = searchedcell.getCellAddress().Column
+			return ichiransheet[r, c]	
