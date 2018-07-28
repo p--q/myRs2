@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, historydialog, staticdialog, transientdialog
+from indoc import commons, historydialog, staticdialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
@@ -72,32 +72,33 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 def detectDuplicates(enhancedmouseevent, xscriptcontext):  # 薬名の重複をチェック。	
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
-	r = celladdress.Row  # selectionの行のインデックスを取得。		
+	r, c = celladdress.Row, celladdress.Column  # selectionの行のインデックスを取得。		
 	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
-		datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
-		datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
-		count = datarows.count(datarow)
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-		controller = doc.getCurrentController()  # コントローラの取得。
-		componentwindow = controller.ComponentWindow			
-		if count>1:  # 同じデータ行が複数ある時。
-			if count==2:  # 重複行が2個だけの時。
-				drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
-				if drow<r:  # 重複行が上の時。
-					msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-					msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-					if msgbox.execute()==MessageBoxResults.OK:
-						sheet = VARS.sheet
-						sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-						sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-						sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
-					return		
-				else:
-					msg = "重複行が選択行の下方にあります。"	
-			else:  # 重複行が3個以上ある時。
-				msg = "重複行が3行以上あります。"	
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()					
+		if c>VARS.splittedcolumn-1:
+			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
+			count = datarows.count(datarow)
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			controller = doc.getCurrentController()  # コントローラの取得。
+			componentwindow = controller.ComponentWindow			
+			if count>1:  # 同じデータ行が複数ある時。
+				if count==2:  # 重複行が2個だけの時。
+					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
+					if drow<r:  # 重複行が上の時。
+						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
+						if msgbox.execute()==MessageBoxResults.OK:
+							sheet = VARS.sheet
+							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
+							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
+							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
+						return		
+					else:
+						msg = "重複行が選択行の下方にあります。"	
+				else:  # 重複行が3個以上ある時。
+					msg = "重複行が3行以上あります。"	
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+				msgbox.execute()					
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -149,6 +150,10 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
 			controller.select(selection)  # ボタンを選択し直す。	
 	elif txt=="薬品名抽出":
+		
+		
+		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		
 		firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (VARS.yakucolumn+1, VARS.yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
 		if firstrow<VARS.emptyrow:
 			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
@@ -156,7 +161,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			datarows = sheet[firstrow:VARS.emptyrow, VARS.yakucolumn].getDataArray()  # 用法設定していない薬品列の各行のタプルを取得。
 			sep = "*sep*"  # 区切り文字。
 			concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
-			transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
+			concatenetedtxt = transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
 			rowtxts = concatenetedtxt.split(sep)  # 区切り文字で分割。
 			rowtxtslength = len(rowtxts)
 			newdatarows = []
@@ -250,6 +255,7 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				defaultrows = "持続", "1回", "2回", "3回"
 				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)	
 		elif c==VARS.yakucolumn+3:  # 限定列。
+			dialogtitle = sheet[1, c].getString()
 			weekdays = "月火水木金土日"
 			defaultrows = ["2日に1回", "3日に1回", "7日に1回", "月木", "火金"]
 			if sheet[2, VARS.yakucolumn+3].getPropertyValue("CharColor")==commons.COLORS["black"]:  # 透析患者の時。
@@ -258,34 +264,57 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				nontosekibi = weekdays.translate(table).replace(" ", "")  # 透析日以外。
 				nontosekibizenjitu = "{}{}".format(tosekibi, "土" if tosekibi.startswith("月") else "日")  # 透析日前日以外
 				defaultrows.extend(["{}(透析日のみ)".format(tosekibi), "{}(透析日以外)".format(nontosekibi), "{}(透析日前日以外)".format(nontosekibizenjitu)])
+				dialogtitle = "{}透析日".format(tosekibi)
 			defaultrows.extend(weekdays)
-			transientdialog.createDialog(xscriptcontext, sheet[1, c].getString(), defaultrows, enhancedmouseevent=enhancedmouseevent, callback=callback_wClickBottomLeft)
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomLeft(enhancedmouseevent, xscriptcontext, fixedtxt=None):
+def callback_wClickBottomLeft(mouseevent, xscriptcontext, fixedtxt=None):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()	
 	if txt:  # セルに文字列がある時。
 		horijustify	= LEFT if len(txt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
 		selection.setPropertyValue("HoriJustify", horijustify)  
+		if txt=="皮下注":
+			VARS.sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
 def wClickBottomRight(enhancedmouseevent, xscriptcontext):
-	defaultrows = "止", "変", "朝", "昼", "夕", "寝"
-	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "処方", defaultrows, callback=callback_wClickBottomRight)
+	r = enhancedmouseevent.Target.getCellAddress().Row
+	yoho = VARS.sheet[r, VARS.yakucolumn+1].getString()
+	if yoho:
+		if yoho in ("吸入"):
+			defaultrows = "止", "変", "朝", "昼", "夕", "寝", "処方"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
+		elif yoho in ("皮下注"):	
+			defaultrows = "止", "処方", "4-4-4", "4"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
+		else:
+			defaultrows = "止", "変", "朝", "昼", "夕", "寝"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "処方", defaultrows, callback=callback_wClickBottomRight)
+	else:  # 用法列が空セルの時は点滴とする。
+		defaultrows = "止", "変", "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "点滴", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
 def callback_wClickBottomRight(mouseevent, xscriptcontext):	
+	sheet = VARS.sheet
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 	if txt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, CENTER))  # 背景を消して中央揃えにする。		
-		VARS.sheet[r, c+1:].clearContents(511)
+		sheet[r, c+1:].clearContents(511)
 		if r>VARS.blackrow:  # 黒行より下の時。
 			rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 			commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
+	elif txt=="処方":
+		selection.setString("")
+		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif txt:  # 上記以外の文字列の時。
-		sheet = VARS.sheet
-		color = "lime" if sheet[r, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
-		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], CENTER))  # 背景をつけて中央揃えにする。	
+		horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+		if selection.getPropertyValue("CellBackColor")==-1:  # 背景色がまだない時。
+			color = "lime" if sheet[r, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
+			selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], horijustify))  
+		else:	
+			selection.setPropertyValue("HoriJustify", horijustify)
 	else:  # 文字列がない時。
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
@@ -350,10 +379,17 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
-				addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry7")})
-				addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
-				addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
-				addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
+				addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
+				if selection.supportsService("com.sun.star.sheet.SheetCell") and sheet[r, VARS.yakucolumn+1].getString()=="皮下注":  # 単一セルかつ用法列が皮下注の時。
+					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+					addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
+				elif selection.supportsService("com.sun.star.sheet.SheetCell") and sheet[r, VARS.yakucolumn+1].getString()=="吸入":  # 単一セルかつ用法列が皮下注の時。
+					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
+				else:
+					addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
+					addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
+					addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "以後消去", "CommandURL": baseurl.format("entry14")})
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
@@ -452,6 +488,41 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
 		toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+	elif entrynum==22:  # インスリン残計算。選択セルは単一。
+		u = 300  # 1本単位。
+		e = 2  # 空打ち単位。
+		celladdress = selection[0, 0].getCellAddress()
+		r, c = celladdress.Row, celladdress.Column
+		color = commons.COLORS["magenta3"]  # インスリン開始セルの背景色。
+		for i in range(VARS.splittedcolumn, c+1)[::-1]:  # 選択セルから左に列インデックスをイテレート。
+			if sheet[r, i].getPropertyValue("CellBackColor")==color:  # 背景色が開始セルの時。
+				startindex = i  # 選択セルを含む左の最初のインスリン開始セルの列インデックスを取得。
+				break
+		else:  # 開始セルが取得出来なかった時。
+			
+			return
+		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
+		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
+		j = 0  # 開始列インデックスを越える前の列インデックス。
+		for i in unitgene:
+			if i>startindex:  # 開始列より右の時。
+				break
+			j = i
+		if j==0:  # 開始時のインスリン量が取得出来なかった時。
+			
+			return
+		startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量。
+		dayu = sum([int(i)+e for i in startunits.split("-") if int(i)>0])  # インスリンの1日消費量を取得。	
+		edgecolumn = startindex + u//dayu  # インスリンがなくなる日の右列インデックスを取得。
+		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーターを再作。
+		for i in (i for i in unitgene if i>startindex):  # 開始時の次のインスリン量について。
+			newdayu = sum([int(i)+e for i in sheet[r, i].getString().split("-") if int(i)>0])  # 新たな1日消費量を取得。
+			edgecolumn = i + dayu*(edgecolumn-i)//newdayu  # 残日数から残インスリン量を取得して新しい1日消費量で残日数を再計算。
+			dayu = newdayu  # 1日消費量を更新。
+		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
+		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
+	elif entrynum==23:  # 処方。
+		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与えられている時はselectionは選択行だけが意味を持つ。
 	rangeaddress = selection.getRangeAddress()
 	startc = rangeaddress.StartColumn

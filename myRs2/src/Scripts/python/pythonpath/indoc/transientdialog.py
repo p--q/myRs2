@@ -157,15 +157,8 @@ class MouseListener(unohelper.Base, XMouseListener):
 						sheet[r, c].setString("".join([selection.getString(), fixedtxt]))  # セルに追記する。
 					else:
 						sheet[r, c].setString(fixedtxt)  # セルに代入。
-						
-# 					import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)		
-						
-						
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(mouseevent, xscriptcontext, fixedtxt)				
-						
-					
-										
+						callback(mouseevent, xscriptcontext, fixedtxt)								
 				gridpopupmenu = self.gridpopupmenu		
 				for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
@@ -173,9 +166,6 @@ class MouseListener(unohelper.Base, XMouseListener):
 						if gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
 							self.dialogframe.close(True)
 							break
-						
-						
-						
 		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。
 			pos = Rectangle(mouseevent.X, mouseevent.Y, 0, 0)  # ポップアップメニューを表示させる起点。
 			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向							
