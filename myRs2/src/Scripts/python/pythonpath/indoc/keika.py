@@ -264,7 +264,17 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	c = celladdress.Column  # selectionの列のインデックスを取得。		
 	sheet = VARS.sheet
 	if c<VARS.yakucolumn:
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), [], VARS.yakucolumn)
+		headertxt = sheet[1, c].getString()
+		defaultrows = None
+		if headertxt=="検査値":
+			
+			
+			
+# 			defaultrows = 
+			pass
+		elif headertxt=="その他":
+			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0)
 	else:
 		r = celladdress.Row
 		defaultrows = []
@@ -298,6 +308,14 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 			defaultrows.extend(weekdays)
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
+def callback_wClickBottomLeft0(mouseevent, xscriptcontext):
+	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+	r = selection.getCellAddress().Row
+	sheet = VARS.sheet
+	txt = sheet[r, VARS.yakucolumn].getString()
+	if ":" in txt:
+		txts = txt.split(":"),
+		sheet[r, VARS.yakucolumn:VARS.yakucolumn+len(txts[0])].setDataArray(txts)
 def callback_wClickBottomLeft(mouseevent, xscriptcontext, fixedtxt=None):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()	
@@ -409,26 +427,30 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
-				addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
-				if selection.supportsService("com.sun.star.sheet.SheetCell") and sheet[r, VARS.yakucolumn+1].getString()=="皮下注":  # 単一セルかつ用法列が皮下注の時。
-					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-					addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
-				elif selection.supportsService("com.sun.star.sheet.SheetCell") and sheet[r, VARS.yakucolumn+1].getString()=="吸入":  # 単一セルかつ用法列が皮下注の時。
-					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
+				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")
+				yoho = sheet[r, VARS.yakucolumn+1].getString()
+				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
+					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
 				else:
+					addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
+					if sheetcell and yoho=="皮下注":  # 単一セルかつ用法列が皮下注の時。
+						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+						addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
+					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が皮下注の時。
+						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
 					addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
 					addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
 					addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "以後消去", "CommandURL": baseurl.format("entry14")})
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
-				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				commons.cutcopypasteMenuEntries(addMenuentry)	
 			else:
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 				
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 		
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
@@ -556,6 +578,25 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
 	elif entrynum==23:  # 処方。
 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+	elif entrynum==24:  # 開始。	
+		celladdress = selection[0, 0].getCellAddress()
+		r, c = celladdress.Row, celladdress.Column
+		yoho = sheet[r, VARS.yakucolumn+1].getString()
+		if yoho=="病棟":
+			sheet[r, VARS.splittedcolumn:].clearContents(511)
+			sheet[r, c:c+60].setPropertyValue("CellBackColor", commons.COLORS["skyblue"]) 	
+			datevalue = int(sheet[VARS.daterow, c].getValue())
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+			functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
+			datevalue += 59
+			enddate = "/".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])
+			selection.setString("{} 終了".format(enddate))
+			commons.toOtherEntry(sheet, selection.getRangeAddress(), VARS.emptyrow, VARS.blackrow+1)  # 黒行下へ移動。
+		elif yoho=="ﾘﾊﾋﾞﾘ":
+			sheet[r, c:].clearContents(511)
+			sheet[r, c:c+30].setPropertyValue("CellBackColor", commons.COLORS["skyblue"]) 
+			commons.toOtherEntry(sheet, selection.getRangeAddress(), VARS.emptyrow, VARS.blackrow+1)  # 黒行下へ移動。
 def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与えられている時はselectionは選択行だけが意味を持つ。
 	rangeaddress = selection.getRangeAddress()
 	startc = rangeaddress.StartColumn

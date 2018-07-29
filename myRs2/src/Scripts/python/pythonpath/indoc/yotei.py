@@ -391,11 +391,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	selection = controller.getSelection()
 	ichiransheet = doc.getSheets()["一覧"]
 	if entrynum==1:  # クリア。	
-		annotation = selection.getAnnotation()
-		cell = getMendanCell(annotation.getString().split(" ")[0], ichiransheet)  # コメントが消える前にIDを取得しておく。
+		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+			annotation = selection.getAnnotation()
+			cells = getMendanCell(annotation.getString().split(" ")[0], ichiransheet),  # コメントが消える前にIDを取得して一覧シート上の面談セルを取得。
+		else:  # 複数セルの時。
+			commentcellgene = (i for i in sheet.getAnnotations() if len(selection.queryIntersection(i.getParent().getRangeAddress())))  # 選択セル範囲にあるコメントのあるセルのジェネレーター。	
+			cells = (getMendanCell(i.getString().split(" ")[0], ichiransheet) for i in commentcellgene)	
 		selection.clearContents(511)  # 範囲をすべてクリアする。コメントも消える。
-		if cell:
-			cell.clearContents(CellFlags.ANNOTATION)
+		[i.clearContents(CellFlags.ANNOTATION) for i in cells if i is not None]  # 一覧シートのコメントを削除する。cellsにはNoneが入ってくるのでそれを除外する。
 	elif entrynum==2:  # 患者一覧。
 		ichiranvars = ichiran.VARS		
 		ichiranvars.setSheet(ichiransheet)
@@ -425,7 +428,6 @@ def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcellda
 	setCellProp(selection)	
 	celladdress = selection.getCellAddress()
 	annotations.insertNew(celladdress, gridcelldata)  # gridcelldataをセル注釈を挿入。
-# 	VARS.setSheet(sheet)
 	ichiransheet = doc.getSheets()["一覧"]
 	cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
 	if cell:	
