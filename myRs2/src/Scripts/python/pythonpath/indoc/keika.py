@@ -150,10 +150,6 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			dispatcher.executeDispatch(controller.getFrame(), ".uno:DataSort", "", 0, props)  # ディスパッチコマンドでソート。sort()メソッドは挙動がおかしくて使えない。								
 			controller.select(selection)  # ボタンを選択し直す。	
 	elif txt=="薬品名抽出":
-		
-		
-		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		
 		firstrow = max(sheet[:, i].queryContentCells(CellFlags.STRING).getRangeAddresses()[-1].EndRow for i in (VARS.yakucolumn+1, VARS.yakucolumn+2)) + 1  # 用法列か回数列の最終行インデックスの下の行インデックスを取得。
 		if firstrow<VARS.emptyrow:
 			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
@@ -163,27 +159,61 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			concatenetedtxt = sep.join(chain.from_iterable(datarows))  # 区切り文字で全行を結合。
 			concatenetedtxt = transliteration.transliterate(concatenetedtxt, 0, len(concatenetedtxt), [])[0]  # 半角に変換。
 			rowtxts = concatenetedtxt.split(sep)  # 区切り文字で分割。
-			rowtxtslength = len(rowtxts)
 			newdatarows = []
-			for i, rowtxt in enumerate(rowtxts):  # 行の相対インデックスとともにイテレートする。
-				if rowtxt.endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
-					if rowtxt in ("ﾍﾟﾝﾆｰﾄﾞﾙ", "ﾋﾞﾀﾒｼﾞﾝ", "ﾌﾞﾄﾞｳ糖注50%PL", "生理食塩水PL", "CV主管", "CV副管"):  # 特定の文字列が含まれている時は追加しない。
-						continue									
-					for j in range(i+1, i+4):  # 3行下の行まで。
-						if j<rowtxtslength:  # j行が存在する時。
-							if "1日間" in rowtxts[j]:  # j行に"1日間"がある時。
-								if j+1<rowtxtslength:  # j+1行が存在する時。
-									if not "日間" in rowtxts[j+1]:  # j+1行に"日間"がない時。
-										break  
-								else:  # "1日間"で終わっている時。
-									break	
-						else:
-							break
-					else:  # breakされなかった時。
-						if not rowtxt in newdatarows:  # まだ追加していない要素の時のみ。
-							newdatarows.append((rowtxt,))  # その行を取得。
-			sheets[firstrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 整理前のセルの文字列と数値をクリア。		
-			sheets[firstrow:firstrow+len(newdatarows), VARS.yakucolumn].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
+			yoho = ""
+			for rowtxt in rowtxts[::-1]:  # 下の行からイテレート。
+				if not rowtxt:
+					continue
+				elif rowtxt.startswith("点滴"):
+					yoho = ""
+					continue
+				elif rowtxt.startswith(("20", "[", "CV", "ﾍﾟﾝﾆｰﾄﾞﾙ", "ﾋﾞﾀﾒｼﾞﾝ", "ﾌﾞﾄﾞｳ糖注50%PL", "生理食塩水PL")):
+					continue
+				elif "本人" in rowtxt:
+					continue
+				elif "家族" in rowtxt:
+					continue				
+				elif rowtxt.endswith(("日分",)):
+					continue				
+				elif rowtxt.endswith(("錠", "袋", "g", "本", "瓶", "管", "包", "枚", "個", "ｶﾌﾟｾﾙ", "ｷｯﾄ")):  # 特定の文字列で終わっている時は追加する。
+					if not yoho:  # 点滴の時
+						rowtxt = rowtxt.replace("1袋", "").replace(" ", "").replace("号輸液", " ")
+					datarow = rowtxt.replace("  ", ""), yoho
+					if not datarow in newdatarows:
+						newdatarows.append(datarow)
+				elif rowtxt.endswith("単位"):
+					if yoho:
+						datarow = rowtxt.split(" ")[0], yoho
+					else:
+						datarow = rowtxt.split(" ")[0], "混注"
+					if not datarow in newdatarows:
+						newdatarows.append(datarow)						
+				else:			
+					yoho = ""
+					if rowtxt.startswith(("外用",)):
+						yoho = "外用"
+						if "吸入" in rowtxt:
+							yoho = "吸入"
+					elif rowtxt.startswith("分3"):
+						yoho = "分3"
+					elif rowtxt.startswith("分2"):
+						yoho = "分2"					
+					elif rowtxt.startswith("分1"):
+						if "朝" in rowtxt:
+							yoho = "朝"
+						elif "昼" in rowtxt:
+							yoho = "昼"
+						elif "夕" in rowtxt:
+							yoho = "夕"					
+						elif "寝" in rowtxt:
+							yoho = "寝"					
+						elif "起床時" in rowtxt:
+							yoho = "起床時"		
+			newdatarows.reverse()				
+		sheet[firstrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].clearContents(511)  # 整理前のセルをクリア。		
+		edgerow = firstrow+len(newdatarows)
+		sheet[firstrow:edgerow, VARS.yakucolumn:VARS.yakucolumn+2].setDataArray(newdatarows)  # 整理した薬品名をシートに代入。		
+		sheet[firstrow:edgerow, VARS.yakucolumn+1].setPropertyValue("HoriJustify", CENTER)
 	elif txt=="透析":
 		celladdress = selection.getCellAddress()
 		if selection.getPropertyValue("CharColor")==commons.COLORS["silver"]:
@@ -424,6 +454,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
+	componentwindow = controller.ComponentWindow
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	VARS.setSheet(sheet)
 	selection = controller.getSelection()
@@ -445,8 +476,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection, "w")
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
-	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。
-		componentwindow = controller.ComponentWindow			
+	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアしますか?"
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
@@ -483,7 +513,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
-		componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
 		keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
 		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
@@ -499,7 +528,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				startindex = i  # 選択セルを含む左の最初のインスリン開始セルの列インデックスを取得。
 				break
 		else:  # 開始セルが取得出来なかった時。
-			
+			msg = "開始セルが取得できませんでした。"					
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			msgbox.execute()	
 			return
 		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
 		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
@@ -509,7 +540,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				break
 			j = i
 		if j==0:  # 開始時のインスリン量が取得出来なかった時。
-			
+			msg = "開始時のインスリン量が取得できませんでした。"					
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			msgbox.execute()	
 			return
 		startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量。
 		dayu = sum([int(i)+e for i in startunits.split("-") if int(i)>0])  # インスリンの1日消費量を取得。	
