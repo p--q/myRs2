@@ -267,11 +267,17 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 		headertxt = sheet[1, c].getString()
 		defaultrows = None
 		if headertxt=="検査値":
-			
-			
-			
-# 			defaultrows = 
-			pass
+			defaultrows = "APTT 目標1.5倍:検査値",\
+				"PT-INR 目標2.0-2.5:検査値",\
+				"ｶﾙﾊﾞﾏｾﾞﾋﾟﾝ(ﾃｸﾞﾚﾄｰﾙ内服)3-10ug/ml10日で定常:検査値",\
+				"ｸﾛﾅｾﾞﾊﾟﾑ(ﾗﾝﾄﾞｾﾝ内服)25-75ug/mlT1/2=27hr:検査値",\
+				"ｼﾞｺﾞｷｼﾝ(ﾗﾆﾗﾋﾟｯﾄﾞ内服)0.7-1ng/mlT1/2=24hr:検査値",\
+				"ｿﾞﾆｻﾐﾄﾞ(ｴｸｾｸﾞﾗﾝ内服)20ug/ml発汗障害注意1wで定常:検査値",\
+				"ﾃｵﾌｨﾘﾝ(ﾈｵﾌｨﾘﾝ注)5-15ug/mlT1/2=9hr:検査値",\
+				"ﾊﾞﾙﾌﾟﾛ酸(ﾃﾞﾊﾟｹﾝ内服)40-120ug/mlT1/2=10hrRは1wで定常:検査値",\
+				"ﾊﾛﾍﾟﾘﾄﾞｰﾙ(ｾﾚﾈｰｽ注)3-10ng/mlT1/2=14hr:検査値",\
+				"ﾌｪﾆﾄｲﾝ(ｱﾚﾋﾞｱﾁﾝ注)10-20ug/mlT1/2=10hr:検査値",\
+				"ﾌｪﾉﾊﾞﾙﾋﾞﾀｰﾙ(ﾌｪﾉﾊﾞｰﾙ内服)10-25ug/ml2-3wで定常:検査値"
 		elif headertxt=="その他":
 			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0)
@@ -315,7 +321,11 @@ def callback_wClickBottomLeft0(mouseevent, xscriptcontext):
 	txt = sheet[r, VARS.yakucolumn].getString()
 	if ":" in txt:
 		txts = txt.split(":"),
-		sheet[r, VARS.yakucolumn:VARS.yakucolumn+len(txts[0])].setDataArray(txts)
+		columnlength = len(txts[0])
+		if columnlength<VARS.splittedcolumn-VARS.yakucolumn+1:
+			sheet[r, VARS.yakucolumn:VARS.yakucolumn+columnlength].setDataArray(txts)
+	if txt.endswith(":検査値"):
+		sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
 def callback_wClickBottomLeft(mouseevent, xscriptcontext, fixedtxt=None):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	txt = selection.getString()	

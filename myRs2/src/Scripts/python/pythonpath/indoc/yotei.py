@@ -397,8 +397,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		else:  # 複数セルの時。
 			commentcellgene = (i for i in sheet.getAnnotations() if len(selection.queryIntersection(i.getParent().getRangeAddress())))  # 選択セル範囲にあるコメントのあるセルのジェネレーター。	
 			cells = (getMendanCell(i.getString().split(" ")[0], ichiransheet) for i in commentcellgene)	
-		selection.clearContents(511)  # 範囲をすべてクリアする。コメントも消える。
 		[i.clearContents(CellFlags.ANNOTATION) for i in cells if i is not None]  # 一覧シートのコメントを削除する。cellsにはNoneが入ってくるのでそれを除外する。
+		selection.clearContents(511)  # 予定シートの選択範囲をすべてクリアする。コメントも消える。
 	elif entrynum==2:  # 患者一覧。
 		ichiranvars = ichiran.VARS		
 		ichiranvars.setSheet(ichiransheet)
