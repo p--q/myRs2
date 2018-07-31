@@ -42,15 +42,19 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 					sheet.clearContents(511)
 					datarange = sheet[:len(outputs), 0]	
 					datarange.setDataArray([(i,) for i in outputs])	
-						
-					controller = xscriptcontext.getDocument().getCurrentController()  # コントローラの取得。
-					dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-					controller.select(datarange)  
-					docframe = controller.getFrame()
+# 						
+# 					controller = xscriptcontext.getDocument().getCurrentController()  # コントローラの取得。
+# 					dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+# 					controller.select(datarange)  
+# 					docframe = controller.getFrame()
 # 					dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # 選択範囲を				
-					dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲を			
-							
-# 					systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
+# 					dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲を			
+# 					dispatcher.executeDispatch(controller.getFrame(), ".uno:Copy", "", 0, ())  # ペーストしたセルをコピー。	
+
+# 					txt = "\n".join(outputs)
+# 					sheet["A1"].setString(txt)
+	
+					systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにコピーする。Windows7はすごく時間がかる。ディスパッチコマンドだとフリーズする(Windows7)。	
 					return False  # セル編集モードにしない。	p					
 					
 					
