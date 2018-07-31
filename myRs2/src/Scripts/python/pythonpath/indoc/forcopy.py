@@ -6,7 +6,7 @@ from com.sun.star.awt import MouseButton  # 定数
 # from com.sun.star.sheet import CellFlags  # 定数
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-# 	sheet = selection.getSpreadsheet()
+	sheet = selection.getSpreadsheet()
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
@@ -21,11 +21,13 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							clipboardtxt = transferable.getTransferData(dataflavor)
 							break					
 
+# 					sheet["A1"].setString(clipboardtxt)
 # 					import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 
 					outputs = []
 					buffer = []
 					for txt in clipboardtxt.split("\n"):
+						txt = txt.strip()
 						if txt.startswith("****"):
 							continue
 						elif txt.startswith("#"):
@@ -34,9 +36,22 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 							outputs.append(txt)
 							buffer = []
 						else:
-							buffer.append(txt)
-					systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
-					return False  # セル編集モードにしない。						
+							buffer.append(txt)	
+					if buffer:
+						outputs[-1] = "".join([outputs[-1], *buffer])
+					sheet.clearContents(511)
+					datarange = sheet[:len(outputs), 0]	
+					datarange.setDataArray([(i,) for i in outputs])	
+						
+					controller = xscriptcontext.getDocument().getCurrentController()  # コントローラの取得。
+					dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
+					controller.select(datarange)  
+					docframe = controller.getFrame()
+# 					dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # 選択範囲を				
+					dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲を			
+							
+# 					systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
+					return False  # セル編集モードにしない。	p					
 					
 					
 	
