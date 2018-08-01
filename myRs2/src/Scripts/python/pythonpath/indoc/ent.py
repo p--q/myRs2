@@ -51,7 +51,34 @@ def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 		if txt=="ﾘｽﾄに戻る":
 			controller = doc.getCurrentController()  # コントローラの取得。
 			sheets = doc.getSheets()
-			controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。	
+			controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+		elif txt=="改行削除":
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
+			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+			transferable = systemclipboard.getContents()
+			clipboardtxt = ""
+			for dataflavor in transferable.getTransferDataFlavors():
+				if dataflavor.MimeType=="text/plain;charset=utf-16":
+					clipboardtxt = transferable.getTransferData(dataflavor)
+					break					
+			if clipboardtxt:
+				outputs = []
+				buffer = []
+				for txt in clipboardtxt.split("\n"):
+					txt = txt.strip()
+					if txt.startswith("****"):
+						continue
+					elif txt.startswith("#"):
+						if buffer and outputs:
+							outputs[-1] = "".join([outputs[-1], *buffer])
+						outputs.append(txt)
+						buffer = []
+					else:
+						buffer.append(txt)	
+				if buffer and outputs:
+					outputs[-1] = "".join([outputs[-1], *buffer])
+				systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。Windows7はすごく時間がかる。ディスパッチコマンドだとフリーズする(Windows7)。	
 	elif c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
 		sortRows(c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		
