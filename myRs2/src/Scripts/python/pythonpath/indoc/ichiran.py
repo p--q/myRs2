@@ -434,12 +434,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			datarow.extend((todayvalue, "経過"))
 			entsheet = sheets["退院"]  # 退院シートを取得。
 			entvars = ent.VARS  # 退院シートの定数を取得。		
-			
-			
-			
-# 			entconsts = ent.getConsts(entsheet)	
+			entvars.setSheet(entsheet)
 			entsheet[entvars.emptyrow, entvars.idcolumn:entvars.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
-			entsheet[entvars.splittedrow:entvars.emptyrow+1, entvars.datecolumn:entvars.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
+			entsheet[entvars.splittedrow:entvars.emptyrow, entvars.datecolumn:entvars.keikacolumn].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
 			searchdescriptor = sheet.createSearchDescriptor()
 			searchdescriptor.setSearchString(idtxt)  # 戻り値はない。
 			cellranges = entsheet[entvars.splittedrow:entvars.emptyrow, entvars.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
