@@ -27,7 +27,7 @@ class Karute():  # シート固有の定数設定。
 		self.replacedatecolumn = 8  # 日付前へ列インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
-		self.dateformat = "%Y/%-m/%-d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
+		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
 	def setSheet(self, sheet): # 逐次変化する値。
 		self.sheet = sheet	
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
@@ -53,40 +53,47 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	# コピー日時セルの色を設定。
 	copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。
 	copieddatetxt = copieddatecell.getString()  # コピー日時セルの文字列を取得。
-	if copieddatetxt:
+	try:
 		copieddatetime = datetime.strptime(copieddatetxt, VARS.dateformat)  # コピーした日時を取得。
+	except:
+		copieddatetime = None
+	if copieddatetxt:
 		now = datetime.now()  # 現在の日時を取得。
 		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
 			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
 		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
 			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
-	dateformat = "****%Y年%-m月%-d日(%a)****"
+	dateformat =  "****%Y年%m月%d日(%a)****"
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
-	articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
-	todaydate = date.today()  # 今日のdateオブジェクトを取得。
-	if articledate!=todaydate:  # 今日の日付でない時。
-		todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
-		datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
-		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
-		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-		if txt:  # 記事の文字列があるときのみ。
-			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
-			stringlength = VARS.stringlength  # 1セルあたりの文字数。
-			newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
-			dest_start_ridx = VARS.redrow + 1  # 移動先の開始行インデックス。
-			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
-			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, VARS.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
-			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
-			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
-			dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
-			dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
-			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
-			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
-		daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
-		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.subjectcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
-		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
+	try:
+		articledate = datetime.strptime(articledatetxt, dateformat)  # 記事列の日付を取得。
+	except:
+		articledate = None
+	if articledate:
+		todaydate = date.today()  # 今日のdateオブジェクトを取得。
+		if articledate!=todaydate:  # 今日の日付でない時。
+			todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
+			datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
+			txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+			if txt:  # 記事の文字列があるときのみ。
+				newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
+				stringlength = VARS.stringlength  # 1セルあたりの文字数。
+				newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
+				dest_start_ridx = VARS.redrow + 1  # 移動先の開始行インデックス。
+				dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
+				dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, VARS.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+				sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
+				sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+				dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
+				dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
+				cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
+				todayarticle.clearContents(511)  # 本日の記事欄をクリア。
+			daterange.setString(todaydate.strftime(dateformat))  # 今日の日付を本日の記事欄に入力。
+			cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.subjectcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
+			cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき

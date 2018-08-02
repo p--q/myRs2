@@ -83,7 +83,9 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol\
 			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
-		keikaconsts = None
+		keikavars = keika.VARS
+		daterow = keikavars.daterow
+		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。
@@ -94,13 +96,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					if not sheetname in sheets:  # 経過シートがない時は次のループに行く。
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
-					if keikaconsts is None:
-						keikaconsts = keika.getConsts(keikasheet)  # 経過シートの定数を取得。
-						daterow = keikaconsts.daterow  # 経過シートの日付行インデックスを取得。
-						splittedcolumn = keikaconsts.splittedcolumn  # 日付列の最初の列インデックスを取得。
-						c = splittedcolumn + todayvalue  # 分割列と今日の日付のシリアル値の和。
 					startdatevalue = int(keikasheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
-					keikadatarows = keikasheet[daterow+1:daterow+3, c-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
+					keikadatarows = keikasheet[daterow+1:daterow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
 					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
 					for i in commons.GAZOs:  # 読影のない画像。
@@ -419,7 +416,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		kanadirpath = os.path.join(dirpath, k)  # 最初のカナ文字のフォルダへのパス。
 		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
 			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
-		detachSheet = createDetachSheet(desktop, controller, doc, sheets, kanadirpath)
+		detachSheet = createDatachSheet(desktop, controller, doc, sheets, kanadirpath)
 		if entrynum==1:  # 退院リストへ。
 			flgs = []
 			newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
@@ -436,12 +433,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 			datarow.extend((todayvalue, "経過"))
 			entsheet = sheets["退院"]  # 退院シートを取得。
-			entconsts = ent.getConsts(entsheet)  # 退院シートの定数を取得。			
-			entsheet[entconsts.emptyrow, entconsts.idcolumn:entconsts.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
-			entsheet[entconsts.splittedrow:entconsts.emptyrow+1, entconsts.datecolumn:entconsts.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
+			entvars = ent.VARS  # 退院シートの定数を取得。		
+			
+			
+			
+# 			entconsts = ent.getConsts(entsheet)	
+			entsheet[entvars.emptyrow, entvars.idcolumn:entvars.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
+			entsheet[entvars.splittedrow:entvars.emptyrow+1, entvars.datecolumn:entvars.cleardatecolumn+1].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
 			searchdescriptor = sheet.createSearchDescriptor()
 			searchdescriptor.setSearchString(idtxt)  # 戻り値はない。
-			cellranges = entsheet[entconsts.splittedrow:entconsts.emptyrow, entconsts.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+			cellranges = entsheet[entvars.splittedrow:entvars.emptyrow, entvars.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
 			if cellranges:  # ID列に同じIDがすでにある時。
 				[entsheet.removeRange(i, delete_rows) for i in cellranges.getRangeAddresses()]  # 同じIDの行を削除。
 			sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
@@ -477,7 +478,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redbluerow)
 	elif entrynum==11:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
-def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
+def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。

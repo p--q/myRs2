@@ -129,21 +129,25 @@ class TextListener(unohelper.Base, XTextListener):
 		dateformat, gridcontrol = self.args
 		todayindex = 7//2  # 本日と同じインデックスを取得。
 		datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, todayindex)  # 中央行の日付文字列を取得。
-		centerday = datetime.strptime(datetxt, dateformat).date()  # 現在の最初のdateオブジェクトを取得。
-		val = numericfield.getValue()  # 数値フィールドの値を取得。		
-		diff = val - self.val  # 前値との差を取得。
-		centerday += timedelta(days=7*diff)  # 週を移動。
-		col0 = [""]*7
-		if val==0:
-			if centerday==date.today():
-				col0[todayindex-1:todayindex+2] = "昨日", "今日", "明日"  # 列インデックス0に入れる文字列を取得。
-			else:	
-				col0[todayindex] = "基準日"
-		else:
-			txt = "{}週後" if val>0 else "{}週前" 
-			col0[todayindex] = txt.format(int(abs(val)))  # valはfloatなので小数点が入ってくる。		
-		addDays(gridcontrol, dateformat, centerday, col0)  # グリッドコントロールに行を入れる。
-		self.val = val  # 変更後の値を前値として取得。
+		try:
+			centerday = datetime.strptime(datetxt, dateformat).date()  # 現在の最初のdateオブジェクトを取得。
+		except:
+			centerday = None
+		if centerday:
+			val = numericfield.getValue()  # 数値フィールドの値を取得。		
+			diff = val - self.val  # 前値との差を取得。
+			centerday += timedelta(days=7*diff)  # 週を移動。
+			col0 = [""]*7
+			if val==0:
+				if centerday==date.today():
+					col0[todayindex-1:todayindex+2] = "昨日", "今日", "明日"  # 列インデックス0に入れる文字列を取得。
+				else:	
+					col0[todayindex] = "基準日"
+			else:
+				txt = "{}週後" if val>0 else "{}週前" 
+				col0[todayindex] = txt.format(int(abs(val)))  # valはfloatなので小数点が入ってくる。		
+			addDays(gridcontrol, dateformat, centerday, col0)  # グリッドコントロールに行を入れる。
+			self.val = val  # 変更後の値を前値として取得。
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
@@ -162,20 +166,24 @@ class MouseListener(unohelper.Base, XMouseListener):
 					rowindexes = dialogcommons.getSelectedRowIndexes(gridcontrol)  # グリッドコントロールの選択行インデックスを返す。昇順で返す。負数のインデックスがある時は要素をクリアする。
 					if rowindexes:
 						datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, rowindexes[0])  # 選択行の日付文字列を取得。
-						selectedday = datetime.strptime(datetxt, dateformat)  # 現在の最初のdatetimeオブジェクトを取得。		
-						if outputcolumn is not None:  # 出力する列が指定されている時。
-							sheet = selection.getSpreadsheet()
-							selection = sheet[selection.getCellAddress().Row, outputcolumn]  # 同じ行の指定された列のセルを取得。						
-						selection.setFormula(selectedday.isoformat())  # セルに式として代入。
-						if formatstring is not None:  # 書式が与えられている時。
-							numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
-							locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。
-							formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
-							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
-								formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。
-							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 											
-						if callback is not None:  # コールバック関数が与えられている時。
-							callback(mouseevent, xscriptcontext)
+						try:
+							selectedday = datetime.strptime(datetxt, dateformat)  # 現在の最初のdatetimeオブジェクトを取得。	
+						except:
+							selectedday = None
+						if selectedday:	
+							if outputcolumn is not None:  # 出力する列が指定されている時。
+								sheet = selection.getSpreadsheet()
+								selection = sheet[selection.getCellAddress().Row, outputcolumn]  # 同じ行の指定された列のセルを取得。						
+							selection.setFormula(selectedday.isoformat())  # セルに式として代入。
+							if formatstring is not None:  # 書式が与えられている時。
+								numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
+								locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。
+								formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
+								if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
+									formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。
+								selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 											
+							if callback is not None:  # コールバック関数が与えられている時。
+								callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):

@@ -274,7 +274,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		searchdescriptor = sheet.createSearchDescriptor()
 		searchdescriptor.setSearchString("強")  # 戻り値はない。	
 		dategene = (startdate+timedelta(days=i) for i in range(n))
-		dates = [i.strftime("%-m/%-d(%a)") for i in dategene]
+		dateformat = "%m/%d(%a)"
+		dates = [i.strftime(dateformat) for i in dategene]
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
 			datarange = sheet[VARS.datarow:VARS.emptyrow, i]
 			cellranges = datarange.queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
@@ -292,7 +293,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
 		dategene = (startdate+timedelta(days=i) for i in range(n))
-		dates = [i.strftime("%-m/%-d(%a)") for i in dategene]
+		dateformat = "%m/%d(%a)"
+		dates = [i.strftime(dateformat) for i in dategene]
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
 			cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
 			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
