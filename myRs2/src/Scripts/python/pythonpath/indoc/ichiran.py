@@ -204,7 +204,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 			return True  # セル編集モードにする。		
 	elif c==VARS.datecolumn:  # 入院日列の時。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "入院日", "YYYY/MM/DD")		
-	elif c==VARS.hospdayscolumn:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
+	elif c==VARS.hospdayscolumn:  
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 		sheets = doc.getSheets()  # シートコレクションを取得。	
@@ -282,6 +282,10 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
+			
+			
+			
+			
 			sheet = selection.getSpreadsheet()
 			VARS.setSheet(sheet)
 			celladdress = selection.getCellAddress()

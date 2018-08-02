@@ -390,6 +390,9 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 	for change in changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
+			
+			
+			
 			celladdress = selection.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右の時。

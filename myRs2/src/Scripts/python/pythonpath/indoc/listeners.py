@@ -20,8 +20,20 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 			return getattr(m, methodname)(*args)  # その関数を実行。
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
 	except:
-		import traceback; traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。		
-		raise  # これがないとLibreOfficeのエラーダイアログがでてこない。これがあっても出ない時もある。
+		import traceback
+		traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。	
+		#  メッセージボックスにも表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
+		lines = traceback.format_exc().split("\n")
+		for i, line in enumerate(lines[::-1], start=1):
+			if line.lstrip().startswith("File "):
+				break			 
+		msg = "\n".join(lines[-i:])  # 一番最後のFile から始まる行以降のみ表示する。メッセージボックスに表示できる文字に制限があるので。
+		xscriptcontext = args[-1]
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		controller = doc.getCurrentController()  # コントローラの取得。		
+		componentwindow = controller.ComponentWindow
+		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, lines[0], msg)
+		msgbox.execute()		
 def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
 	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 

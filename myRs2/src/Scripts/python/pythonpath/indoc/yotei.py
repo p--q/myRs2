@@ -76,8 +76,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	weekday = todaydate.weekday()  # 月=0が返る。
-	weekdays = VARS.weekdays
-# 	weekdays = "月", "火", "水", "木", "金", "土", "日", "祝"  # シートでは日=1であることに注意。最後に祝日も追加している。		
+	weekdays = VARS.weekdays	
 	datarows = [["" for dummy in range(daycount)],\
 			[i for i in range(todayvalue, todayvalue+daycount)],\
 			[weekdays[i%7] for i in range(weekday, weekday+daycount)]]  # 月行、日行と曜日行を作成。日付はシリアル値で入力しないといけない。
@@ -266,7 +265,6 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
 	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))  # 30分毎に枠を取得。
 	times = ["{}:{:0>2}".format(i.hour, i.minute) for i in timegen]
-# 	locale.setlocale(locale.LC_ALL, '')  # これがないとWindows10では曜日が英語になる。locale.setlocale(locale.LC_TIME, 'ja_JP.utf-8')では文字化けする。
 	outputs = [sheet[VARS.menurow, VARS.templatestartcolumn].getString()]  # 最初の文をセルから取得。
 	if txt=="COPY":
 		createScheduleToClip(systemclipboard, times, startdate, outputs)(14)					
@@ -276,7 +274,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		searchdescriptor.setSearchString("強")  # 戻り値はない。	
 		dategene = (startdate+timedelta(days=i) for i in range(n))
 		weekdays = VARS.weekdays
-		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]		
+		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]	
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
 			datarange = sheet[VARS.datarow:VARS.emptyrow, i]
 			cellranges = datarange.queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
