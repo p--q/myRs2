@@ -184,6 +184,12 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 			else:
 				return True  # セル編集モードにする。		
 	elif c==VARS.kanacolumn:  # カナ名列の時。
+		if not kanatxt:  # カナ列が空文字の時。
+		
+		
+			pass
+		
+		
 		if hospdays:  # 経過列がすでにある時。
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
@@ -194,7 +200,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:
 			return True  # セル編集モードにする。		
 	elif c==VARS.datecolumn:  # 入院日列の時。
-		datedialog.createDialog(xscriptcontext, enhancedmouseevent, "入院日", "YYYY/MM/DD")		
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "入院日", "YYYY/MM/DD")		
 	elif c==VARS.hospdayscolumn:  # 経過列のボタンはカルテシートの作成時に作成されるのでカルテシート作成後のみ有効。			
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
@@ -335,7 +341,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
 	startrow, startcolumn = rangeaddress.StartRow, rangeaddress.StartColumn  # 選択範囲の左上セルだけで判断する。
-	if startrow<VARS.splittedrow or startrow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 固定行より上、またはタイトル行の時はコンテクストメニューを表示しない。
+	if startrow<VARS.splittedrow:  # 固定行より上の時。
+		if contextmenuname=="cell" and\
+		 selection.supportsService("com.sun.star.sheet.SheetCell") and\
+		 selection.getString()=="ｶﾅ名":  # 分割行より上、かつ、セルを右クリック、かつ、単一セル、かつ、ｶﾅ名、のセルの時。
+			addMenuentry("ActionTrigger", {"Text": "ﾌﾘｶﾞﾅ辞書設定", "CommandURL": baseurl.format("entry12")}) 
+			return EXECUTE_MODIFIED
+	elif startrow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # タイトル行の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
 	elif contextmenuname=="cell":  # セルのとき。セル範囲も含む。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
@@ -475,6 +487,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redbluerow)
 	elif entrynum==11:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
+	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
+		
+		
+		pass
+
+
 def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):

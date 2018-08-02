@@ -78,7 +78,7 @@ def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 						buffer.append(txt)	
 				if buffer and outputs:
 					outputs[-1] = "".join([outputs[-1], *buffer])
-				systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。Windows7はすごく時間がかる。ディスパッチコマンドだとフリーズする(Windows7)。	
+				systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。\rはWindowsのメモ帳でも改行するため。
 	elif c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
 		sortRows(c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		

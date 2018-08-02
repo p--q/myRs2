@@ -1,7 +1,6 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-import locale
 from indoc import commons, staticdialog, ichiran, transientdialog
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
@@ -20,6 +19,7 @@ class Schedule():  # シート固有の定数設定。
 		self.weekdayrow = 3  # 曜日行。
 		self.datarow = 4  # データ開始行。
 		self.datacolumn = 1  # データ開始列。
+		self.weekdays = "月", "火", "水", "木", "金", "土", "日", "祝"  # シートでは日=1であることに注意。最後に祝日も追加している。		
 	def setSheet(self, sheet):
 		self.sheet = sheet
 		cellranges = sheet[:, 0].queryContentCells(CellFlags.STRING+CellFlags.VALUE+CellFlags.DATETIME)  # 先頭列の文字列か数値が入っているセルに限定して抽出。
@@ -76,7 +76,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	weekday = todaydate.weekday()  # 月=0が返る。
-	weekdays = "月", "火", "水", "木", "金", "土", "日", "祝"  # シートでは日=1であることに注意。最後に祝日も追加している。		
+	weekdays = VARS.weekdays
+# 	weekdays = "月", "火", "水", "木", "金", "土", "日", "祝"  # シートでは日=1であることに注意。最後に祝日も追加している。		
 	datarows = [["" for dummy in range(daycount)],\
 			[i for i in range(todayvalue, todayvalue+daycount)],\
 			[weekdays[i%7] for i in range(weekday, weekday+daycount)]]  # 月行、日行と曜日行を作成。日付はシリアル値で入力しないといけない。
@@ -264,8 +265,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
 	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))  # 30分毎に枠を取得。
-	times = [i.strftime("%-H:%M") for i in timegen]
-	locale.setlocale(locale.LC_ALL, '')  # これがないとWindows10では曜日が英語になる。locale.setlocale(locale.LC_TIME, 'ja_JP.utf-8')では文字化けする。
+	times = ["{}:{:0>2}".format(i.hour, i.minute) for i in timegen]
+# 	locale.setlocale(locale.LC_ALL, '')  # これがないとWindows10では曜日が英語になる。locale.setlocale(locale.LC_TIME, 'ja_JP.utf-8')では文字化けする。
 	outputs = [sheet[VARS.menurow, VARS.templatestartcolumn].getString()]  # 最初の文をセルから取得。
 	if txt=="COPY":
 		createScheduleToClip(systemclipboard, times, startdate, outputs)(14)					
@@ -274,8 +275,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		searchdescriptor = sheet.createSearchDescriptor()
 		searchdescriptor.setSearchString("強")  # 戻り値はない。	
 		dategene = (startdate+timedelta(days=i) for i in range(n))
-		dateformat = "%m/%d(%a)"
-		dates = [i.strftime(dateformat) for i in dategene]
+		weekdays = VARS.weekdays
+		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]		
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
 			datarange = sheet[VARS.datarow:VARS.emptyrow, i]
 			cellranges = datarange.queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
@@ -293,15 +294,15 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
 		dategene = (startdate+timedelta(days=i) for i in range(n))
-		dateformat = "%m/%d(%a)"
-		dates = [i.strftime(dateformat) for i in dategene]
+		weekdays = VARS.weekdays
+		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
 			cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
 			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
 			if fs:
 				outputs.extend(["", dates[i-VARS.datacolumn]])
 				outputs.extend(fs)	
-		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
+		systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。	\rはWindowsのメモ帳で開業するため。
 	return scheduleToClip
 def wClickCell(enhancedmouseevent, xscriptcontext):
 	defaultrows = "2F", "3F", "強", "新", "閉", "外", "会", "手", "ｸﾘｱ", "x", "/"
@@ -313,13 +314,14 @@ def callback_wClickCell(mouseevent, xscriptcontext):
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	changes = changesevent.Changes	
 	for change in changes:
-		if change.Accessor=="cell-change":  # セルの値が変化した時。
+		if change.Accessor=="cell-change":  # セルの値が変化した時。マクロで変更したときはセル範囲が入ってくる時がある。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。	
-			celladdress = selection.getCellAddress()
-			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-			if VARS.datarow-1<r<VARS.emptyrow:
-				if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-					setCellProp(selection)
+			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+				if VARS.datarow-1<r<VARS.emptyrow:
+					if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+						setCellProp(selection)
 			break
 def setCellProp(selection):		
 	txt = selection.getString()	
