@@ -186,7 +186,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 	elif c==VARS.kanacolumn:  # カナ名列の時。
 		if not kanatxt:  # カナ列が空文字の時。
 		
-		
+			# フリガナ選択ダイアログを表示する。
 			pass
 		
 		
