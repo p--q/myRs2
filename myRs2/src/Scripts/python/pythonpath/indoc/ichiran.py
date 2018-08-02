@@ -153,10 +153,13 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		if hospdays:  # 在院日数列が空セルでない時。
 			items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
 			items.append(items[0])  # 最初の要素を最後の要素に追加する。
-			dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。								
-			selection.setString(dic[sumitxt][0])
+			dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。	
+			newtxt = dic[sumitxt][0]							
+			selection.setString(newtxt)
 			sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
 			refreshCounts()  # カウントを更新する。
+			if newtxt=="済":
+				xscriptcontext.getDocument().store()  # ドキュメントを保存する。
 	elif c==VARS.yocolumn:  # 予列の時。
 		if hospdays:  # 在院日数列が空セルでない時。
 			if yotxt:
