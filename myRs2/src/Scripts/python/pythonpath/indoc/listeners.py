@@ -21,11 +21,14 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
 	except:
 		import traceback
-		traceback.print_exc()  # これがないとPyDevのコンソールにトレースバックが表示されない。stderrToServer=Trueが必須。	
+		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		traceback.print_exc()  # PyDevのコンソールにトレースバックを表示。stderrToServer=Trueが必須。
 		#  メッセージボックスにも表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
-		lines = traceback.format_exc().split("\n")
-		for i, line in enumerate(lines[::-1], start=1):
-			if line.lstrip().startswith("File "):
+		lines = traceback.format_exc().split("\n")  # トレースバックを改行で分割。
+		for i, line in enumerate(lines[::-1], start=1):  # トレースバックの行を後ろからインデックス1としてイテレート。
+			if line.lstrip().startswith("File "):  # File から始まる行の時。
+				fileurl = line.split('"')[1]
+				lineno = int(line.split(',')[1].split(" ")[2])
 				break			 
 		msg = "\n".join(lines[-i:])  # 一番最後のFile から始まる行以降のみ表示する。メッセージボックスに表示できる文字に制限があるので。
 		xscriptcontext = args[-1]
@@ -34,6 +37,9 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, lines[0], msg)
 		msgbox.execute()		
+		
+		
+		
 def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
 	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
