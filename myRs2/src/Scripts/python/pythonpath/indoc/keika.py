@@ -386,35 +386,58 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
 		drowBorders(selection)  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
-	changes = changesevent.Changes	
-	for change in changes:
+	selection = None
+	for change in changesevent.Changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
-			selection = change.ReplacedElement  # 値を変更したセルを取得。	
-			
-			
-			
-			celladdress = selection.getCellAddress()
-			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
-			if c>VARS.splittedcolumn-1:  # 分割列を含む右の時。
-				if r>VARS.daterow:  # 日付行より下の時。
-					txt = selection.getString()
-					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-					smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
-					transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))						
-					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if txt!=txt2:  # 変換前と異なる時はセルに代入。
-						selection.setString(txt2)
-					horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
-					if r<VARS.splittedrow:  # 分割行より上の時。
-						if txt:  # セルに文字列がある時。
-							selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-						else:
-							selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
-					else:
-						if txt:
-							selection.setPropertyValues("HoriJustify", horijustify)
+			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
+	if selection:	
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
+		skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
+		colorlesscells = []  # 背景色を無色にするセルのリスト。
+		leftcells = []  # 左寄せにするセルのリスト。
+		centercells = []  # 中央寄せにするセルのリスト。	
+		sheet = selection.getSpreadsheet()
+		rangeaddress = selection.getRangeAddress()	
+		daterow = VARS.daterow
+		splittedrow = VARS.splittedrow
+		splittedcolumn = VARS.splittedcolumn
+		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
+			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
+				if c>splittedcolumn-1:  # 分割列を含む右の時。
+					if r>daterow:  # 日付行より下の時。
+						cell = sheet[r, c]
+						txt = cell.getString()
+						txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+						if txt!=txt2:  # 変換前と異なる時はセルに代入。
+							cell.setString(txt2)
+						if r<splittedrow:  # 分割行より上の時。
+							if txt:  # セルに文字列がある時。
+								skybluecells.append(cell)
+								if len(txt)>1:  # 文字数が1個の時は中央揃えにする。
+									leftcells.append(cell)
+								else:
+									centercells.append(cell)	
+							else:
+								colorlesscells.append(cell)
+						else:
+							if txt:
+								if len(txt)>1:
+									leftcells.append(cell)
+								else:
+									centercells.append(cell)
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
+		setRangeProp(doc, colorlesscells, "CellBackColor", -1)
+		setRangeProp(doc, leftcells, "HoriJustify", LEFT)
+		setRangeProp(doc, centercells, "HoriJustify", CENTER)
+def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リストの#を検索するセル範囲。
+	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+	cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
+	cellranges.setPropertyValue(propname, propvalue)						
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。

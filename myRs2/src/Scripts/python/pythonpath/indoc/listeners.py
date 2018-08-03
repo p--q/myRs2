@@ -53,7 +53,7 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 				p = subprocess.run(["which", "geany"], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # which geanyの結果をuniversal_newlines=Trueで文字列で取得。
 				geanypath = p.stdout.strip()  # /usr/bin/geany が返る。
 			if geanypath:  # geanyがインストールされている時。
-				msg = "Geanyでソースのエラー箇所を見ますか?"
+				msg = "Geanyでソースのエラー箇所を一時ファイルで表示しますか?"
 				msgbox = toolkit.createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "Geany", msg)
 				if msgbox.execute()==MessageBoxResults.OK:	
 					ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -66,7 +66,7 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 					destfileurl = "".join([tempfileURL.Protocol, tempfileURL.Path, fileURL.Name])
 					simplefileaccess.copy(fileurl, destfileurl)  # マクロファイルを一時フォルダにコピー。
 					filepath =  unohelper.fileUrlToSystemPath(destfileurl)  # 一時フォルダのシステムパスを取得。
-					if flg:  # Windowsの時。Windowsではなぜか一時ファイルが残る。削除してもLibreOfficeを終了すると復活して残る。
+					if flg:  # Windowsの時。Windowsではなぜか一時ファイルが残る。削除してもLibreOffice6.0.5を終了すると復活して残る。C:\Users\pq\AppData\Local\Temp\
 						os.system('start "" "{}" "{}:{}"'.format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。第一引数の""はウィンドウタイトル。
 					else:
 						os.system("{} {}:{} &".format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。

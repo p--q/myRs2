@@ -278,47 +278,71 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		drowBorders(selection)  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。マクロで変更した時は発火しない模様。	
-	changes = changesevent.Changes	
-	for change in changes:
+	selection = None
+	for change in changesevent.Changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
-			selection = change.ReplacedElement  # 値を変更したセルを取得。	
-			
-			
-			
-			
-			sheet = selection.getSpreadsheet()
-			VARS.setSheet(sheet)
-			celladdress = selection.getCellAddress()
-			r, c = celladdress.Row, celladdress.Column
-			if r>VARS.splittedrow-1:  # 分割行以降の時。
-				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
-				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-				transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))	
-				txt = selection.getString()  # セルの文字列を取得。			
-				if c==VARS.idcolumn:  # ID列の時。
-					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-					if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
-						selection.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
-				elif c==VARS.kanacolumn:  # カナ列の時。
-					transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-					transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。
-					txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
-					txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if all(map(lambda x: chr(0xFF61)<=x<=chr(0xFF9F), txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
-						selection.setString(transliteration.transliterate(txt, 0, len(txt), [])[0])  # 半角に変換してセルに代入。
-					else:
-						msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
-						doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-						controller = doc.getCurrentController()  # コントローラの取得。						
-						componentwindow = controller.ComponentWindow
-						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-						msgbox.execute()							
-						controller.select(selection)  # 元のセルに戻る。セル編集モードにするとおかしくなる。
-				elif c==VARS.datecolumn:  # 日付列の時。
-					doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-					selection.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
+	if selection:	
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
+		transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+		transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。		
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		datecolumncells = []	
+		nonkanacells = []
+		sheet = selection.getSpreadsheet()
+		VARS.setSheet(sheet)
+		rangeaddress = selection.getRangeAddress()	
+		flg = False
+		titlerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
+		splittedrow = VARS.splittedrow
+		idcolumn = VARS.idcolumn
+		kanacolumn = VARS.kanacolumn
+		datecolumn = VARS.datecolumn
+		hospdayscolumn = VARS.hospdayscolumn
+		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
+			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
+				if r>splittedrow-1 and r not in titlerows:  # 分割行を含めてその下、かつ、タイトル行でない、時。
+					cell = sheet[r, c]
+					txt = cell.getString()  # セルの文字列を取得。			
+					if c==idcolumn:  # ID列の時。
+						txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
+						if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
+							cell.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
+					elif c==kanacolumn:  # カナ列の時。
+						txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
+						txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+						if all(map(lambda x: chr(0xFF61)<=x<=chr(0xFF9F), txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
+							cell.setString(txt)
+						else:
+							nonkanacells.append(cell)
+					elif c==datecolumn:  # 日付列の時。
+						datecolumncells.append(cell)
+					if idcolumn-1<c<hospdayscolumn:
+						flg = True
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		cellranges.addRangeAddresses([i.getRangeAddress() for i in datecolumncells], False)
+		cellranges.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		if flg:
+			ranges = [sheet[titlerows[2]+1:, idcolumn:hospdayscolumn]]
+			if splittedrow<titlerows[0]:
+				ranges.append(sheet[splittedrow:titlerows[0], idcolumn:hospdayscolumn])
+			if titlerows[0]+1<titlerows[1]:
+				ranges.append(sheet[titlerows[0]+1:titlerows[1], idcolumn:hospdayscolumn])
+			if titlerows[1]+1<titlerows[2]:
+				ranges.append(sheet[titlerows[1]+1:titlerows[2], idcolumn:hospdayscolumn])
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
+			cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
+		if nonkanacells:
+			cells = " ".join(i.getPropertyValue("AbsoluteName").split(".")[1].replace("$", "") for i in nonkanacells)
+			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。\n{}".format(cells)
+			componentwindow = doc.getCurrentController().ComponentWindow		
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			msgbox.execute()		
 def refreshCounts():  # カウントを更新する。
 	sheet = VARS.sheet
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
@@ -491,7 +515,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==9:  # 新入院からStableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.skybluerow)
 	elif entrynum==10:  # 新入院からUnstableへ移動。
-		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redbluerow)
+		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redrow)
 	elif entrynum==11:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
