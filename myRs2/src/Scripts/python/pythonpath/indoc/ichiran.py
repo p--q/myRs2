@@ -400,8 +400,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		
-		
+		addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry13")}) 
 		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry11")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if startrow>VARS.emptyrow-1:
@@ -524,11 +523,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		
 		
 		pass
-	elif entrynum==13:  # 値をクリア。書式設定とオブジェクト以外を消去。
-		
-		
-# 		selection.clearContents(511)  # 範囲をすべてクリアする。
-
+	elif entrynum==13:  # 値のみクリア。書式設定とオブジェクト以外を消去。
+		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
 def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):

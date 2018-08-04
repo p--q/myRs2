@@ -174,7 +174,15 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	setRangesProperty(doc, columnindexes, ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
 	n = 6  # 日曜日の曜日番号。
 	columnindexes = range(datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 日曜日の列インデックスを取得。
-	setRangesProperty(doc, columnindexes, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。				
+	setRangesProperty(doc, columnindexes, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
+	
+		
+	# 休日の背景色をsilverにする。
+	
+	
+	
+	
+				
 	holidayset.difference_update(columnindexes)  # 日曜日と重なっている祝日を除く。	
 	setRangesProperty(doc, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。
 	createFormatKey = commons.formatkeyCreator(doc)	
@@ -200,6 +208,22 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	ranges = sheet[monthrow:datarow, datacolumn:endedgecolumn], temlatedaterange
 	dataranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)			
 	dataranges.setPropertyValue("HoriJustify", CENTER) 
+	
+	
+def setSilverDays():	
+	sheet = VARS.sheet	
+	searchdescriptor = sheet.createSearchDescriptor()
+	searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
+	searchedcell = sheet[VARS.menurow, :].findFirst(searchdescriptor)  # 見つからなかった時はNoneが返る。
+	if searchedcell:
+		c = searchedcell.getCellAddress().Column
+		cellranges = sheet[:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
+		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
+		datarows = sheet[1:emptyrow, c].getDataArray()	
+			
+			
+			
+				
 def createSetPropSearchedCells(cellrange):	
 	searchdescriptor = VARS.sheet.createSearchDescriptor()
 	def setPropSearchedCells(txt, prop):		
@@ -347,10 +371,11 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 		if VARS.datacolumn-1<c<VARS.firstemptycolumn:
 			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.datacolumn:VARS.firstemptycolumn].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 		if VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
 			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
-		selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
