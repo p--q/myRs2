@@ -210,7 +210,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	dataranges.setPropertyValue("HoriJustify", CENTER) 
 	
 	
-def setSilverDays():	
+def setColumnIndexesSilver():	
 	sheet = VARS.sheet	
 	searchdescriptor = sheet.createSearchDescriptor()
 	searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
@@ -220,6 +220,7 @@ def setSilverDays():
 		cellranges = sheet[:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
 		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
 		datarows = sheet[1:emptyrow, c].getDataArray()	
+		for i in datarows:
 			
 			
 			
