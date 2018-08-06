@@ -36,6 +36,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["C1"].setString("COPY")
 	sheet["I1"].setString("強有効")
 	sheet["O1"].setString("3wCOPY")
+	sheet["AM1"].setString("休日更新")
 	VARS.setSheet(sheet)
 	daycount = 31  # シートに表示する日数。
 	monthrow = VARS.monthrow
@@ -210,20 +211,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	dataranges.setPropertyValue("HoriJustify", CENTER) 
 	
 	
-def setColumnIndexesSilver():	
-	sheet = VARS.sheet	
-	searchdescriptor = sheet.createSearchDescriptor()
-	searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
-	searchedcell = sheet[VARS.menurow, :].findFirst(searchdescriptor)  # 見つからなかった時はNoneが返る。
-	if searchedcell:
-		c = searchedcell.getCellAddress().Column
-		cellranges = sheet[:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
-		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
-		datarows = sheet[1:emptyrow, c].getDataArray()	
-		for i in datarows:
-			
-			
-			
 				
 def createSetPropSearchedCells(cellrange):	
 	searchdescriptor = VARS.sheet.createSearchDescriptor()
@@ -272,10 +259,10 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	txt = selection.getString()	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+	controller = doc.getCurrentController()  # コントローラの取得。		
 	if txt=="一覧へ":
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-		sheets = doc.getSheets()  # シートコレクションを取得。	
-		controller = doc.getCurrentController()  # コントローラの取得。			
+		sheets = doc.getSheets()  # シートコレクションを取得。		
 		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 		return False  # セル編集モードにしない。	
 	sheet = VARS.sheet
@@ -313,6 +300,43 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
 	elif txt=="3wCOPY":
 		createScheduleToClip(systemclipboard, times, startdate, outputs)(21)
+	elif txt=="休日更新":  # 祝日も更新する。
+		msg = "全経過シートの休日も更新します。\n祝日も含みます。"
+		componentwindow = controller.ComponentWindow
+		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
+		if msgbox.execute()==MessageBoxResults.OK:			
+			searchdescriptor = sheet.createSearchDescriptor()
+			searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
+			c = VARS.templatestartcolumn - 1
+			searchedcell = sheet[VARS.emptyrow:, c].findFirst(searchdescriptor)  # 見つからなかった時はNoneが返る。
+			if searchedcell:
+				startrow = searchedcell.getCellAddress().Row + 2
+				cellranges = sheet[startrow:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
+				emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
+				datarows = sheet[startrow:emptyrow, c].getDataArray()	
+				weekdays = VARS.weekdays
+				for datarow in datarows:	
+					d = datarow[0]
+					if len(d):  # 一文字の時は曜日とする。
+						startdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
+						startdate = date(*[int(functionaccess.callFunction(i, (startdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
+
+
+
+						colors = commons.COLORS
+						n = 5  # 土曜日の曜日番号。
+						columnindexes = range(datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 土曜日の列インデックスを取得。	
+	
+							
+						weekday = weekdays.index(d)
+						weekdays[i%7] for i in range(weekday, weekday+daycount)
+		
+						n = weekdays.index(td)  # 月=0の曜日番号を取得。
+						ws = range((n-weekday)%7, daycount, 7)  # 同じ曜日の相対インデックスを取得。		
+		
+		
+		
+		
 	return False  # セル編集モードにしない。	
 def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
