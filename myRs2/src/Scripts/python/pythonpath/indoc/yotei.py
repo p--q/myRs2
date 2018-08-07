@@ -315,9 +315,51 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 				emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
 				datarows = sheet[startrow:emptyrow, c].getDataArray()	
 				weekdays = VARS.weekdays
+				offweekdays = []
+				offdays = []
 				for datarow in datarows:	
 					d = datarow[0]
-					if len(d):  # 一文字の時は曜日とする。
+					if isinstance(d, float):  # floatの時は日付シリアル値と考える。
+						offdays.append(d)
+# 						offdays.append(date(*[int(functionaccess.callFunction(i, (d,))) for i in ("YEAR", "MONTH", "DAY")]))
+					else:  # 文字列の時。
+						offweekdays.append(weekdays.index(i) for i in d.replace("曜日", ""))
+				dayrow = sheet[VARS.dayrow, :VARS.firstemptycolumn].getDataArray()[0]			
+						
+						
+				holidays = commons.HOLIDAYS		
+				
+
+				firstyear, firstmonth = [int(functionaccess.callFunction(i, (dayrow[VARS.datacolumn],))) for i in ("YEAR", "MONTH")]
+				lastyear, lastmonth = [int(functionaccess.callFunction(i, (dayrow[-1],))) for i in ("YEAR", "MONTH")]
+				
+
+				
+						
+						
+						
+				columnindexes = set()
+				offdayranges = []
+				
+				columnindexes.update(dayrow.index(i) for i in offdays)
+				firstweekdaytxt = sheet[VARS.weekdayrow, VARS.datacolumn].getString()
+				firstweekday = weekdays.index(firstweekdaytxt)
+				columnindexes.update(range(VARS.datacolumn+(i-firstweekday)%7, VARS.firstemptycolumn, 7) for i in offweekdays)
+				
+				
+				offdayranges.append(sheet[VARS.dayrow:VARS.dayrow+2, i] for i in columnindexes)
+				
+		
+				
+				
+				weekdayrow = datarows[1]	
+				
+				
+				columnindexes.extend(weekdayrow.index(i) for i in offweekdays)
+						
+					
+						
+						
 						startdatevalue = sheet[VARS.dayrow, VARS.datacolumn].getValue()
 						startdate = date(*[int(functionaccess.callFunction(i, (startdatevalue,))) for i in ("YEAR", "MONTH", "DAY")])
 
