@@ -321,33 +321,42 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					d = datarow[0]
 					if isinstance(d, float):  # floatの時は日付シリアル値と考える。
 						offdays.append(d)
-# 						offdays.append(date(*[int(functionaccess.callFunction(i, (d,))) for i in ("YEAR", "MONTH", "DAY")]))
 					else:  # 文字列の時。
 						offweekdays.append(weekdays.index(i) for i in d.replace("曜日", ""))
-				dayrow = sheet[VARS.dayrow, :VARS.firstemptycolumn].getDataArray()[0]			
-						
 						
 				holidays = commons.HOLIDAYS		
+				offdayrangeaddresses = []		
+				holidayrangeaddresses = []		
 				
-
-				firstyear, firstmonth = [int(functionaccess.callFunction(i, (dayrow[VARS.datacolumn],))) for i in ("YEAR", "MONTH")]
-				lastyear, lastmonth = [int(functionaccess.callFunction(i, (dayrow[-1],))) for i in ("YEAR", "MONTH")]
-				
-
-				
-						
-						
-						
+				dayrow = sheet[VARS.dayrow, :VARS.firstemptycolumn].getDataArray()[0]		
+				startyear, startmonth, startday = [int(functionaccess.callFunction(i, (dayrow[VARS.datacolumn],))) for i in ("YEAR", "MONTH", "DAY")]
+				endyear, endmonth, endday = [int(functionaccess.callFunction(i, (dayrow[-1],))) for i in ("YEAR", "MONTH", "DAY")]
+				holidaycolumns = set()
+				if startyear in holidays:
+					for d in holidays[startyear][startmonth-1:]:
+						if d>=startday:
+							holidaycolumns.add(VARS.datacolumn+d-startday)
+				newyear = startyear + 1
+				newstartcoumn = int(functionaccess.callFunction("EOMONTH", (dayrow[VARS.datacolumn], 0)))
+				while newyear<endyear:
+					for d in holidays[newyear]:	
+						holidaycolumns.add(newstartcoumn+d)
+					newyear += 1	
+					newstartcoumn = int(functionaccess.callFunction("EOMONTH", (dayrow[newstartcoumn], 0)))
+				if endyear in holidays:
+					for d in holidays[endyear][:endmonth]:
+						if d<=endday:
+							holidaycolumns.add(newstartcoumn+d)	
 				columnindexes = set()
-				offdayranges = []
-				
 				columnindexes.update(dayrow.index(i) for i in offdays)
-				firstweekdaytxt = sheet[VARS.weekdayrow, VARS.datacolumn].getString()
-				firstweekday = weekdays.index(firstweekdaytxt)
-				columnindexes.update(range(VARS.datacolumn+(i-firstweekday)%7, VARS.firstemptycolumn, 7) for i in offweekdays)
+				startweekdaytxt = sheet[VARS.weekdayrow, VARS.datacolumn].getString()
+				startweekday = weekdays.index(startweekdaytxt)
+				columnindexes.update(range(VARS.datacolumn+(i-startweekday)%7, VARS.firstemptycolumn, 7) for i in offweekdays)
 				
+				# 祝日から日曜日を除く。
 				
-				offdayranges.append(sheet[VARS.dayrow:VARS.dayrow+2, i] for i in columnindexes)
+				columnindexes.difference_update(holidaycolumns)
+				offdayrangeaddresses.extend(sheet[VARS.dayrow:VARS.dayrow+2, i].getRangeAddress() for i in columnindexes)
 				
 		
 				
