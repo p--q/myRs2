@@ -17,7 +17,7 @@ from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Keika():  # シート固有の定数設定。
 	def __init__(self):
-		self.daterow = 1  # 日付行インデックス。
+		self.dayrow = 1  # 日付行インデックス。
 		self.splittedrow = 4  # 分割行インデックス。
 		self.yakucolumn = 5  # 薬名列インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。
@@ -36,15 +36,15 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
-	daterow = VARS.daterow
+	dayrow = VARS.dayrow
 	splittedcolumn = VARS.splittedcolumn
-	startdatevalue = int(sheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
+	startdatevalue = int(sheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-	sheet[daterow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
+	sheet[dayrow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
 	c = splittedcolumn + (todayvalue - startdatevalue)  # 今日の日付の列インデックスを取得。
 	if c<1024:
-		sheet[daterow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
-	sheet[daterow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
+		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
+	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 	
 	# 休日の背景色をsilverにする。
 	
@@ -239,17 +239,17 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-	if r==VARS.daterow-1:  # 日付行の直上の時。月を入力。
+	if r==VARS.dayrow-1:  # 日付行の直上の時。月を入力。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。							
-		datevalue = int(VARS.sheet[VARS.daterow, c].getValue())
+		datevalue = int(VARS.sheet[VARS.dayrow, c].getValue())
 		m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 		selection.setString("{}月".format(m))
-	elif r==VARS.daterow+1:
+	elif r==VARS.dayrow+1:
 		defaultrows = "", "○", "尿"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
-	elif r==VARS.daterow+2:
+	elif r==VARS.dayrow+2:
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
 	return False  # セル編集モードにしない。		
@@ -405,13 +405,13 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		centercells = []  # 中央寄せにするセルのリスト。	
 		sheet = selection.getSpreadsheet()
 		rangeaddress = selection.getRangeAddress()	
-		daterow = VARS.daterow
+		dayrow = VARS.dayrow
 		splittedrow = VARS.splittedrow
 		splittedcolumn = VARS.splittedcolumn
 		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
 			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
 				if c>splittedcolumn-1:  # 分割列を含む右の時。
-					if r>daterow:  # 日付行より下の時。
+					if r>dayrow:  # 日付行より下の時。
 						cell = sheet[r, c]
 						txt = cell.getString()
 						txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
@@ -457,10 +457,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 単一セルの時。
 				if c>VARS.splittedcolumn-1:  # 分割列含む右の時。
-					if r==VARS.daterow:  # 日付行の時。
+					if r==VARS.dayrow:  # 日付行の時。
 						if selection.getValue():  # セルに値があるとき。
 							addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry3")}) 
-					elif r>VARS.daterow:  # 日付行より下の時。
+					elif r>VARS.dayrow:  # 日付行より下の時。
 						commons.cutcopypasteMenuEntries(addMenuentry)					
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 						addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
@@ -625,7 +625,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		if yoho=="病棟":
 			sheet[r, VARS.splittedcolumn:].clearContents(511)
 			sheet[r, c:c+60].setPropertyValue("CellBackColor", commons.COLORS["skyblue"]) 	
-			datevalue = int(sheet[VARS.daterow, c].getValue())
+			datevalue = int(sheet[VARS.dayrow, c].getValue())
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 			functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
@@ -647,7 +647,7 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 	selection.clearContents(511)  # 範囲をすべてクリアする。
 	celladdress = selection[0, 0].getCellAddress()  # 選択セル左上端セルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column		
-	datevalue = int(sheet[VARS.daterow, c].getValue())
+	datevalue = int(sheet[VARS.dayrow, c].getValue())
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
