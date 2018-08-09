@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import calendar
 from itertools import chain
-from indoc import commons, historydialog, staticdialog
+from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
@@ -709,49 +709,120 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(tentekirangeaddress, False)
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])	
-def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。
+def setDates(xscriptcontext, doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
-	holidays = commons.HOLIDAYS
 	daycount = 100  # 経過シートに入力する日数。
 	celladdress = cell.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-	r, c = celladdress.Row, celladdress.Column
+	r, c = celladdress.Row, celladdress.Column  # cは開始列インデックスになる。
 	sheet[:r+1, c:].clearContents(511)  # 開始列より右の日付行の内容を削除。
 	endcolumn = c + daycount + 1
-	endcolumn = endcolumn if endcolumn<1024 else 1023  # 列インデックスの上限1023。
-	sheet[r, c:endcolumn].setDataArray(([i for i in range(datevalue, datevalue+daycount+1)],))  # 日時シリアル値を経過シートに入力。
-	sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
-	y, m, d = map(int, sheet[r, c].getString().split("/"))  # 年、月、日を整数型で取得。
-	weekday, days = calendar.monthrange(y, m)  # 月曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
-	weekday = (weekday+(d-1)%7) % 7  # dの曜日番号を取得。1日からの7の余りと1日の余りを加えた7の余りがdの曜日番号。
+	if not endcolumn<1024:
+		endcolumn = 1023  # 列インデックスの上限1023。	
+		daycount = endcolumn - c - 1
+	datevalues = [i for i in range(datevalue, datevalue+daycount)]  # 日付シリアル値を取得。
+	sheet[r, c:endcolumn].setDataArray((datevalues,))  # 日時シリアル値を経過シートに入力。
+	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。
+	holidaycolumns = getHolidaycolumns(functionaccess, datevalues, c)
+	startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))  # 開始日の曜日を取得。月=0。
+	offdaycolumns = getOffdaycolumns(doc, datevalues, startweekday, c, endcolumn)
+	offdaycolumns.difference_update(holidaycolumns)  # 休日インデックスから祝日インデックスを除く。
 	n = 6  # 日曜日の曜日番号。
-	sunsset = set(range(c+(n-weekday)%7, endcolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
-	setRangesProperty(doc, sheet, r, sunsset, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
+	sunindexes = set(range(c+(n-startweekday)%7, daycount, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。	
+	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
 	n = 5  # 土曜日の曜日番号。
-	setRangesProperty(doc, sheet, r, range(c+(n-weekday)%7, endcolumn, 7), ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
-	holidayset = set()  # 祝日の列インデックスを入れる集合。
-	days = days - d + 1  # 翌月1日までの日数を取得。
-	mr = r - 1  # 月を代入する行のインデックス。
-	mc = c  # 1日を表示する列のインデックス。最初の月のみ開始日になる。
-	if y in holidays:  # 祝日一覧のキーがある時。
-		holidayset.update(mc+i-d for i in holidays[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。
-	while True:
-		sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
-		mc += days  # 次月1日の列に進める。
-		if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
-			ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
-			y, m = map(int, ymd.split("/")[:2])  # 年と月を取得。
-			if y in holidays:  # 祝日一覧のキーがある時。
-				holidayset.update(mc+i-1 for i in holidays[y][m-1] if mc+i-1<endcolumn)  # 祝日の列インデックスの集合を取得。
-			weekday, days = calendar.monthrange(y, m)  # 1日の曜日と月の日数を取得。
-		else:
-			break	
+	satindexes = set(range(c+(n-startweekday)%7, daycount, 7))  # 土曜日の列インデックスの集合。
+	setRangesProperty(doc, sheet, r, holidaycolumns, ("CellBackColor", colors["red3"]))
+	setRangesProperty(doc, sheet, r, offdaycolumns, ("CellBackColor", colors["silver"]))
+	setRangesProperty(doc, sheet, r, sunindexes, ("CharColor", colors["red3"]))
+	setRangesProperty(doc, sheet, r, satindexes, ("CharColor", colors["skyblue"]))
+	startmonth, startday = [int(functionaccess.callFunction(i, (datevalues[0],))) for i in ("MONTH", "DAY")]  # 開始年月日を取得。
+	if c==VARS.splittedcolumn:
+		sheet[r-1, c].setString("{}月".format(startmonth))
+	startmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[0], 0))) - startday + 1
+	month = startmonth + 1
+	if month>12:
+		month = 1
+	while startmonthindex<daycount:
+		sheet[r-1, c+startmonthindex].setString("{}月".format(month))
+		month += 1
+		if month>12:
+			month = 1
+		startmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[startmonthindex], 0))) + 1
+			
+	
+	
+	
+	
+	
+# 	sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
+# 	y, m, d = map(int, sheet[r, c].getString().split("/"))  # 年、月、日を整数型で取得。
+# 	weekday, days = calendar.monthrange(y, m)  # 月曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
+# 	weekday = (weekday+(d-1)%7) % 7  # dの曜日番号を取得。1日からの7の余りと1日の余りを加えた7の余りがdの曜日番号。
+# 	n = 6  # 日曜日の曜日番号。
+# 	sunsset = set(range(c+(n-weekday)%7, endcolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
+# 	setRangesProperty(doc, sheet, r, sunsset, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
+# 	n = 5  # 土曜日の曜日番号。
+# 	setRangesProperty(doc, sheet, r, range(c+(n-weekday)%7, endcolumn, 7), ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
+# 	holidayset = set()  # 祝日の列インデックスを入れる集合。
+# 	days = days - d + 1  # 翌月1日までの日数を取得。
+# 	mr = r - 1  # 月を代入する行のインデックス。
+# 	mc = c  # 1日を表示する列のインデックス。最初の月のみ開始日になる。
+# 	if y in holidays:  # 祝日一覧のキーがある時。
+# 		holidayset.update(mc+i-d for i in holidays[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。
+# 	while True:
+# 		sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
+# 		mc += days  # 次月1日の列に進める。
+# 		if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
+# 			ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
+# 			y, m = map(int, ymd.split("/")[:2])  # 年と月を取得。
+# 			if y in holidays:  # 祝日一覧のキーがある時。
+# 				holidayset.update(mc+i-1 for i in holidays[y][m-1] if mc+i-1<endcolumn)  # 祝日の列インデックスの集合を取得。
+# 			weekday, days = calendar.monthrange(y, m)  # 1日の曜日と月の日数を取得。
+# 		else:
+# 			break	
 		
 	# 休日の背景色をsilverにする。
 		
-	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
-	setRangesProperty(doc, sheet, r, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。	
-	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。	
+# 	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
+# 	setRangesProperty(doc, sheet, r, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。	
+# 	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。	
+def getHolidaycolumns(functionaccess, datevalues, c): 
+	holidaycolumns = set()  # 祝日インデックスの集合。
+	holidays = commons.HOLIDAYS	
+	startyear, startmonth, startday = [int(functionaccess.callFunction(i, (datevalues[0],))) for i in ("YEAR", "MONTH", "DAY")]  # 開始年月日を取得。
+	endyear, endmonth, endday = [int(functionaccess.callFunction(i, (datevalues[-1],))) for i in ("YEAR", "MONTH", "DAY")]  # 終了年月日を取得。
+	if startyear in holidays:
+		for days in holidays[startyear][startmonth-1:]:
+			for d in days:
+				if d>=startday:
+					holidaycolumns.add(c+d-startday)
+	endmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[0], 0))) - startday
+	newyear = startyear + 1
+	while newyear<endyear:
+		for days in holidays[newyear]:
+			for d in days:	
+				holidaycolumns.add(c+endmonthindex+d)
+		endmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[endmonthindex], 0)))
+		newyear += 1	
+	if endyear in holidays:
+		for d in holidays[endyear][:endmonth]:
+			for d in days:
+				if d<=endday:
+					holidaycolumns.add(c+endmonthindex+d)	
+	return holidaycolumns
+def getOffdaycolumns(doc, datevalues, startweekday, c, endcolumn):
+	sheets = doc.getSheets()  # シートコレクションを取得。
+	yoteivars = yotei.VARS
+	yoteivars.setSheet(sheets["予定"])
+	offdays, offweekdays = yotei.getOffdays()
+	offdaycolumns = set()  # 休日インデックスの集合。
+	offdaycolumns.update(c+datevalues.index(i) for i in offdays)  # 休日のシリアル値のインデックスを取得。
+	offdaycolumns.update(range(c+(i-startweekday)%7, endcolumn, 7) for i in offweekdays)  # 曜日のインデックスを取得。
+	return offdaycolumns
 def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
 	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
 	cellranges.addRangeAddresses((sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
