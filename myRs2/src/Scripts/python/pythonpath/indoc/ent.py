@@ -166,7 +166,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Delete"})	
+		addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry2")}) 
+		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。				
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
@@ -177,26 +178,29 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。	
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-	desktop = xscriptcontext.getDesktop()
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()  # 選択範囲を取得。
-	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
-	r = rangeaddress.StartRow
-	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-	if entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
+	if entrynum==1:  # クリア。
+		selection.clearContents(511)  # 範囲をすべてクリアする。
+	elif entrynum==2:  # 値のみクリア。書式設定とオブジェクト以外を消去。
+		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
-		idtxt, dummy, kanatxt = sheet[r, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]
+		sheet = controller.getActiveSheet()  # アクティブシートを取得。
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		idtxt, dummy, kanatxt = sheet[rangeaddress.StartRow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]
 		startcolumn = rangeaddress.StartColumn
 		if startcolumn in (VARS.datecolumn,):  # 入院日列の時。
 			filename = "{}{}_*入院.ods"  # カルテシートファイル名。
 		elif startcolumn in (VARS.keikacolumn,):  # 経過列の時。
-			filename = "{}{}経_*開始.ods"  # 経過シートファイル名。		
+			filename = "{}{}経_*開始.ods"  # 経過シートファイル名。	
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。					
 		for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, filename), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
 			if i==c:  # インデックスが一致する時。
+				desktop = xscriptcontext.getDesktop()
 				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
 				break

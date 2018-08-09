@@ -28,7 +28,6 @@ class Karute():  # シート固有の定数設定。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
 		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
-# 		self.dateformat = "{}/{}/{} {}:{}:{} Copied"  # 記事をコピーした日時の書式。
 	def setSheet(self, sheet): # 逐次変化する値。
 		self.sheet = sheet	
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
@@ -65,7 +64,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
 			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
-# 	dateformat =  "****%Y年%m月%d日(%a)****"  # 
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	try:
@@ -92,13 +90,9 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
 				cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
 				todayarticle.clearContents(511)  # 本日の記事欄をクリア。
-			
 			weekdays = "月", "火", "水", "木", "金", "土", "日"
 			datetxt = "****{}年{}月{}日({})****".format(todaydate.year, todaydate.month, todaydate.day, weekdays[todaydate.weekday()])  # 今日の日付を本日の記事欄に入力。
 			daterange.setString(datetxt)
-# 			daterange.setString(todaydate.strftime(dateformat))
-			
-			
 			cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.subjectcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
 			cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
@@ -166,14 +160,9 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
 		copyCells(controller, copieddatecell, newdatarows)
-		
 		now = datetime.now()
 		datetxt = "{}/{}/{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minite, now.second)  # コピーボタンを押した日付を入力。
 		copieddatecell.setString(datetxt)
-# 		copieddatecell.setString(datetime.now().strftime(VARS.dateformat))
-
-
-
 		copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 	elif txt=="退院ｻﾏﾘ":
 		dummy, dummy, formatProblemList, copyCells = createCopyFuncs(xscriptcontext)
@@ -458,6 +447,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+			addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry7")}) 			
 			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry6")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
@@ -520,6 +510,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 	elif entrynum==6:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
+	elif entrynum==7:  # 値のみクリア。書式設定とオブジェクト以外を消去。
+		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
