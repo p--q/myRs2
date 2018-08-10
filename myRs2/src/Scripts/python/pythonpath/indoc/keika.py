@@ -44,9 +44,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	if c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
 	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
-	
-	# 休日の背景色をsilverにする。
-	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
@@ -733,7 +730,7 @@ def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # s
 	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
 	n = 5  # 土曜日の曜日番号。
 	satindexes = set(range(c+(n-startweekday)%7, endcolumn, 7))  # 土曜日の列インデックスの集合。
-	setRangesProperty = createSetRangesProperty(doc, sheet, r)
+	setRangesProperty = createSetRangesProperty(doc, r)
 	setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
 	setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
 	setRangesProperty(sunindexes, ("CharColor", colors["red3"]))
@@ -781,18 +778,39 @@ def getHolidaycolumns(functionaccess, datevalues, c): # 祝日になる列イン
 						holidaycolumns.add(c+datevalues.index(datevalue))
 	return holidaycolumns
 def getOffdaycolumns(doc, datevalues, startweekday, c, endcolumn):  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
-	sheets = doc.getSheets()  # シートコレクションを取得。
-	yoteivars = yotei.VARS
-	yoteivars.setSheet(sheets["予定"])
-	offdays, offweekdays = yotei.getOffdays()  # 予定シートの休日設定を取得。offdays; 休日シリアル値、offweeks: 休日にする曜日番号。
+	offdays, offweekdays = getOffdays(doc)  # 予定シートの休日設定を取得。offdays; 休日シリアル値、offweeks: 休日にする曜日番号。
 	offdaycolumns = set()  # 休日インデックスの集合。
 	offdaycolumns.update(c+datevalues.index(i) for i in offdays if i in datevalues)  # 休日のシリアル値のインデックスを取得。
 	offdaycolumns.update(j for i in offweekdays for j in range(c+(i-startweekday)%7, endcolumn, 7))  # 曜日のインデックスを取得。
 	return offdaycolumns
-def createSetRangesProperty(doc, sheet, r): 
+def getOffdays(doc):  # 予定シートの休日を取得。
+	sheets = doc.getSheets()  # シートコレクションを取得。
+	sheet = sheets["予定"]
+	yoteivars = yotei.VARS
+	yoteivars.setSheet(sheet)	
+	weekdays = yoteivars.weekdays  # 曜日のタプルを取得。
+	searchdescriptor = sheet.createSearchDescriptor()
+	searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
+	c = yoteivars.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
+	searchedcell = sheet[yoteivars.emptyrow:, c].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。
+	if searchedcell:  # 休日設定の開始セルがある時。
+		startrow = searchedcell.getCellAddress().Row + 2  # 休日設定の開始行を取得。
+		cellranges = sheet[startrow:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
+		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
+		offweekdays = []  # 休日の曜日のリスト。
+		offdays = []  # 休日のシリアル値のリスト。
+		if startrow<emptyrow:  # 休日設定行がある時。
+			for datarow in sheet[startrow:emptyrow, c].getDataArray():	# 休日設定の各行について。
+				d = datarow[0]
+				if isinstance(d, float):  # floatの時は日付シリアル値と考える。
+					offdays.append(int(d))
+				else:  # 文字列の時。
+					offweekdays.extend(weekdays.index(i) for i in d.replace("曜日", ""))  # 曜日は曜日番号で取得する。金土などの書き方も処理する。
+	return offdays, offweekdays
+def createSetRangesProperty(doc, r): 
 	def setRangesProperty(columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-		cellranges.addRangeAddresses((sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+		cellranges.addRangeAddresses((VARS.sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
 		if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 			cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 	return setRangesProperty
