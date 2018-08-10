@@ -213,7 +213,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
 				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
-				keikasheet = commons.getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+				keikasheet = commons.getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
 def wClickCheckCol(enhancedmouseevent, xscriptcontext):

@@ -117,7 +117,7 @@ def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
 		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 		karutesheet[:karutevars.splittedrow, karutevars.articlecolumn].setDataArray((("",), (" ".join((idtxt, kanjitxt, kanatxt)),)))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
-def getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
+def getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue):
 	sheets = doc.getSheets()  # シートコレクションを取得。
 	newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 	if newsheetname in sheets:  # すでに経過シートがある時。
@@ -127,7 +127,7 @@ def getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 		keikavars = keika.VARS
 		keikasheet[keikavars.daterow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-		keika.setDates(doc, keikasheet, keikasheet[keikavars.daterow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
+		keika.setDates(xscriptcontext, doc, keikasheet, keikasheet[keikavars.daterow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet	
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 使用中最下行へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。

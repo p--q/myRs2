@@ -132,7 +132,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 					if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 						kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
 						datevalue = sheet[VARS.splittedrow, VARS.datecolumn].getValue()
-						keikasheet =  commons.getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+						keikasheet =  commons.getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 						controller.setActiveSheet(keikasheet)  # 経過シートをアクティブにする。
 					else:
 						commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
