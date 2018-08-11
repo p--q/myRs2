@@ -94,8 +94,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	templatedic = {}  # キー: テンプレート列インデックス、値: 日付列インデックスの集合。
 	templates = sheet[monthrow:emptyrow, templatestartcolumn:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を月行から取得。
 	excludes = set()  # 処理済列インデックスの集合。
-	holidaycolumns = keika.getHolidaycolumns(functionaccess, datarows[1], datacolumn)  # 休日の列インデックスを取得。
-	offdaycolumns = keika.getOffdaycolumns(doc, datarows[1], startweekday, datacolumn, endedgecolumn)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
+	holidaycolumns = keika.getHolidaycolumns(functionaccess, datarows[1], datacolumn)  # 休日の列インデックスの集合を取得。
+	offdaycolumns = keika.getOffdaycolumns(doc, datarows[1], startweekday, datacolumn, endedgecolumn)  # 予定シートの休日設定を取得して合致する列インデックスの集合を取得する。
 	offdaycolumns.difference_update(holidaycolumns)  # 休日インデックスから祝日インデックスを除く。	
 	for ti in range(len(templates[0]))[::-1]:  # テンプレートの列の相対インデックスをイテレート。優先度を付けるため後ろからイテレート。
 		tm = templates[1][ti]  # 空文字、週数の文字列、月のfloat、のいずれかが返る。
@@ -178,10 +178,10 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet[dayrow, datacolumn:endedgecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('D'), CENTER))  # 日付行の書式を設定。
 	sheet[VARS.weekdayrow, datacolumn:endedgecolumn].setPropertyValue("HoriJustify", CENTER)  # 曜日行の書式を設定。
 	n = 6  # 日曜日の曜日番号。
-	sunindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。	
+	sunindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスのリスト。祝日と重ならないようにあとで使用する。	
 	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
 	n = 5  # 土曜日の曜日番号。
-	satindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 土曜日の列インデックスの集合。
+	satindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 土曜日の列インデックスのリスト。
 	setRangesProperty = createSetRangesProperty(doc)
 	setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
 	setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
@@ -317,8 +317,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			keikavars = keika.VARS  # 経過シートの定数を取得。
 			keikadayrow = keikavars.dayrow
 			keikasplittedcolumn = keikavars.splittedcolumn
-			keikaholidayrangeaddresses = set()  # 経過シートの祝日のセル範囲アドレスの集合。	 		
-			keikaoffdayrangeaddresses = set()  # 経過シートの休日のセル範囲アドレスの集合。		
+			keikaholidayrangeaddresses = []  # 経過シートの祝日のセル範囲アドレスのリスト。	 		
+			keikaoffdayrangeaddresses = []  # 経過シートの休日のセル範囲アドレスのリスト。		
 			todaydatevalue = functionaccess.callFunction("TODAY", ())  # 今日のシリアル値を整数で取得。floatで返る。
 			for keikasheet in doc.getSheets():
 				sheetname = keikasheet.getName()
@@ -333,16 +333,16 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 							startindex = keikadatevalues.index(todaydatevalue)
 							keikastartcolumn = keikasplittedcolumn + startindex  # 今日の列インデックスを取得。
 							keikaholidaycolumns = keika.getHolidaycolumns(functionaccess, keikadatevalues[startindex:], keikastartcolumn)  # 休日の列インデックスを取得。
-							keikaholidayrangeaddresses.update(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaholidaycolumns) # 祝日にするセル範囲アドレスを取得。
+							keikaholidayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaholidaycolumns) # 祝日にするセル範囲アドレスを取得。
 							keikastartweekday = int(functionaccess.callFunction("WEEKDAY", (todaydatevalue, 3)))  # 開始日の曜日を取得。月=0。
 							keikaoffdaycolumns = keika.getOffdaycolumns(doc, keikadatevalues[startindex:], keikastartweekday, keikastartcolumn, keikadayendedge)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。					
-							keikaoffdayrangeaddresses.update(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaoffdaycolumns) # 休日にするセル範囲アドレスを取得。					
+							keikaoffdayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaoffdaycolumns) # 休日にするセル範囲アドレスを取得。					
 			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-			cellranges.addRangeAddresses(tuple(keikaholidayrangeaddresses), False)  # セル範囲コレクションを取得。集合のまま渡すとエラーになる。
+			cellranges.addRangeAddresses(keikaholidayrangeaddresses, False)  # セル範囲コレクションを取得。集合のまま渡すとエラーになる。
 			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 				cellranges.setPropertyValue("CellBackColor", commons.COLORS["red3"])
 			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-			cellranges.addRangeAddresses(tuple(keikaoffdayrangeaddresses), False)  # セル範囲コレクションを取得。
+			cellranges.addRangeAddresses(keikaoffdayrangeaddresses, False)  # セル範囲コレクションを取得。
 			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 				cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])				
 	return False  # セル編集モードにしない。	

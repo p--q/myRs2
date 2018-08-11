@@ -186,6 +186,7 @@ class ActionListener(unohelper.Base, XActionListener):
 				edit1 = controlcontainer.getControl("Edit1")  # テキストボックスコントロールを取得。
 				txt = edit1.getText()  # テキストボックスコントロールの文字列を取得。
 				if txt:  # テキストボックスコントロールに文字列がある時。
+					global DATAROWS
 					txt = self.transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
 					datarows = DATAROWS
 					if datarows:  # すでにグリッドコントロールにデータがある時。
@@ -196,7 +197,6 @@ class ActionListener(unohelper.Base, XActionListener):
 					refreshRows(gridcontrol1, datarows)
 					scrollDown(gridcontrol1)  # グリッドコントロールを下までスクロール。
 					selection.setString(txt)  # 選択セルに代入。
-					global DATAROWS
 					DATAROWS = datarows				
 				sheet = controller.getActiveSheet()
 				celladdress = selection.getCellAddress()
@@ -273,6 +273,7 @@ class MenuListener(unohelper.Base, XMenuListener):
 	def itemSelected(self, menuevent):  # PopupMenuの項目がクリックされた時。どこのコントロールのメニューかを知る方法はない。
 		cmd = menuevent.Source.getCommand(menuevent.MenuId)
 		controlcontainer = self.controlcontainer
+		global DATAROWS
 		datarows = list(DATAROWS)
 		peer = controlcontainer.getPeer()  # ピアを取得。	
 		gridcontrol = controlcontainer.getControl("Grid1")  # グリッドコントロールを取得。
@@ -308,7 +309,6 @@ class MenuListener(unohelper.Base, XMenuListener):
 							d = griddatamodel.getRowData(i)[0]  # タプルが返るのでその先頭の要素を取得。
 							datarows = [j for j in datarows if not d in j]  # dが要素にある行を除いて取得。
 						griddatamodel.removeAllRows()  # グリッドコントロールの行を全削除。							
-		global DATAROWS
 		DATAROWS = datarows			
 	def itemActivated(self, menuevent):
 		pass
