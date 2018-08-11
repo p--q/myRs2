@@ -85,8 +85,8 @@ def detectDuplicates(enhancedmouseevent, xscriptcontext):  # 薬名の重複を�
 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
 					if drow<r:  # 重複行が上の時。
 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-						if msgbox.execute()==MessageBoxResults.OK:
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+						if msgbox.execute()==MessageBoxResults.YES:
 							sheet = VARS.sheet
 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
@@ -535,7 +535,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
-		msg = "選択セルから右をすべてクリアしますか?"
+		msg = "選択セルから右をすべてクリアします。"
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
 			rangeaddress = selection.getRangeAddress()

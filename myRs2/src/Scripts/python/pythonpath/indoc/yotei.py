@@ -223,10 +223,11 @@ def convertToInteger(s):  # s: floatか文字列。
 		return int(s)	
 def createSetRangesProperty(doc): 	
 	def setRangesProperty(columnindexes, prop):  # columnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
-		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-		cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-		if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-			cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
+		if columnindexes:  # 列インデックスがある時のみ。
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+			cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+				cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
 	return setRangesProperty
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()

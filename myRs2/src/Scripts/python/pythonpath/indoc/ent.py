@@ -83,10 +83,11 @@ def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 		sortRows(c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		
 def sortRows(c, *, reverse=None):
-	datarange = VARS.sheet[VARS.splittedrow:VARS.emptyrow, :VARS.keikacolumn+1]
-	datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
-	datarows.sort(key=lambda x:x[c], reverse=reverse)  # 各行を列インデックスcでソート。
-	datarange.setDataArray(datarows)  # シートに代入する。	
+	if VARS.splittedrow<VARS.emptyrow:
+		datarange = VARS.sheet[VARS.splittedrow:VARS.emptyrow, :VARS.keikacolumn+1]
+		datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
+		datarows.sort(key=lambda x:x[c], reverse=reverse)  # 各行を列インデックスcでソート。
+		datarange.setDataArray(datarows)  # シートに代入する。	
 def mousePressedWSectionB(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
