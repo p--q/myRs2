@@ -76,7 +76,7 @@ def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文
 	controller = doc.getCurrentController()  # コントローラの取得。
 	changeslistener = ChangesListener(xscriptcontext)  # ChangesListener。セルの変化の感知に利用。列の挿入も感知。
 	selectionchangelistener = SelectionChangeListener(xscriptcontext)  # SelectionChangeListener。選択範囲の変更の感知に利用。
-	activationeventlistener = ActivationEventListener(xscriptcontext)  # ActivationEventListener。シートの切替の感知に利用。
+	activationeventlistener = ActivationEventListener(xscriptcontext, selectionchangelistener)  # ActivationEventListener。シートの切替の感知に利用。selectionchangelistenerを無効にするために渡す。
 	enhancedmouseclickhandler = EnhancedMouseClickHandler(xscriptcontext)  # EnhancedMouseClickHandler。マウスの左クリックの感知に利用。enhancedmouseeventのSourceはNone。
 	contextmenuinterceptor = ContextMenuInterceptor(xscriptcontext)  # ContextMenuInterceptor。右クリックメニューの変更に利用。
 	doc.addChangesListener(changeslistener)
@@ -104,10 +104,14 @@ class DocumentEventListener(unohelper.Base, XDocumentEventListener):
 	def disposing(self, eventobject):  # ドキュメントを閉じるときに発火する。	
 		eventobject.Source.removeDocumentEventListener(self)
 class ActivationEventListener(unohelper.Base, XActivationEventListener):
-	def __init__(self, xscriptcontext):
+	def __init__(self, xscriptcontext, selectionchangelistener):
 		self.xscriptcontext = xscriptcontext
+		self.selectionchangelistener = selectionchangelistener
 	def activeSpreadsheetChanged(self, activationevent):  # アクティブシートが変化した時に発火。
+		controller = activationevent.Source
+		controller.removeSelectionChangeListener(self.selectionchangelistener)  # シートを切り替えた時はselectionchangelistenerが発火しないようにSelectionChangeListenerをはずす。
 		invokeModuleMethod(activationevent.ActiveSheet.getName(), "activeSpreadsheetChanged", activationevent, self.xscriptcontext)
+		controller.addSelectionChangeListener(self.selectionchangelistener)  # SelectionChangeListenerを付け直す。
 	def disposing(self, eventobject):
 		eventobject.Source.removeActivationEventListener(self)	
 class EnhancedMouseClickHandler(unohelper.Base, XEnhancedMouseClickHandler):  # enhancedmouseeventのSourceはNoneなので、このリスナーのメソッドの引数からコントローラーを直接取得する方法はない。
