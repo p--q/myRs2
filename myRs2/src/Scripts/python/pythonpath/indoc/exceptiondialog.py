@@ -13,12 +13,10 @@ def createDialog(xscriptcontext):
 	traceback.print_exc()  # PyDevのコンソールにトレースバックを表示。stderrToServer=Trueが必須。
 	#  ダイアログに表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
 	lines = traceback.format_exc().split("\n")  # トレースバックを改行で分割。
-	h = 20  # FixedTextコントロールの高さ。ma単位。2行分。
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	h = 20  # FixedTextコントロールの高さ。ma単位。2行分。	
 	docwindow = xscriptcontext.getDocument().getCurrentController().getFrame().getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
 	dialogwidth = 380  # ウィンドウの幅。ma単位。
-	dialog, addControl = dialogCreator(ctx, smgr, {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "Title": lines[0], "Name": "exceptiondialog", "Moveable": True})  # Heightは後で設定し直す。
+	dialog, addControl = dialogCreator(xscriptcontext, {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "Title": lines[0], "Name": "exceptiondialog", "Moveable": True})  # Heightは後で設定し直す。
 	dialog.createPeer(docwindow.getToolkit(), docwindow)  # ダイアログを描画。親ウィンドウを渡す。
 	mouselistener = MouseListener(xscriptcontext)
 	controlheight = 0  # コントロールの高さ。ma単位。
@@ -89,7 +87,9 @@ class MouseListener(unohelper.Base, XMouseListener):  # Editコントロール�
 		pass
 	def disposing(self, eventobject):
 		eventobject.Source.removeMouseListener(self)	
-def dialogCreator(ctx, smgr, dialogprops):  # ダイアログと、それにコントロールを追加する関数を返す。まずダイアログモデルのプロパティを取得。
+def dialogCreator(xscriptcontext, dialogprops):  # ダイアログと、それにコントロールを追加する関数を返す。まずダイアログモデルのプロパティを取得。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 	dialog = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)  # ダイアログの生成。
 	dialogmodel = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)  # ダイアログモデルの生成。
 	dialogmodel.setPropertyValues(tuple(dialogprops.keys()), tuple(dialogprops.values()))  # ダイアログモデルのプロパティを設定。

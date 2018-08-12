@@ -96,16 +96,8 @@ def addDays(gridcontrol, dateformat, centerday, col0, daycount=7):
 	todayindex = 7//2  # 今日の日付の位置を決定。切り下げ。
 	startday = centerday - timedelta(days=1)*todayindex  # 開始dateを取得。
 	dategene = (startday+timedelta(days=i) for i in range(daycount))  # daycount分のdateオブジェクトのジェネレーターを取得。
-# 	locale.setlocale(locale.LC_ALL, '')  # これがないとWindows10では曜日が英語になる。locale.setlocale(locale.LC_TIME, 'ja_JP.utf-8')では文字化けする。
-
-	
 	weekdays = "月", "火", "水", "木", "金", "土", "日"
 	datarows = tuple(zip(col0, ("{}/{}/{}({})".format(i.year, i.month, i.day, weekdays[i.weekday()]) for i in dategene)))  # 列インデックス0に語句、列インデックス1に日付を入れる。
-
-
-# 	datarows = tuple(zip(col0, (i.strftime(dateformat) for i in dategene)))  # 列インデックス0に語句、列インデックス1に日付を入れる。
-
-	
 	griddatamodel = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModel
 	griddatamodel.removeAllRows()  # グリッドコントロールの行を全削除。
 	griddatamodel.addRows(("",)*len(datarows), datarows)  # グリッドに行を追加。	
