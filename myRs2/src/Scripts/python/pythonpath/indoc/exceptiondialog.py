@@ -2,109 +2,103 @@
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, platform, subprocess, traceback, unohelper
-from com.sun.star.awt import MessageBoxButtons, MessageBoxResults  # 定数
+from com.sun.star.awt import XMouseListener
+from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
+from com.sun.star.awt import Point  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
 from com.sun.star.util import URL  # Struct
+from com.sun.star.util import MeasureUnit  # 定数
+from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 def createDialog(xscriptcontext):
 	traceback.print_exc()  # PyDevのコンソールにトレースバックを表示。stderrToServer=Trueが必須。
-	#  メッセージボックスにも表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
+	#  ダイアログに表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
 	lines = traceback.format_exc().split("\n")  # トレースバックを改行で分割。
-	fileurl, lineno = "", ""
-	for i, line in enumerate(lines[::-1], start=1):  # トレースバックの行を後ろからインデックス1としてイテレート。
-		if line.lstrip().startswith("File "):  # File から始まる行の時。
-			fileurl = line.split('"')[1]  # エラー箇所のfileurlを取得。
-			lineno = line.split(',')[1].split(" ")[2]  # エラー箇所の行番号を取得。
-			break			 
-		
-	
-	# ダイアログからfileurlをクリックして開けるようにする。
-	# pyで終わるfileurlのときのみ。
-		
-		
-		
-	msg = "\n".join(lines[-i:])  # 一番最後のFile から始まる行以降のみ表示する。メッセージボックスに表示できる文字に制限があるので。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	controller = doc.getCurrentController()  # コントローラの取得。		
-	componentwindow = controller.ComponentWindow
-	toolkit = componentwindow.getToolkit()
-	msgbox = toolkit.createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, lines[0], msg)
-	msgbox.execute()	
-	
-#   File "/opt/eclipse4.6jee/plugins/org.python.pydev_5.6.0.201703221358/pysrc/_pydevd_bundle/pydevd_breakpoin...Traceback (most recent call last):
-#   File "vnd.sun.star.tdoc:/1/Scripts/python/pythonpath/indoc/listeners.py", line 18, in invokeModuleMethod
-#     return getattr(m, methodname)(*args)  # その関数を実行。
-#   File "vnd.sun.star.tdoc:/1/Scripts/python/pythonpath/indoc/yotei.py", line 186, in activeSpreadsheetChanged
-#     setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
-#   File "vnd.sun.star.tdoc:/1/Scripts/python/pythonpath/indoc/yotei.py", line 231, in setRangesProperty
-#     cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-# indoc.yotei.com.sun.star.script.CannotConvertException: conversion not possible!
-	
-		
-	# Geayでエラー箇所を開く。
-	if all([fileurl, lineno]):  # ファイル名と行番号が取得出来ている時。
-		flg = (platform.system()=="Windows")  # Windowsかのフラグ。
-		if flg:  # Windowsの時
-			geanypath = "C:\\Program Files (x86)\\Geany\\bin\\geany.exe"  # 64bitでのパス。パス区切りは\\にしないとエスケープ文字に反応してしまう。
-			if not os.path.exists(geanypath):  # binフォルダはなぜかos.path.exists()は常にFalseになるので使えない。
-				geanypath = "C:\\Program Files\\Geany\\bin\\geany.exe"  # 32bitでのパス。
-				if not os.path.exists(geanypath):
-					geanypath = ""
-		else:  # Linuxの時。
-			p = subprocess.run(["which", "geany"], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # which geanyの結果をuniversal_newlines=Trueで文字列で取得。
-			geanypath = p.stdout.strip()  # /usr/bin/geany が返る。
-		if geanypath:  # geanyがインストールされている時。
-			msg = "Geanyでソースのエラー箇所を一時ファイルで表示しますか?"
-			msgbox = toolkit.createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "Geany", msg)
-			if msgbox.execute()==MessageBoxResults.OK:	
-				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。 			
-				simplefileaccess = smgr.createInstanceWithContext("com.sun.star.ucb.SimpleFileAccess", ctx)					
-				tempfile = smgr.createInstanceWithContext("com.sun.star.io.TempFile", ctx)  # 一時ファイルを取得。一時フォルダを利用するため。
-				urltransformer = smgr.createInstanceWithContext("com.sun.star.util.URLTransformer", ctx)
-				dummy, tempfileURL = urltransformer.parseStrict(URL(Complete=tempfile.Uri))
-				dummy, fileURL = urltransformer.parseStrict(URL(Complete=fileurl))
-				destfileurl = "".join([tempfileURL.Protocol, tempfileURL.Path, fileURL.Name])
-				simplefileaccess.copy(fileurl, destfileurl)  # マクロファイルを一時フォルダにコピー。
-				filepath =  unohelper.fileUrlToSystemPath(destfileurl)  # 一時フォルダのシステムパスを取得。
-				if flg:  # Windowsの時。Windowsではなぜか一時ファイルが残る。削除してもLibreOffice6.0.5を終了すると復活して残る。C:\Users\pq\AppData\Local\Temp\
-					os.system('start "" "{}" "{}:{}"'.format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。第一引数の""はウィンドウタイトル。
-				else:
-					os.system("{} {}:{} &".format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。
-					
+	h = 20  # FixedTextコントロールの高さ。ma単位。2行分。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	docwindow = xscriptcontext.getDocument().getCurrentController().getFrame().getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
+	dialogwidth = 380  # ウィンドウの幅。ma単位。
+	dialog, addControl = dialogCreator(ctx, smgr, {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "Title": lines[0], "Name": "exceptiondialog", "Moveable": True})  # Heightは後で設定し直す。
+	dialog.createPeer(docwindow.getToolkit(), docwindow)  # ダイアログを描画。親ウィンドウを渡す。
+	mouselistener = MouseListener(xscriptcontext)
+	controlheight = 0  # コントロールの高さ。ma単位。
+	for i in lines[1:]:  # 2行目以降イテレート。
+		if i:  # 空行は除外。
+			fixedtextprops = [{"PositionX": 0, "PositionY": controlheight, "Width": dialogwidth, "Height": h, "Label": i, "MultiLine": True, "NoLabel": True, "VerticalAlign": MIDDLE}]
+			if i.lstrip().startswith("File "):  # File から始まる行の時。	
+				fixedtextprops[0]["TextColor"] = 0x0000FF  # 文字色をblue3にする。
+				fixedtextprops.append({"addMouseListener": mouselistener})
+			elif not i.startswith(" "):  # スペース以外から始まる時。
+				fixedtextprops[0]["TextColor"] = 0xFF0000  # 文字色をred3にする。
+			fixedtextcontrol = addControl("FixedText", *fixedtextprops)
+			controlheight += h
+	controlrectangle = fixedtextcontrol.getPosSize()  # コントロール間の間隔を幅はX、高さはYから取得。
+	dialog.setPosSize(0, 0, 0, controlrectangle.Y+controlrectangle.Height, PosSize.HEIGHT)  # 最後の行からダイアログの高さを再設定。
+	dialog.execute()
+	dialog.dispose()	
+class MouseListener(unohelper.Base, XMouseListener):  # Editコントロールではうまく動かない。
+	def __init__(self, xscriptcontext):
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+		self.pointer = smgr.createInstanceWithContext("com.sun.star.awt.Pointer", ctx)  # ポインタのインスタンスを取得。
+		self.args = ctx, smgr, xscriptcontext.getDocument()
+	def mousePressed(self, mouseevent):
+		ctx, smgr, doc = self.args
+		txt = mouseevent.Source.getText()
+		fileurl = txt.split('"')[1]  # エラー箇所のfileurlを取得。
+		lineno = txt.split(',')[1].split(" ")[2]  # エラー箇所の行番号を取得。		
+		# Geayでエラー箇所を開く。
+		if all([fileurl, lineno]):  # ファイル名と行番号が取得出来ている時。
+			flg = (platform.system()=="Windows")  # Windowsかのフラグ。
+			if flg:  # Windowsの時
+				geanypath = "C:\\Program Files (x86)\\Geany\\bin\\geany.exe"  # 64bitでのパス。パス区切りは\\にしないとエスケープ文字に反応してしまう。
+				if not os.path.exists(geanypath):  # binフォルダはなぜかos.path.exists()は常にFalseになるので使えない。
+					geanypath = "C:\\Program Files\\Geany\\bin\\geany.exe"  # 32bitでのパス。
+					if not os.path.exists(geanypath):
+						geanypath = ""
+			else:  # Linuxの時。
+				p = subprocess.run(["which", "geany"], universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)  # which geanyの結果をuniversal_newlines=Trueで文字列で取得。
+				geanypath = p.stdout.strip()  # /usr/bin/geany が返る。
+			componentwindow = doc.getCurrentController().ComponentWindow
+			toolkit = componentwindow.getToolkit()			
+			if geanypath:  # geanyがインストールされている時。
+				msg = "Geanyでソースのエラー箇所を一時ファイルで表示しますか?"
+				msgbox = toolkit.createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+				if msgbox.execute()==MessageBoxResults.YES:			
+					simplefileaccess = smgr.createInstanceWithContext("com.sun.star.ucb.SimpleFileAccess", ctx)					
+					tempfile = smgr.createInstanceWithContext("com.sun.star.io.TempFile", ctx)  # 一時ファイルを取得。一時フォルダを利用するため。
+					urltransformer = smgr.createInstanceWithContext("com.sun.star.util.URLTransformer", ctx)
+					dummy, tempfileURL = urltransformer.parseStrict(URL(Complete=tempfile.Uri))
+					dummy, fileURL = urltransformer.parseStrict(URL(Complete=fileurl))
+					destfileurl = "".join([tempfileURL.Protocol, tempfileURL.Path, fileURL.Name])
+					simplefileaccess.copy(fileurl, destfileurl)  # マクロファイルを一時フォルダにコピー。
+					filepath =  unohelper.fileUrlToSystemPath(destfileurl)  # 一時フォルダのシステムパスを取得。
+					if flg:  # Windowsの時。Windowsではなぜか一時ファイルが残る。削除してもLibreOffice6.0.5を終了すると復活して残る。C:\Users\pq\AppData\Local\Temp\
+						os.system('start "" "{}" "{}:{}"'.format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。第一引数の""はウィンドウタイトル。
+					else:
+						os.system("{} {}:{} &".format(geanypath, filepath, lineno))  # バックグランドでGeanyでカーソルの行番号を指定して開く。
+			else:
+				msg = "Geanyがインストールされていません。"
+				msgbox = toolkit.createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+	def mouseReleased(self, mouseevent):
+		pass
+	def mouseEntered(self, mouseevent):
+		self.pointer.setType(SystemPointer.REFHAND)  # マウスポインタの種類を設定。
+		mouseevent.Source.getPeer().setPointer(self.pointer)  # マウスポインタを変更。コントロールからマウスがでるとポインタは元に戻る。
+	def mouseExited(self, mouseevent):
+		pass
+	def disposing(self, eventobject):
+		eventobject.Source.removeMouseListener(self)	
 def dialogCreator(ctx, smgr, dialogprops):  # ダイアログと、それにコントロールを追加する関数を返す。まずダイアログモデルのプロパティを取得。
 	dialog = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)  # ダイアログの生成。
-	if "PosSize" in dialogprops:  # コントロールモデルのプロパティの辞書にPosSizeキーがあるときはピクセル単位でコントロールに設定をする。
-		dialog.setPosSize(dialogprops.pop("PositionX"), dialogprops.pop("PositionY"), dialogprops.pop("Width"), dialogprops.pop("Height"), dialogprops.pop("PosSize"))  # ダイアログモデルのプロパティで設定すると単位がMapAppになってしまうのでコントロールに設定。
 	dialogmodel = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)  # ダイアログモデルの生成。
 	dialogmodel.setPropertyValues(tuple(dialogprops.keys()), tuple(dialogprops.values()))  # ダイアログモデルのプロパティを設定。
 	dialog.setModel(dialogmodel)  # ダイアログにダイアログモデルを設定。
 	dialog.setVisible(False)  # 描画中のものを表示しない。
 	def addControl(controltype, props, attrs=None):  # props: コントロールモデルのプロパティ、attr: コントロールの属性。
-		control = None
-		items, currentitemid = None, None
-		if controltype == "Roadmap":  # Roadmapコントロールのとき、Itemsはダイアログモデルに追加してから設定する。そのときはCurrentItemIDもあとで設定する。
-			if "Items" in props:  # Itemsはダイアログモデルに追加されてから設定する。
-				items = props.pop("Items")
-				if "CurrentItemID" in props:  # CurrentItemIDはItemsを追加されてから設定する。
-					currentitemid = props.pop("CurrentItemID")
-		if "PosSize" in props:  # コントロールモデルのプロパティの辞書にPosSizeキーがあるときはピクセル単位でコントロールに設定をする。
-			control = smgr.createInstanceWithContext("com.sun.star.awt.UnoControl{}".format(controltype), ctx)  # コントロールを生成。
-			control.setPosSize(props.pop("PositionX"), props.pop("PositionY"), props.pop("Width"), props.pop("Height"), props.pop("PosSize"))  # ピクセルで指定するために位置座標と大きさだけコントロールで設定。
-			controlmodel = _createControlModel(controltype, props)  # コントロールモデルの生成。
-			control.setModel(controlmodel)  # コントロールにコントロールモデルを設定。
-			dialog.addControl(props["Name"], control)  # コントロールをコントロールコンテナに追加。
-		else:  # Map AppFont (ma)のときはダイアログモデルにモデルを追加しないと正しくピクセルに変換されない。
-			controlmodel = _createControlModel(controltype, props)  # コントロールモデルの生成。
-			dialogmodel.insertByName(props["Name"], controlmodel)  # ダイアログモデルにモデルを追加するだけでコントロールも作成される。
-		if items is not None:  # コントロールに追加されたRoadmapモデルにしかRoadmapアイテムは追加できない。
-			for i, j in enumerate(items):  # 各Roadmapアイテムについて
-				item = controlmodel.createInstance()
-				item.setPropertyValues(("Label", "Enabled"), j)
-				controlmodel.insertByIndex(i, item)  # IDは0から整数が自動追加される
-			if currentitemid is not None:  #Roadmapアイテムを追加するとそれがCurrentItemIDになるので、Roadmapアイテムを追加してからCurrentIDを設定する。
-				controlmodel.setPropertyValue("CurrentItemID", currentitemid)
-		if control is None:  # コントロールがまだインスタンス化されていないとき
-			control = dialog.getControl(props["Name"])  # コントロールコンテナに追加された後のコントロールを取得。
+		controlmodel = _createControlModel(controltype, props)  # コントロールモデルの生成。
+		dialogmodel.insertByName(props["Name"], controlmodel)  # ダイアログモデルにモデルを追加するだけでコントロールも作成される。
+		control = dialog.getControl(props["Name"])  # コントロールコンテナに追加された後のコントロールを取得。
 		if attrs is not None:  # Dialogに追加したあとでないと各コントロールへの属性は追加できない。
 			for key, val in attrs.items():  # メソッドの引数がないときはvalをNoneにしている。
 				if val is None:
