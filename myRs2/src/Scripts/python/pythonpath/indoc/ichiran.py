@@ -123,7 +123,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 							datarows[r][ecgcol] = "E"							
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
 	elif txt=="済をﾘｾｯﾄ":
-		msg = "済列をリセットしますか？"
+		msg = "済列をリセットします。"
 		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:
@@ -213,7 +213,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:  # 経過シートがなければ作成する。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
 				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
-				keikasheet = commons.getKeikaSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
+				keikasheet = commons.getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
 def wClickCheckCol(enhancedmouseevent, xscriptcontext):
@@ -439,14 +439,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 	r = rangeaddress.StartRow
 	if entrynum<3:  # セルのコンテクストメニュー。
-		sheets = doc.getSheets()
-		datarow = sheet[r, VARS.idcolumn:VARS.hospdayscolumn].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
-		idtxt, dummy, kanatxt, datevalue = datarow
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+		sheets = doc.getSheets()
+		datarow = sheet[r, VARS.idcolumn:VARS.hospdayscolumn].getDataArray()[0]   # ダブルクリックした行をID列からｶﾅ名列までのタプルを取得。
+		idtxt, kanjitxt, kanatxt, datevalue = datarow
+		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
 		datetxt = "-".join([str(int(functionaccess.callFunction(i, (datevalue,)))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年-月-日の文字列にする。
 		k = kanatxt[0]  # 最初のカナ文字を取得。カタカナであることは入力時にチェック済。
 		kana = "ア", "カ", "サ", "タ", "ナ", "ハ", "マ", "ヤ", "ラ", "ワ"
@@ -461,35 +461,43 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
 			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
 		detachSheet = createDatachSheet(desktop, controller, doc, sheets, kanadirpath)
+		componentwindow = controller.ComponentWindow
 		if entrynum==1:  # 退院リストへ。
-			flgs = []
-			newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-			flgs.append(detachSheet(idtxt, newsheetname))
-			newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-			flgs.append(detachSheet("".join([idtxt, "経"]), newsheetname))
-			if not all(flgs):
-				msg = "{}{}をリストシートから退院シートに移動させますか？".format(kanatxt, idtxt)
-				componentwindow = controller.ComponentWindow
-				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-				if msgbox.execute()!=MessageBoxResults.OK:  # OKでない時は何もしない。
-					return			
-			datarow = list(datarow)
-			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
-			datarow.extend((todayvalue, "経過"))
-			entsheet = sheets["退院"]  # 退院シートを取得。
-			entvars = ent.VARS  # 退院シートの定数を取得。		
-			entvars.setSheet(entsheet)
-			entsheet[entvars.emptyrow, entvars.idcolumn:entvars.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
-			entsheet[entvars.splittedrow:entvars.emptyrow, entvars.datecolumn:entvars.keikacolumn].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 日付書式を設定。
-			searchdescriptor = sheet.createSearchDescriptor()
-			searchdescriptor.setSearchString(idtxt)  # 戻り値はない。
-			cellranges = entsheet[entvars.splittedrow:entvars.emptyrow, entvars.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
-			if cellranges:  # ID列に同じIDがすでにある時。
-				[entsheet.removeRange(i, delete_rows) for i in cellranges.getRangeAddresses()]  # 同じIDの行を削除。
-			sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
+			msg = "{} {}のシートをファイルに切り出します。".format(kanjitxt, kanatxt)
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)			
+			if msgbox.execute()==MessageBoxResults.OK:
+				flgs = []
+				newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+				flgs.append(detachSheet(idtxt, newsheetname))
+				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+				flgs.append(detachSheet("".join([idtxt, "経"]), newsheetname))
+				if not all(flgs):
+					msg = "{} {}を退院シートに登録しますか？".format(kanjitxt, kanatxt)
+					msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_NO, "myRs", msg)
+					if msgbox.execute()!=MessageBoxResults.YES:  # YESでない時はここで終わる。
+						sheet.removeRange(rangeaddress, delete_rows)  # ソース行を削除。
+						return			
+				datarow = list(datarow)
+				todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
+				datarow.extend((todayvalue, "経過"))
+				entsheet = sheets["退院"]  # 退院シートを取得。
+				entvars = ent.VARS  # 退院シートの定数を取得。		
+				entvars.setSheet(entsheet)
+				entsheet[entvars.emptyrow, entvars.idcolumn:entvars.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
+				entsheet[entvars.emptyrow, entvars.datecolumn:entvars.keikacolumn].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 追加した行の日付書式を設定。
+				if entvars.splittedrow<entvars.emptyrow:
+					searchdescriptor = sheet.createSearchDescriptor()
+					searchdescriptor.setSearchString(idtxt)  # 戻り値はない。
+					cellranges = entsheet[entvars.splittedrow:entvars.emptyrow, entvars.idcolumn].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+					if cellranges:  # ID列に同じIDがすでにある時。
+						[entsheet.removeRange(i, delete_rows) for i in cellranges.getRangeAddresses()]  # 同じIDの行を削除。
+				sheet.removeRange(rangeaddress, delete_rows)  # 移動したソース行を削除。
 		elif entrynum==2:  # 経過ｼｰﾄをArchiveへ。
-			newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-			detachSheet("".join([idtxt, "経"]), newsheetname)  # 切り出したシートのfileurlを取得。
+			msg = "{}{}の経過シートをファイルに切り出します。".format(kanatxt, idtxt)
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)					
+			if msgbox.execute()==MessageBoxResults.OK:
+				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
+				detachSheet("".join([idtxt, "経"]), newsheetname)  # 切り出したシートのfileurlを取得。
 	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
@@ -540,8 +548,8 @@ def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 			if os.path.exists(systempath):  # すでにファイルが存在する時。
 				msg = "シート{}はすでにバックアップ済です。\n上書きしますか？"
 				componentwindow = controller.ComponentWindow
-				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-				if msgbox.execute()!=MessageBoxResults.OK:			
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+				if msgbox.execute()!=MessageBoxResults.YES:			
 					return True  # 上書きしない時は、切り出したものとして返す。
 			fileurl = unohelper.systemPathToFileUrl(systempath)
 			newdoc.storeToURL(fileurl, ())  

@@ -1,9 +1,8 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-import calendar
 from itertools import chain
-from indoc import commons, historydialog, staticdialog
+from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
@@ -45,9 +44,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	if c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
 	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
-	
-	# 休日の背景色をsilverにする。
-	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
@@ -89,8 +85,8 @@ def detectDuplicates(enhancedmouseevent, xscriptcontext):  # 薬名の重複を�
 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
 					if drow<r:  # 重複行が上の時。
 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-						if msgbox.execute()==MessageBoxResults.OK:
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+						if msgbox.execute()==MessageBoxResults.YES:
 							sheet = VARS.sheet
 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
@@ -521,7 +517,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	VARS.setSheet(sheet)
 	selection = controller.getSelection()
 	if entrynum==3:  # 日付追加。selectionは単一セル。	
-		setDates(doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
+		setDates(xscriptcontext, doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
 		if int(selection.getString())!=1:  # 日付が１日でない時。
 			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
 			r, c = celladdress.Row, celladdress.Column
@@ -539,7 +535,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
-		msg = "選択セルから右をすべてクリアしますか?"
+		msg = "選択セルから右をすべてクリアします。"
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
 			rangeaddress = selection.getRangeAddress()
@@ -709,54 +705,115 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(tentekirangeaddress, False)
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])	
-def setDates(doc, sheet, cell, datevalue):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。
+def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。daycount: 経過シートに入力する日数。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 	createFormatKey = commons.formatkeyCreator(doc)	
 	colors = commons.COLORS
-	holidays = commons.HOLIDAYS
-	daycount = 100  # 経過シートに入力する日数。
 	celladdress = cell.getCellAddress()  # 経過シートの日付の開始セルのセルアドレスを取得。
-	r, c = celladdress.Row, celladdress.Column
+	r, c = celladdress.Row, celladdress.Column  # cは開始列インデックスになる。
 	sheet[:r+1, c:].clearContents(511)  # 開始列より右の日付行の内容を削除。
-	endcolumn = c + daycount + 1
-	endcolumn = endcolumn if endcolumn<1024 else 1023  # 列インデックスの上限1023。
-	sheet[r, c:endcolumn].setDataArray(([i for i in range(datevalue, datevalue+daycount+1)],))  # 日時シリアル値を経過シートに入力。
-	sheet[r, c:endcolumn].setPropertyValue("NumberFormat", createFormatKey('YYYY/M/D'))  # 日時シリアルから年月日の取得のため一時的に2018/5/4の形式に変換する。
-	y, m, d = map(int, sheet[r, c].getString().split("/"))  # 年、月、日を整数型で取得。
-	weekday, days = calendar.monthrange(y, m)  # 月曜日が曜日番号0。1日の曜日と一月の日数のタプルが返る。
-	weekday = (weekday+(d-1)%7) % 7  # dの曜日番号を取得。1日からの7の余りと1日の余りを加えた7の余りがdの曜日番号。
+	endcolumn = c + daycount
+	if not endcolumn<1024:
+		endcolumn = 1023  # 列インデックスの上限1023。	
+		daycount = endcolumn - c
+	datevalues = [i for i in range(datevalue, datevalue+daycount)]  # 日付シリアル値を取得。
+	sheet[r, c:endcolumn].setDataArray((datevalues,))  # 日時シリアル値を経過シートに入力。
+	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。
+	holidaycolumns = getHolidaycolumns(functionaccess, datevalues, c)
+	startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))  # 開始日の曜日を取得。月=0。
+	offdaycolumns = getOffdaycolumns(doc, datevalues, startweekday, c, endcolumn)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
+	offdaycolumns.difference_update(holidaycolumns)  # 休日インデックスから祝日インデックスを除く。
 	n = 6  # 日曜日の曜日番号。
-	sunsset = set(range(c+(n-weekday)%7, endcolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。
-	setRangesProperty(doc, sheet, r, sunsset, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
+	sunindexes = set(range(c+(n-startweekday)%7, endcolumn, 7))  # 日曜日の列インデックスの集合。祝日と重ならないようにあとで使用する。	
+	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
 	n = 5  # 土曜日の曜日番号。
-	setRangesProperty(doc, sheet, r, range(c+(n-weekday)%7, endcolumn, 7), ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
-	holidayset = set()  # 祝日の列インデックスを入れる集合。
-	days = days - d + 1  # 翌月1日までの日数を取得。
-	mr = r - 1  # 月を代入する行のインデックス。
-	mc = c  # 1日を表示する列のインデックス。最初の月のみ開始日になる。
-	if y in holidays:  # 祝日一覧のキーがある時。
-		holidayset.update(mc+i-d for i in holidays[y][m-1] if i>=d)  # 祝日の列インデックスの集合を取得。
+	satindexes = set(range(c+(n-startweekday)%7, endcolumn, 7))  # 土曜日の列インデックスの集合。
+	setRangesProperty = createSetRangesProperty(doc, r)
+	setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
+	setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
+	setRangesProperty(sunindexes, ("CharColor", colors["red3"]))
+	setRangesProperty(satindexes, ("CharColor", colors["skyblue"]))
+	month = int(functionaccess.callFunction("MONTH", (datevalues[0],)))  # 開始月を取得。
+	if c==VARS.splittedcolumn:  # 日付行の先頭列の時。
+		sheet[r-1, c].setString("{}月".format(month))
+	startmonthindex = 0
 	while True:
-		sheet[mr, mc].setString("{}月".format(m))  # 月を入力。
-		mc += days  # 次月1日の列に進める。
-		if mc<endcolumn:  # 日時シリアル値が入力されている列の時。
-			ymd = sheet[r, mc].getString()  # 1日の年/月/日を取得。
-			y, m = map(int, ymd.split("/")[:2])  # 年と月を取得。
-			if y in holidays:  # 祝日一覧のキーがある時。
-				holidayset.update(mc+i-1 for i in holidays[y][m-1] if mc+i-1<endcolumn)  # 祝日の列インデックスの集合を取得。
-			weekday, days = calendar.monthrange(y, m)  # 1日の曜日と月の日数を取得。
+		startmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[startmonthindex], 0))) - datevalue + 1  # 次月の1日のdatevaluesでのインデックスを取得。
+		month += 1
+		if month>12:
+			month = 1
+		if startmonthindex<daycount:	
+			sheet[r-1, c+startmonthindex].setString("{}月".format(month))
 		else:
-			break	
-		
-	# 休日の背景色をsilverにする。
-		
-	holidayset.difference_update(sunsset)  # 日曜日と重なっている祝日を除く。
-	setRangesProperty(doc, sheet, r, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。	
-	sheet[r, c:endcolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('D'), CENTER))  # 経過シートの日付の書式を設定。	
-def setRangesProperty(doc, sheet, r, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
-	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	cellranges.addRangeAddresses((sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-	if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-		cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
+			break
+def getHolidaycolumns(functionaccess, datevalues, c): # 祝日になる列インデックスを返す。datevalues: 日付シリアル値のタプル。c: 開始列インデックス。
+	holidaycolumns = set()  # 祝日インデックスの集合。
+	holidays = commons.HOLIDAYS	
+	startyear, startmonth = [int(functionaccess.callFunction(i, (datevalues[0],))) for i in ("YEAR", "MONTH")]  # 開始年月日を取得。
+	endyear, endmonth = [int(functionaccess.callFunction(i, (datevalues[-1],))) for i in ("YEAR", "MONTH")]  # 終了年月日を取得。
+	if startyear in holidays:  # 開始年の祝日がある時。
+		for m, days in enumerate(holidays[startyear][startmonth-1:], start=startmonth):  # 開始月以降の祝日のタプルを取得。
+			for d in days:
+				datevalue = int(functionaccess.callFunction("DATE", (startyear, m, d)))
+				if datevalue in datevalues:
+					holidaycolumns.add(c+datevalues.index(datevalue))
+				elif m>startmonth:  # 開始月より後はもう日付列は終了しているので関数を出る。
+					return holidaycolumns
+	newyear = startyear + 1
+	while newyear<endyear:  # 最終年ではない間。
+		if newyear in holidays:
+			for m, days in enumerate(holidays[newyear], start=1):
+				for d in days:	
+					datevalue = int(functionaccess.callFunction("DATE", (newyear, m, d)))
+					holidaycolumns.add(c+datevalues.index(datevalue))
+		newyear += 1	
+	if newyear==endyear:  # 最終年の時。
+		if endyear in holidays:
+			for m, days in enumerate(holidays[endyear][:endmonth], start=1):
+				for d in days:
+					datevalue = int(functionaccess.callFunction("DATE", (endyear, m, d)))
+					if datevalue in datevalues:
+						holidaycolumns.add(c+datevalues.index(datevalue))
+	return holidaycolumns
+def getOffdaycolumns(doc, datevalues, startweekday, c, endcolumn):  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
+	offdays, offweekdays = getOffdays(doc)  # 予定シートの休日設定を取得。offdays; 休日シリアル値、offweeks: 休日にする曜日番号。
+	offdaycolumns = set()  # 休日インデックスの集合。
+	offdaycolumns.update(c+datevalues.index(i) for i in offdays if i in datevalues)  # 休日のシリアル値のインデックスを取得。
+	offdaycolumns.update(j for i in offweekdays for j in range(c+(i-startweekday)%7, endcolumn, 7))  # 曜日のインデックスを取得。
+	return offdaycolumns
+def getOffdays(doc):  # 予定シートの休日を取得。
+	sheets = doc.getSheets()  # シートコレクションを取得。
+	sheet = sheets["予定"]
+	yoteivars = yotei.VARS
+	yoteivars.setSheet(sheet)	
+	weekdays = yoteivars.weekdays  # 曜日のタプルを取得。
+	searchdescriptor = sheet.createSearchDescriptor()
+	searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
+	c = yoteivars.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
+	searchedcell = sheet[yoteivars.emptyrow:, c].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。
+	if searchedcell:  # 休日設定の開始セルがある時。
+		startrow = searchedcell.getCellAddress().Row + 2  # 休日設定の開始行を取得。
+		cellranges = sheet[startrow:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
+		emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
+		offweekdays = []  # 休日の曜日のリスト。
+		offdays = []  # 休日のシリアル値のリスト。
+		if startrow<emptyrow:  # 休日設定行がある時。
+			for datarow in sheet[startrow:emptyrow, c].getDataArray():	# 休日設定の各行について。
+				d = datarow[0]
+				if isinstance(d, float):  # floatの時は日付シリアル値と考える。
+					offdays.append(int(d))
+				else:  # 文字列の時。
+					offweekdays.extend(weekdays.index(i) for i in d.replace("曜日", ""))  # 曜日は曜日番号で取得する。金土などの書き方も処理する。
+	return offdays, offweekdays
+def createSetRangesProperty(doc, r): 
+	def setRangesProperty(columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+		cellranges.addRangeAddresses((VARS.sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+		if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+			cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
+	return setRangesProperty
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		

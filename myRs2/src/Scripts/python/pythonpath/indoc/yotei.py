@@ -3,7 +3,7 @@
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from indoc import commons, staticdialog, ichiran, transientdialog, keika
 from calendar import monthrange
-from datetime import date, datetime, time, timedelta  # 日付計算はシート関数では遅いし複雑になりすぎてロジックが組めないのでこれを使う。
+from datetime import date, datetime, time, timedelta  # シート関数ではアルゴリズムが難しい。
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
@@ -40,21 +40,23 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	VARS.setSheet(sheet)
 	daycount = 31  # シートに表示する日数。
 	monthrow = VARS.monthrow
+	dayrow = VARS.dayrow
 	datarow = VARS.datarow
 	emptyrow = VARS.emptyrow
 	datacolumn = VARS.datacolumn
 	templatestartcolumn = VARS.templatestartcolumn
-	if datacolumn+daycount>templatestartcolumn:  # daycountの上限はテンプレート列までにする。
-		daycount = templatestartcolumn - datacolumn		
+	if datacolumn+daycount>templatestartcolumn-1:  # daycountの上限はテンプレート列までにする。
+		daycount = templatestartcolumn - 1 - datacolumn		
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
 	endedgecolumn = datacolumn + daycount  # 更新後のデータの右端列の右。
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
-	firstdatevalue = int(sheet[VARS.dayrow, datacolumn].getValue())  # 先頭の日付のシリアル値を整数で取得。空セルの時は0.0が返る。	
-	if firstdatevalue>0:  # シリアル値が取得できた時。	
-		diff = todayvalue - firstdatevalue  # 今日の日付と先頭の日付との差を取得。
+	startdatecell = sheet[dayrow, datacolumn]
+	startdatevalue = int(startdatecell.getValue())  # 先頭の日付のシリアル値を整数で取得。空セルの時は0.0が返る。	
+	if startdatevalue>0:  # シリアル値が取得できた時。	
+		diff = todayvalue - startdatevalue  # 今日の日付と先頭の日付との差を取得。
 		if diff>0:  # 先頭日付が過去の時。
 			todaycolumn = datacolumn + diff # 移動前の今日の日付列インデックスを取得。	
 			if diff and todaycolumn<VARS.firstemptycolumn:  # 今日の日付列が表示されている範囲内にある時。今日の日付を先頭に移動させる。先頭が今日でない時は移動させない。
@@ -76,11 +78,11 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	else:
 		sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
-	weekday = todaydate.weekday()  # 月=0が返る。
+	startweekday = todaydate.weekday()  # 開始曜日を取得。月=0が返る。
 	weekdays = VARS.weekdays	
 	datarows = [["" for dummy in range(daycount)],\
 			[i for i in range(todayvalue, todayvalue+daycount)],\
-			[weekdays[i%7] for i in range(weekday, weekday+daycount)]]  # 月行、日行と曜日行を作成。日付はシリアル値で入力しないといけない。
+			[weekdays[i%7] for i in range(startweekday, startweekday+daycount)]]  # 月行、日行と曜日行を作成。日付はシリアル値で入力しないといけない。
 	datarows.extend(list(i) for i in sheet[datarow:emptyrow, datacolumn:endedgecolumn].getDataArray())  # シートのデータ部分を取得。タプルをリストにして取得。			
 	dates = [todaydate+timedelta(days=i) for i in range(daycount)]  # 表示する日数をdateオブジェクトで取得。
 	datarows[0][0] = "{}月".format(todaydate.month)
@@ -89,10 +91,12 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		d = dates[nextidx]
 		datarows[0][nextidx] = "{}月".format(d.month)
 		nextidx += monthrange(d.year, d.month)[1] + 1
-	templatedic = {}  # キー: テンプレート列インデックス、値: 日付列インデックスのリスト。
+	templatedic = {}  # キー: テンプレート列インデックス、値: 日付列インデックスの集合。
 	templates = sheet[monthrow:emptyrow, templatestartcolumn:VARS.templateendcolumnedge].getDataArray()  # テンプレートの値を月行から取得。
 	excludes = set()  # 処理済列インデックスの集合。
-	holidayset = set()  # 祝日列インデックスの集合。
+	holidaycolumns = keika.getHolidaycolumns(functionaccess, datarows[1], datacolumn)  # 休日の列インデックスの集合を取得。
+	offdaycolumns = keika.getOffdaycolumns(doc, datarows[1], startweekday, datacolumn, endedgecolumn)  # 予定シートの休日設定を取得して合致する列インデックスの集合を取得する。
+	offdaycolumns.difference_update(holidaycolumns)  # 休日インデックスから祝日インデックスを除く。	
 	for ti in range(len(templates[0]))[::-1]:  # テンプレートの列の相対インデックスをイテレート。優先度を付けるため後ろからイテレート。
 		tm = templates[1][ti]  # 空文字、週数の文字列、月のfloat、のいずれかが返る。
 		td = templates[2][ti]  # 曜日or日の要素を取得。
@@ -106,7 +110,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 					if d in dates:
 						c = datacolumn + dates.index(d)  # 列インデックスを取得。
 						if not c in excludes:
-							templatedic.setdefault(tc, []).append(c)
+							templatedic.setdefault(tc, set()).add(c)
 							excludes.add(c)
 			else:  # 日指定のみの時。
 				d = dates[0].replace(day=td)  # 開始日と同じ月の日を取得。
@@ -114,11 +118,10 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 					if d in dates:
 						c = datacolumn + dates.index(d)  # 列インデックスを取得。
 						if not c in excludes:
-							templatedic.setdefault(tc, []).append(c)
+							templatedic.setdefault(tc, set()).add(c)
 							excludes.add(c)
 					d += timedelta(days=monthrange(d.year, d.month)[1])  # 翌月の同じ日を取得。
-		elif td=="祝":  # 祝日の時。
-			holidayset.add(tc)  # テンプレートの祝列インデックスを取得。
+		elif td=="祝":  # 祝日の時。休業日もここで処理する。
 			holidays = commons.HOLIDAYS	
 			for y in range(dates[0].year, dates[-1].year+1):  # 表示期間の年をイテレート。
 				for m, ds in enumerate(holidays[y], start=1):  # 祝日のリストを月ごとにイテレート。
@@ -127,12 +130,13 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 						if d in dates:
 							c = datacolumn + dates.index(d)  # 列インデックスを取得。
 							if not c in excludes:
-								templatedic.setdefault(tc, []).append(c)	
+								templatedic.setdefault(tc, set()).add(c)
 								excludes.add(c)
-								holidayset.add(c)
+			templatedic.setdefault(tc, set()).update(offdaycolumns)  # 休業日も祝日として追加する。
+			excludes.update(offdaycolumns)
 		else:  # 曜日指定のある時。
 			n = weekdays.index(td)  # 月=0の曜日番号を取得。
-			ws = range((n-weekday)%7, daycount, 7)  # 同じ曜日の相対インデックスを取得。
+			ws = range((n-startweekday)%7, daycount, 7)  # 同じ曜日の相対インデックスを取得。
 			if tm:  # 週数or月の指定がある時。
 				if tm.endswith("w"):  # wで終わっている時、週数と曜日指定の時。
 					w = convertToInteger(tm[:-1])  # 週数を整数に変換して取得。
@@ -140,7 +144,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 						if w==-(-dates[i].day//7):  # 週番号が一致する時。商を切り上げ。	
 							c = datacolumn + i
 							if not c in excludes:
-								templatedic.setdefault(tc, []).append(c)
+								templatedic.setdefault(tc, set()).add(c)
 								excludes.add(c)
 				else:  # 月と曜日指定の時。
 					m = convertToInteger(m)  # 月を整数に変換して取得。
@@ -148,13 +152,13 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 						if m==dates[i].month:
 							c = datacolumn + i
 							if not c in excludes:
-								templatedic.setdefault(tc, []).append(c)
+								templatedic.setdefault(tc, set()).add(c)
 								excludes.add(c)
 			else:  # 曜日のみの指定の時。	
 				for i in ws:  # 同じ曜日の相対インデックスを取得。
 					c = datacolumn + i
 					if not c in excludes:
-						templatedic.setdefault(tc, []).append(c)
+						templatedic.setdefault(tc, set()).add(c)
 	for tc, cs in templatedic.items():  # tc: テンプレートの列インデックス、cs:  書き換える列インデックスのリスト。
 		dataranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
 		dataranges.addRangeAddresses((sheet[datarow:emptyrow, i].getRangeAddress() for i in cs), False)  # セル範囲コレクションを取得。		
@@ -169,25 +173,20 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。											
 	sheet[monthrow:emptyrow, datacolumn:endedgecolumn].setDataArray(datarows)  # コメントが消されてしまう。
 	[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
+	sheet[VARS.dayrow:VARS.datarow, datacolumn:templatestartcolumn-1].clearContents(CellFlags.HARDATTR)  # 日付行と曜日行の書式をクリア。
 	colors = commons.COLORS
-	n = 5  # 土曜日の曜日番号。
-	columnindexes = range(datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 土曜日の列インデックスを取得。			
-	setRangesProperty(doc, columnindexes, ("CharColor", colors["skyblue"]))  # 土曜日の文字色を設定。	
+	sheet[dayrow, datacolumn:endedgecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('D'), CENTER))  # 日付行の書式を設定。
+	sheet[VARS.weekdayrow, datacolumn:endedgecolumn].setPropertyValue("HoriJustify", CENTER)  # 曜日行の書式を設定。
 	n = 6  # 日曜日の曜日番号。
-	columnindexes = range(datacolumn+(n-weekday)%7, endedgecolumn, 7)   # 日曜日の列インデックスを取得。
-	setRangesProperty(doc, columnindexes, ("CharColor", colors["red3"]))  # 日曜日の文字色を設定。
-	
-		
-	# 休日の背景色をsilverにする。
-	
-	
-	
-	
-				
-	holidayset.difference_update(columnindexes)  # 日曜日と重なっている祝日を除く。	
-	setRangesProperty(doc, holidayset, ("CellBackColor", colors["red3"]))  # 祝日の背景色を設定。
-	createFormatKey = commons.formatkeyCreator(doc)	
-	sheet[VARS.dayrow, datacolumn:endedgecolumn].setPropertyValue("NumberFormat", createFormatKey('D'))  
+	sunindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 日曜日の列インデックスのリスト。祝日と重ならないようにあとで使用する。	
+	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
+	n = 5  # 土曜日の曜日番号。
+	satindexes = set(range(datacolumn+(n-startweekday)%7, endedgecolumn, 7))  # 土曜日の列インデックスのリスト。
+	setRangesProperty = createSetRangesProperty(doc)
+	setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
+	setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
+	setRangesProperty(sunindexes, ("CharColor", colors["red3"]))
+	setRangesProperty(satindexes, ("CharColor", colors["skyblue"]))
 	dataranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。	
 	ranges = sheet[datarow:emptyrow, datacolumn:endedgecolumn],\
 			sheet[datarow:emptyrow, templatestartcolumn:VARS.templateendcolumnedge]  # テンプレートを含めたデータ範囲。
@@ -209,9 +208,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	ranges = sheet[monthrow:datarow, datacolumn:endedgecolumn], temlatedaterange
 	dataranges.addRangeAddresses((i.getRangeAddress() for i in ranges), False)			
 	dataranges.setPropertyValue("HoriJustify", CENTER) 
-	
-	
-				
 def createSetPropSearchedCells(cellrange):	
 	searchdescriptor = VARS.sheet.createSearchDescriptor()
 	def setPropSearchedCells(txt, prop):		
@@ -225,11 +221,14 @@ def convertToInteger(s):  # s: floatか文字列。
 		return int(s)
 	elif s.isdigit():  # 数字のみの文字列の時。
 		return int(s)	
-def setRangesProperty(doc, columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
-	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-	cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-	if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-		cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
+def createSetRangesProperty(doc): 	
+	def setRangesProperty(columnindexes, prop):  # columnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
+		if columnindexes:  # 列インデックスがある時のみ。
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+			cellranges.addRangeAddresses((VARS.sheet[VARS.dayrow:VARS.datarow, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
+			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+				cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。	
+	return setRangesProperty
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -304,98 +303,50 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		msg = "全経過シートの休日も更新します。\n祝日も含みます。"
 		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
-		if msgbox.execute()==MessageBoxResults.OK:			
-			weekdays = VARS.weekdays  # 曜日のタプルを取得。
-			searchdescriptor = sheet.createSearchDescriptor()
-			searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
-			c = VARS.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
-			searchedcell = sheet[VARS.emptyrow:, c].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。
-			if searchedcell:  # 休日設定の開始セルがある時。
-				startrow = searchedcell.getCellAddress().Row + 2  # 休日設定の開始行を取得。
-				cellranges = sheet[startrow:, c].queryContentCells(CellFlags.STRING+CellFlags.DATETIME)  # 休日設定列の文字列か日付が入っているセルに限定して抽出。
-				emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。		
-				offweekdays = []  # 休日の曜日のリスト。
-				offdays = []  # 休日のシリアル値のリスト。
-				if startrow<emptyrow:  # 休日設定行がある時。
-					for datarow in sheet[startrow:emptyrow, c].getDataArray():	# 休日設定の各行について。
-						d = datarow[0]
-						if isinstance(d, float):  # floatの時は日付シリアル値と考える。
-							offdays.append(d)
-						else:  # 文字列の時。
-							offweekdays.append(weekdays.index(i) for i in d.replace("曜日", ""))  # 曜日は曜日番号で取得する。金土などの書き方も処理する。
-				offdayrangeaddresses = []		
-				holidayrangeaddresses = []	
-				# 予定シートについて。
-				dayrow = VARS.dayrow
-				datacolumn = VARS.datacolumn
-				firstemptycolumn = VARS.firstemptycolumn
-				datevalues = sheet[dayrow, datacolumn:firstemptycolumn].getDataArray()[0]  # シートの日付のタプルを取得。
-				holidayindexes = getHolidayindexes(functionaccess, datevalues)
-				holidayrangeaddresses.extend(sheet[dayrow:dayrow+2, datacolumn+i].getRangeAddress() for i in holidayindexes)  # 祝日にするセル範囲アドレスを取得。
-				startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))	
-				offdayindexes = getOffdayindexes(offdays, offweekdays, datevalues, startweekday, firstemptycolumn)
-				offdayindexes.difference_update(holidayindexes)  # 休日インデックスから祝日インデックスを除く。
-				offdayrangeaddresses.extend(sheet[dayrow:dayrow+2, datacolumn+i].getRangeAddress() for i in offdayindexes)  # 休日にするセル範囲アドレスを取得。
-				# 経過シートについて
-				keikavars = keika.VARS
-				dayrow = keikavars.dayrow
-				splittedcolumn = keikavars.splittedcolumn
-				for keikasheet in doc.getSheets():
-					sheetname = keikasheet.getName()
-					if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
-						continue
-					elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-						cellranges = sheet[keikavars.dayrow, splittedcolumn:].queryContentCells(CellFlags.DATETIME)
-						dayendedge = cellranges.getRangeAddresses()[-1].EndRow + 1
-						datevalues = keikasheet[dayrow, splittedcolumn:dayendedge].getDataArray()[0]
-						holidayindexes = getHolidayindexes(functionaccess, datevalues)
-						holidayrangeaddresses.extend(sheet[dayrow, splittedcolumn+i].getRangeAddress() for i in holidayindexes)  # 祝日にするセル範囲アドレスを取得。
-						startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))
-						offdayindexes = getOffdayindexes(offdays, offweekdays, datevalues, startweekday, dayendedge)
-						offdayindexes.difference_update(holidayindexes)  # 休日インデックスから祝日インデックスを除く。
-						offdayrangeaddresses.extend(sheet[dayrow, splittedcolumn+i].getRangeAddress() for i in offdayindexes)  # 休日にするセル範囲アドレスを取得。		
-								
-				cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-				cellranges.addRangeAddresses(holidayrangeaddresses, False)  # セル範囲コレクションを取得。
-				if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-					cellranges.setPropertyValue("CellBackColor", commons.COLORS["red3"])
-					
-				cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-				cellranges.addRangeAddresses(offdayrangeaddresses, False)  # セル範囲コレクションを取得。
-				if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-					cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])				
-					
-					
+		if msgbox.execute()==MessageBoxResults.OK:		
+			datevalues = sheet[VARS.dayrow, VARS.datacolumn:VARS.firstemptycolumn].getDataArray()[0]
+			holidaycolumns = keika.getHolidaycolumns(functionaccess, datevalues, VARS.datacolumn)  # 休日の列インデックスを取得。
+			startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))  # 開始日の曜日を取得。月=0。
+			offdaycolumns = keika.getOffdaycolumns(doc, datevalues, startweekday, VARS.datacolumn, VARS.firstemptycolumn)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
+			offdaycolumns.difference_update(holidaycolumns)  # 休日インデックスから祝日インデックスを除く。
+			sheet[VARS.dayrow:VARS.datarow, VARS.datacolumn:VARS.templatestartcolumn-1].setPropertyValue("CellBackColor", -1)  # 日付行と曜日行の背景色をクリア。	
+			colors = commons.COLORS				
+			setRangesProperty = createSetRangesProperty(doc)
+			setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
+			setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
+			# 全経過シートについて
+			keikavars = keika.VARS  # 経過シートの定数を取得。
+			keikadayrow = keikavars.dayrow
+			keikasplittedcolumn = keikavars.splittedcolumn
+			keikaholidayrangeaddresses = []  # 経過シートの祝日のセル範囲アドレスのリスト。	 		
+			keikaoffdayrangeaddresses = []  # 経過シートの休日のセル範囲アドレスのリスト。		
+			todaydatevalue = functionaccess.callFunction("TODAY", ())  # 今日のシリアル値を整数で取得。floatで返る。
+			for keikasheet in doc.getSheets():
+				sheetname = keikasheet.getName()
+				if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
+					continue
+				elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+					cellranges = keikasheet[keikadayrow, keikasplittedcolumn:].queryContentCells(CellFlags.DATETIME)  # 経過シートの日付行の空セルのセル範囲コレクションを取得。
+					if len(cellranges):
+						keikadayendedge = cellranges.getRangeAddresses()[0].EndColumn + 1 # 日付行の右端の右の列インデックスを取得。
+						keikadatevalues = keikasheet[keikadayrow, keikasplittedcolumn:keikadayendedge].getDataArray()[0]  # 今日以降の日付行のシリアル値をすべて取得。要素はfloat。
+						if todaydatevalue in keikadatevalues:  # 今日の日付がある時のみ。
+							startindex = keikadatevalues.index(todaydatevalue)
+							keikastartcolumn = keikasplittedcolumn + startindex  # 今日の列インデックスを取得。
+							keikaholidaycolumns = keika.getHolidaycolumns(functionaccess, keikadatevalues[startindex:], keikastartcolumn)  # 休日の列インデックスを取得。
+							keikaholidayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaholidaycolumns) # 祝日にするセル範囲アドレスを取得。
+							keikastartweekday = int(functionaccess.callFunction("WEEKDAY", (todaydatevalue, 3)))  # 開始日の曜日を取得。月=0。
+							keikaoffdaycolumns = keika.getOffdaycolumns(doc, keikadatevalues[startindex:], keikastartweekday, keikastartcolumn, keikadayendedge)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。					
+							keikaoffdayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaoffdaycolumns) # 休日にするセル範囲アドレスを取得。					
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+			cellranges.addRangeAddresses(keikaholidayrangeaddresses, False)  # セル範囲コレクションを取得。集合のまま渡すとエラーになる。
+			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+				cellranges.setPropertyValue("CellBackColor", commons.COLORS["red3"])
+			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+			cellranges.addRangeAddresses(keikaoffdayrangeaddresses, False)  # セル範囲コレクションを取得。
+			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+				cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])				
 	return False  # セル編集モードにしない。	
-def getOffdayindexes(offdays, offweekdays, datevalues, startweekday, endedgecolumn):
-	offdayindexes = set()  # 休日インデックスの集合。
-	offdayindexes.update(datevalues.index(i) for i in offdays)  # 休日のシリアル値のインデックスを取得。
-	offdayindexes.update(range((i-startweekday)%7, endedgecolumn, 7) for i in offweekdays)  # 曜日のインデックスを取得。
-	return offdayindexes
-def getHolidayindexes(functionaccess, datevalues):
-	holidayindexes = set()  # 祝日インデックスの集合。
-	holidays = commons.HOLIDAYS	
-	startyear, startmonth, startday = [int(functionaccess.callFunction(i, (datevalues[0],))) for i in ("YEAR", "MONTH", "DAY")]  # 開始年月日を取得。
-	endyear, endmonth, endday = [int(functionaccess.callFunction(i, (datevalues[-1],))) for i in ("YEAR", "MONTH", "DAY")]  # 終了年月日を取得。
-	if startyear in holidays:
-		for days in holidays[startyear][startmonth-1:]:
-			for d in days:
-				if d>=startday:
-					holidayindexes.add(d-startday)
-	newyear = startyear + 1
-	endmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[0], 0))) - startday
-	while newyear<endyear:
-		for days in holidays[newyear]:
-			for d in days:	
-				holidayindexes.add(endmonthindex+d)
-		newyear += 1	
-		endmonthindex = int(functionaccess.callFunction("EOMONTH", (datevalues[endmonthindex+1], 0)))
-	if endyear in holidays:
-		for d in holidays[endyear][:endmonth]:
-			for d in days:
-				if d<=endday:
-					holidayindexes.add(endmonthindex+d)	
-	return holidayindexes
 def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
 		dategene = (startdate+timedelta(days=i) for i in range(n))
