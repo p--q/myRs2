@@ -161,7 +161,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
 		copyCells(controller, copieddatecell, newdatarows)
 		now = datetime.now()
-		datetxt = "{}/{}/{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minite, now.second)  # コピーボタンを押した日付を入力。
+		datetxt = "{}/{}/{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
 		copieddatecell.setString(datetxt)
 		copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 	elif txt=="退院ｻﾏﾘ":
