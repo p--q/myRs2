@@ -84,7 +84,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
 		keikavars = keika.VARS
-		daterow = keikavars.dayrow
+		dayrow = keikavars.dayrow
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
@@ -96,8 +96,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					if not sheetname in sheets:  # 経過シートがない時は次のループに行く。
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
-					startdatevalue = int(keikasheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
-					keikadatarows = keikasheet[daterow+1:daterow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
+					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
+					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
 					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
 					for i in commons.GAZOs:  # 読影のない画像。
