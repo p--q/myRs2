@@ -183,13 +183,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 									formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。
 								selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 											
 							if callback is None:  # コールバック関数が与えられていない時。
-								
-								# シリアル値を代入。
-								
-								selection.setString(datetxt)
-								
-								
-								
+								selection.setFormula(datetxt.split("(")[0].replace("/", "-"))  # 2018/8/7の書式で式としてセルに代入。
 							else:  # コールバック関数が与えられている時。
 								callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。

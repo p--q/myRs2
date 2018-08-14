@@ -126,7 +126,7 @@ def getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue):
 		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 		keikavars = keika.VARS
-		keikasheet[keikavars.dayrow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
+		keikasheet[keikavars.dayrow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。			
 		keika.setDates(xscriptcontext, doc, keikasheet, keikasheet[keikavars.dayrow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet	
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 使用中最下行へ。新規行挿入は不要。

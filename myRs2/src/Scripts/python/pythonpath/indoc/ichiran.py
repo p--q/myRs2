@@ -84,7 +84,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
 		keikavars = keika.VARS
-		daterow = keikavars.daterow
+		daterow = keikavars.dayrow
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
@@ -338,8 +338,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
 			cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
 		if nonkanacells:
-			cells = " ".join(i.getPropertyValue("AbsoluteName").split(".")[1].replace("$", "") for i in nonkanacells)
-			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。\n{}".format(cells)
+			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
 			componentwindow = doc.getCurrentController().ComponentWindow		
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 			msgbox.execute()		
