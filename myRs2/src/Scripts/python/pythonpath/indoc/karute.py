@@ -123,7 +123,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		if newsheetname in sheets:  # 経過シート名がある時。
 			controller.setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 		else:  # 経過シートの作成。
-			idcelltxts = sheet[VARS.splittedrow-1, VARS.articlecolumn].getString().split(" ")  # 半角スペースで分割。
+			idcelltxts = sheet[VARS.splittedrow-1, VARS.articlecolumn].getString().replace("　", " ").split(" ")  # 半角スペースで分割。
 			idtxt = idcelltxts[0]  # 最初の要素を取得。
 			if idtxt.isdigit():  # IDが数値のみの時。					
 				if idtxt in sheets:  # ID名のシートがあるとき。

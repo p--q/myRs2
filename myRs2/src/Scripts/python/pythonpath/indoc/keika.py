@@ -111,7 +111,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 	elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
 		datarow = sheet[1, VARS.yakucolumn:VARS.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
-		idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
+		idcelltxts = datarow[0].replace("　", " ").split(" ")  # 半角スペースで分割。
 		idtxt = idcelltxts[0]  # 最初の要素を取得。
 		if idtxt.isdigit():  # IDが数値のみの時。					
 			if idtxt in sheets:  # ID名のシートがあるとき。
@@ -120,7 +120,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 				if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 					kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
 					datevalue = datarow[-1]
-					karutesheet = commons.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
+					karutesheet = commons.getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)
 					controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
 				else:
 					commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")

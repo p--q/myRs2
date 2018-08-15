@@ -12,7 +12,6 @@ from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import SINGLE  # enum 
 def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。formatstringは代入セルの書式。
-# 	dateformat = "%Y/%m/%d(%a)"  # 日付書式。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
@@ -171,10 +170,9 @@ class MouseListener(unohelper.Base, XMouseListener):
 							formatkey = numberformats.queryKey(formatstring, localestruct, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
 							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
 								formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。
-							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 	
-						if callback is None:  # コールバック関数が与えられていない時。
-							selection.setFormula(datetxt.split("(")[0].replace("/", "-"))  # 2018/8/7の書式で式としてセルに代入。
-						else:  # コールバック関数が与えられている時。
+							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
+						selection.setFormula(datetxt.split("(")[0].replace("/", "-"))  # 2018/8/7の書式で式としてセルに代入。
+						if callback is not None:  # コールバック関数が与えられている時。
 							callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
