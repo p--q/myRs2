@@ -76,10 +76,10 @@ class TextTransferable(unohelper.Base, XTransferable):
 def formatkeyCreator(doc):  # ドキュメントを引数にする。
 	def createFormatKey(formatstring):  # formatstringの書式はLocalによって異なる。 
 		numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
-		locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。。 
-		formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
+		localestruct = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。。 
+		formatkey = numberformats.queryKey(formatstring, localestruct, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
 		if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
-			formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。 
+			formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。 
 		return formatkey
 	return createFormatKey
 def createBorders():# 枠線の作成。

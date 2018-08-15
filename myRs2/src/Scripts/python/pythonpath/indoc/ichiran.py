@@ -255,10 +255,10 @@ def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, da
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-	locale = Locale(Language = "ja", Country = "JP")
-	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), locale)  # 変換モジュールをロード。	
+	localestruct = Locale(Language = "ja", Country = "JP")
+	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), localestruct)  # 変換モジュールをロード。	
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ひらがなをカタカナに変換		
-	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), locale)
+	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), localestruct)
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換
 	r = enhancedmouseevent.Target.getCellAddress().Row				
 	cellstringaddress = sheet[r, VARS.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
