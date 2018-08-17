@@ -410,7 +410,7 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 		return newdatarows
 	def copyCells(newdatarows):
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-		txt = "\n".join(i[0] for i in newdatarows)
+		txt = "\r\n".join(i[0] for i in newdatarows)  # Windowsのために\rも付ける。
 		systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにコピーする。シートのコピーからだとペーストできないアプリがある。クリップボードが開けないと言われる。			
 	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
