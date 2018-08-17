@@ -84,8 +84,8 @@ def formatkeyCreator(doc):  # ドキュメントを引数にする。
 	return createFormatKey
 def createBorders():# 枠線の作成。
 	noneline = BorderLine2(LineStyle=BorderLineStyle.NONE)
-	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["violet"])
-	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["magenta3"])	
+	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=45, Color=COLORS["violet"])
+	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=45, Color=COLORS["magenta3"])	
 	tableborder2 = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=True, IsRightLineValid=True)
 	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
 	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
