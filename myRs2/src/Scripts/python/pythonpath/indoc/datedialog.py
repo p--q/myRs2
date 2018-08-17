@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
-import unohelper, locale  # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from datetime import date, datetime, timedelta
+import unohelper # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+from datetime import date, timedelta
 from indoc import dialogcommons
 from com.sun.star.awt import XMouseListener, XTextListener
 from com.sun.star.awt import MenuItemStyle, MouseButton, PopupMenuDirection, PosSize  # 定数
@@ -12,7 +12,6 @@ from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import SINGLE  # enum 
 def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。formatstringは代入セルの書式。
-	dateformat = "%Y/%m/%d(%a)"  # 日付書式。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
@@ -30,7 +29,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
 	items = ("セル入力で閉じる", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": True}),  # グリッドコントロールのコンテクストメニュー。XMenuListenerのmenuevent.MenuIdでコードを実行する。
 	gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items)  # 右クリックでまず呼び出すポップアップメニュー。 
-	args = xscriptcontext, dateformat, formatstring, outputcolumn, callback
+	args = xscriptcontext, formatstring, outputcolumn, callback
 	mouselistener = MouseListener(gridpopupmenu, args)
 	gridcontrolwidth = gridprops["Width"]  # gridpropsは消費されるので、グリッドコントロールの幅を取得しておく。
 	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。
@@ -47,7 +46,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	numericfieldprops1.update({"PositionX": fixedtextprops1["PositionX"]-numericfieldprops1["Width"]})
 	optioncontrolcontainerprops.update({"PositionY": dialogcommons.YHeight(optioncontrolcontainerprops), "Height": dialogcommons.YHeight(numericfieldprops1, m)})
 	optioncontrolcontainer, optionaddControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, optioncontrolcontainerprops)  # コントロールコンテナの作成。
-	textlistener = TextListener(dateformat, gridcontrol1)
+	textlistener = TextListener(gridcontrol1)
 	numericfield1 = optionaddControl("NumericField", numericfieldprops1, {"addTextListener": textlistener})		
 	optionaddControl("FixedText", fixedtextprops1)
 	rectangle = controlcontainer.getPosSize()  # コントロールコンテナのRectangle Structを取得。px単位。
@@ -81,7 +80,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	if centerday is None:
 		centerday = date.today()
 		col0[todayindex-1:todayindex+2] = "昨日", "今日", "明日"  # 列インデックス0に入れる文字列を取得。
-	addDays(gridcontrol1, dateformat, centerday, col0)  # グリッドコントロールに行を入れる。	
+	addDays(gridcontrol1, centerday, col0)  # グリッドコントロールに行を入れる。	
 	dialogstate = dialogcommons.getSavedData(doc, "dialogstate_{}".format(dialogtitle))  # 保存データを取得。optioncontrolcontainerの表示状態は常にFalseなので保存されていない。
 	if dialogstate is not None:  # 保存してあるダイアログの状態がある時。
 		for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
@@ -92,7 +91,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 					gridpopupmenu.checkItem(menuid, closecheck)	
 	args = doc, mouselistener, controlcontainer
 	dialogframe.addCloseListener(CloseListener(args))  # CloseListener。ノンモダルダイアログのリスナー削除用。		
-def addDays(gridcontrol, dateformat, centerday, col0, daycount=7):
+def addDays(gridcontrol, centerday, col0, daycount=7):
 	todayindex = 7//2  # 今日の日付の位置を決定。切り下げ。
 	startday = centerday - timedelta(days=1)*todayindex  # 開始dateを取得。
 	dategene = (startday+timedelta(days=i) for i in range(daycount))  # daycount分のdateオブジェクトのジェネレーターを取得。
@@ -126,28 +125,24 @@ class TextListener(unohelper.Base, XTextListener):
 		self.val = 0  # 変更前の値。
 	def textChanged(self, textevent):
 		numericfield = textevent.Source
-		dateformat, gridcontrol = self.args
+		gridcontrol, = self.args
 		todayindex = 7//2  # 本日と同じインデックスを取得。
 		datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, todayindex)  # 中央行の日付文字列を取得。
-		try:
-			centerday = datetime.strptime(datetxt, dateformat).date()  # 現在の最初のdateオブジェクトを取得。
-		except:
-			centerday = None
-		if centerday:
-			val = numericfield.getValue()  # 数値フィールドの値を取得。		
-			diff = val - self.val  # 前値との差を取得。
-			centerday += timedelta(days=7*diff)  # 週を移動。
-			col0 = [""]*7
-			if val==0:
-				if centerday==date.today():
-					col0[todayindex-1:todayindex+2] = "昨日", "今日", "明日"  # 列インデックス0に入れる文字列を取得。
-				else:	
-					col0[todayindex] = "基準日"
-			else:
-				txt = "{}週後" if val>0 else "{}週前" 
-				col0[todayindex] = txt.format(int(abs(val)))  # valはfloatなので小数点が入ってくる。		
-			addDays(gridcontrol, dateformat, centerday, col0)  # グリッドコントロールに行を入れる。
-			self.val = val  # 変更後の値を前値として取得。
+		centerday = date(*map(int, datetxt.split("(")[0].split("/")))
+		val = numericfield.getValue()  # 数値フィールドの値を取得。		
+		diff = val - self.val  # 前値との差を取得。
+		centerday += timedelta(days=7*diff)  # 週を移動。
+		col0 = [""]*7
+		if val==0:
+			if centerday==date.today():
+				col0[todayindex-1:todayindex+2] = "昨日", "今日", "明日"  # 列インデックス0に入れる文字列を取得。
+			else:	
+				col0[todayindex] = "基準日"
+		else:
+			txt = "{}週後" if val>0 else "{}週前" 
+			col0[todayindex] = txt.format(int(abs(val)))  # valはfloatなので小数点が入ってくる。		
+		addDays(gridcontrol, centerday, col0)  # グリッドコントロールに行を入れる。
+		self.val = val  # 変更後の値を前値として取得。
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
@@ -156,7 +151,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		self.gridpopupmenu = gridpopupmenu  # CloseListenerでも使用する。
 		self.dialogframe = None
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
-		xscriptcontext, dateformat, formatstring, outputcolumn, callback = self.args
+		xscriptcontext, formatstring, outputcolumn, callback = self.args
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		if mouseevent.Buttons==MouseButton.LEFT:
 			if mouseevent.ClickCount==2:  # ダブルクリックの時。
@@ -166,24 +161,19 @@ class MouseListener(unohelper.Base, XMouseListener):
 					rowindexes = dialogcommons.getSelectedRowIndexes(gridcontrol)  # グリッドコントロールの選択行インデックスを返す。昇順で返す。負数のインデックスがある時は要素をクリアする。
 					if rowindexes:
 						datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, rowindexes[0])  # 選択行の日付文字列を取得。
-						try:
-							selectedday = datetime.strptime(datetxt, dateformat)  # 現在の最初のdatetimeオブジェクトを取得。	
-						except:
-							selectedday = None
-						if selectedday:	
-							if outputcolumn is not None:  # 出力する列が指定されている時。
-								sheet = selection.getSpreadsheet()
-								selection = sheet[selection.getCellAddress().Row, outputcolumn]  # 同じ行の指定された列のセルを取得。						
-							selection.setFormula(selectedday.isoformat())  # セルに式として代入。
-							if formatstring is not None:  # 書式が与えられている時。
-								numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
-								locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。
-								formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
-								if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
-									formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。
-								selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 											
-							if callback is not None:  # コールバック関数が与えられている時。
-								callback(mouseevent, xscriptcontext)
+						if outputcolumn is not None:  # 出力する列が指定されている時。
+							sheet = selection.getSpreadsheet()
+							selection = sheet[selection.getCellAddress().Row, outputcolumn]  # 同じ行の指定された列のセルを取得。						
+						if formatstring is not None:  # 書式が与えられている時。
+							numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
+							localestruct = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。
+							formatkey = numberformats.queryKey(formatstring, localestruct, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
+							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
+								formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。
+							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
+						selection.setFormula(datetxt.split("(")[0].replace("/", "-"))  # 2018/8/7の書式で式としてセルに代入。
+						if callback is not None:  # コールバック関数が与えられている時。
+							callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):

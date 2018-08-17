@@ -84,7 +84,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
 		keikavars = keika.VARS
-		daterow = keikavars.daterow
+		dayrow = keikavars.dayrow
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
@@ -96,8 +96,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					if not sheetname in sheets:  # 経過シートがない時は次のループに行く。
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
-					startdatevalue = int(keikasheet[daterow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
-					keikadatarows = keikasheet[daterow+1:daterow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
+					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
+					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
 					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
 					for i in commons.GAZOs:  # 読影のない画像。
@@ -255,10 +255,10 @@ def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, da
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-	locale = Locale(Language = "ja", Country = "JP")
-	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), locale)  # 変換モジュールをロード。	
+	localestruct = Locale(Language = "ja", Country = "JP")
+	transliteration.loadModuleNew((HIRAGANA_KATAKANA,), localestruct)  # 変換モジュールをロード。	
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # ひらがなをカタカナに変換		
-	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), locale)
+	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), localestruct)
 	kanatxt = transliteration.transliterate(kanatxt, 0, len(kanatxt), [])[0]  # 半角に変換
 	r = enhancedmouseevent.Target.getCellAddress().Row				
 	cellstringaddress = sheet[r, VARS.datecolumn].getPropertyValue("AbsoluteName").split(".")[-1].replace("$", "")  # 入院日セルの文字列アドレスを取得。
@@ -338,8 +338,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
 			cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
 		if nonkanacells:
-			cells = " ".join(i.getPropertyValue("AbsoluteName").split(".")[1].replace("$", "") for i in nonkanacells)
-			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。\n{}".format(cells)
+			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
 			componentwindow = doc.getCurrentController().ComponentWindow		
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 			msgbox.execute()		

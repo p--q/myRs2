@@ -14,6 +14,8 @@ from com.sun.star.view.SelectionType import MULTI  # enum
 from com.sun.star.lang import Locale  # Struct
 DATAROWS = []  # グリッドコントロールのデータ行、タプルのタプルやリストのタプルやリストのリスト、の可能性がある。複数クラスからアクセスするのでグローバルにしないといけない。
 def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
+	global DATAROWS
+	DATAROWS = []  # マクロの起動中グローバル変数は保持されるので毎回リセットしないといけない。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
@@ -55,7 +57,6 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 		datarows = [i if isinstance(i, (list, tuple)) else (i,) for i in defaultrows]  # defaultrowsの要素をリストかタプルでなければタプルに変換する。
 	if datarows:  # 行のリストが取得出来た時。
 		griddatamodel.addRows(("",)*len(datarows), datarows)  # グリッドに行を追加。
-		global DATAROWS
 		DATAROWS = datarows  # グリッドのデータをDATAROWSに反映。
 	textlistener = TextListener(xscriptcontext)	
 	addControl("Edit", textboxprops, {"addTextListener": textlistener})  

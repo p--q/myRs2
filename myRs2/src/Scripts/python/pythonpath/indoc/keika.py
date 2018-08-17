@@ -111,7 +111,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 	elif txt=="ｶﾙﾃへ":  # カルテシートをアクティブにする、なければ作成する。
 		datarow = sheet[1, VARS.yakucolumn:VARS.splittedcolumn+1].getDataArray()[0]  # IDセルから最初の日付セルまで取得。
-		idcelltxts = datarow[0].split(" ")  # 半角スペースで分割。
+		idcelltxts = datarow[0].replace("　", " ").split(" ")  # 半角スペースで分割。
 		idtxt = idcelltxts[0]  # 最初の要素を取得。
 		if idtxt.isdigit():  # IDが数値のみの時。					
 			if idtxt in sheets:  # ID名のシートがあるとき。
@@ -120,7 +120,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 				if len(idcelltxts)==5:  # ID、漢字姓・名、カタカナ姓・名、の5つに分割できていた時。
 					kanjitxt, kanatxt = " ".join(idcelltxts[1:3]), " ".join(idcelltxts[3:])
 					datevalue = datarow[-1]
-					karutesheet = commons.getKaruteSheet(commons.formatkeyCreator(doc), sheets, idtxt, kanjitxt, kanatxt, datevalue)
+					karutesheet = commons.getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)
 					controller.setActiveSheet(karutesheet)  # カルテシートをアクティブにする。
 				else:
 					commons.showErrorMessageBox(controller, "「ID(数値のみ) 漢字姓 名 カナ姓 名」の形式になっていません。")
@@ -262,9 +262,9 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	celladdress = selection.getCellAddress()
 	c = celladdress.Column  # selectionの列のインデックスを取得。		
 	sheet = VARS.sheet
+	defaultrows = None
 	if c<VARS.yakucolumn:
 		headertxt = sheet[1, c].getString()
-		defaultrows = None
 		if headertxt=="検査値":
 			defaultrows = "APTT 目標1.5倍:検査値",\
 				"PT-INR 目標2.0-2.5:検査値",\
@@ -730,7 +730,7 @@ def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # s
 	holidaycolumns.difference_update(sunindexes)  # 祝日インデックスから日曜日インデックスを除く。
 	n = 5  # 土曜日の曜日番号。
 	satindexes = set(range(c+(n-startweekday)%7, endcolumn, 7))  # 土曜日の列インデックスの集合。
-	setRangesProperty = createSetRangesProperty(doc, r)
+	setRangesProperty = createSetRangesProperty(doc, sheet, r)
 	setRangesProperty(holidaycolumns, ("CellBackColor", colors["red3"]))
 	setRangesProperty(offdaycolumns, ("CellBackColor", colors["silver"]))
 	setRangesProperty(sunindexes, ("CharColor", colors["red3"]))
@@ -807,12 +807,13 @@ def getOffdays(doc):  # 予定シートの休日を取得。
 				else:  # 文字列の時。
 					offweekdays.extend(weekdays.index(i) for i in d.replace("曜日", ""))  # 曜日は曜日番号で取得する。金土などの書き方も処理する。
 	return offdays, offweekdays
-def createSetRangesProperty(doc, r): 
+def createSetRangesProperty(doc, sheet, r): 
 	def setRangesProperty(columnindexes, prop):  # r行のcolumnindexesの列のプロパティを変更。prop: プロパティ名とその値のリスト。
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-		cellranges.addRangeAddresses((VARS.sheet[r, i].getRangeAddress() for i in columnindexes), False)  # セル範囲コレクションを取得。
-		if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-			cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
+		if columnindexes:  
+			cellranges.addRangeAddresses([sheet[r, i].getRangeAddress() for i in columnindexes], False)  # セル範囲コレクションを取得。columnindexesが空要素だとエラーになる。
+			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
+				cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 	return setRangesProperty
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。

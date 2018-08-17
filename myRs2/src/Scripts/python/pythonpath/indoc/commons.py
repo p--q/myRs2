@@ -76,10 +76,10 @@ class TextTransferable(unohelper.Base, XTransferable):
 def formatkeyCreator(doc):  # ドキュメントを引数にする。
 	def createFormatKey(formatstring):  # formatstringの書式はLocalによって異なる。 
 		numberformats = doc.getNumberFormats()  # ドキュメントのフォーマット一覧を取得。デフォルトのフォーマット一覧はCalcの書式→セル→数値でみれる。
-		locale = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。。 
-		formatkey = numberformats.queryKey(formatstring, locale, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
+		localestruct = Locale(Language="ja", Country="JP")  # フォーマット一覧をくくる言語と国を設定。インストールしていないUIの言語でもよい。。 
+		formatkey = numberformats.queryKey(formatstring, localestruct, True)  # formatstringが既存のフォーマット一覧にあるか調べて取得。第3引数のブーリアンは意味はないはず。 
 		if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
-			formatkey = numberformats.addNew(formatstring, locale)  # フォーマット一覧に追加する。保存はドキュメントごと。 
+			formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。 
 		return formatkey
 	return createFormatKey
 def createBorders():# 枠線の作成。
@@ -126,8 +126,8 @@ def getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue):
 		sheets.copyByName("00000000経", newsheetname, len(sheets))  # テンプレートシートをコピーしてID経名のシートにして最後に挿入。	
 		keikasheet = sheets[newsheetname]  # 新規経過シートを取得。
 		keikavars = keika.VARS
-		keikasheet[keikavars.daterow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。					
-		keika.setDates(xscriptcontext, doc, keikasheet, keikasheet[keikavars.daterow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
+		keikasheet[keikavars.dayrow, keikavars.yakucolumn].setString(" ".join((idtxt, kanjitxt, kanatxt)))  # ID漢字名ｶﾅ名を入力。			
+		keika.setDates(xscriptcontext, doc, keikasheet, keikasheet[keikavars.dayrow, keikavars.splittedcolumn], datevalue)  # 経過シートの日付を設定。
 	return keikasheet	
 def toNewEntry(sheet, rangeaddress, edgerow, dest_row):  # 使用中最下行へ。新規行挿入は不要。
 	startrow, endrowbelow = rangeaddress.StartRow, rangeaddress.EndRow+1  # 選択範囲の開始行と終了行の取得。

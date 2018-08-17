@@ -13,7 +13,7 @@ def main():
 	source_path = os.path.join(os.getcwd(), "src", "Scripts", "python")  # コピー元フォルダのパスを取得。	
 	source_fileurl = unohelper.systemPathToFileUrl(source_path)  # fileurlに変換。	
 	if not simplefileaccess.exists(source_fileurl):  # ソースにするフォルダがないときは終了する。
-		print("The source macro folder does not exist.")	
+		print("fileurl: {}\nThe source macro folder does not exist.".format(source_fileurl))	
 		return	
 	ods = glob.glob("*.ods")[0]  # odsファイルを取得。最初の一つのみ取得。
 	systempath = os.path.join(os.getcwd(), ods)  # odsファイルのフルパス。
