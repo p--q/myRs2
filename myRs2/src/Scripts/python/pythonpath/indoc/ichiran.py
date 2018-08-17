@@ -372,10 +372,12 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
 	startrow, startcolumn = rangeaddress.StartRow, rangeaddress.StartColumn  # 選択範囲の左上セルだけで判断する。
 	if startrow<VARS.splittedrow:  # 固定行より上の時。
-		if contextmenuname=="cell" and\
-		 selection.supportsService("com.sun.star.sheet.SheetCell") and\
-		 selection.getString()=="ｶﾅ名":  # 分割行より上、かつ、セルを右クリック、かつ、単一セル、かつ、ｶﾅ名、のセルの時。
-			addMenuentry("ActionTrigger", {"Text": "ﾌﾘｶﾞﾅ辞書設定", "CommandURL": baseurl.format("entry12")}) 
+		if contextmenuname=="cell" and selection.supportsService("com.sun.star.sheet.SheetCell"):
+			txt = selection.getString()  # 分割行より上、かつ、セルを右クリック、かつ、単一セル
+			if txt=="ｶﾅ名":  # ｶﾅ名、のセルの時。
+				addMenuentry("ActionTrigger", {"Text": "ﾌﾘｶﾞﾅ辞書設定", "CommandURL": baseurl.format("entry12")}) 
+			elif txt=="読影":
+				addMenuentry("ActionTrigger", {"Text": "済をすべて消去", "CommandURL": baseurl.format("entry14")}) 	
 			return EXECUTE_MODIFIED
 	elif startrow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # タイトル行の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
@@ -532,6 +534,19 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		pass
 	elif entrynum==13:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+	elif entrynum==14:  # その列の済をすべて消去。
+		splittedrow = VARS.splittedrow
+		c = selection.getCellAddress().Column  # 選択セルの列インデックスを取得。
+		datarange = sheet[splittedrow:VARS.emptyrow, c]
+		searchdescriptor = sheet.createSearchDescriptor()
+		searchdescriptor.setSearchString("済")  # 戻り値はない。	
+		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+		if cellranges:		
+			datarows = list(datarange.getDataArray())  # タプルのリストでデータ行を取得。行ごと入れ替える。
+			for i in cellranges.getCells():
+				j = i.getCellAddress().Row - splittedrow  # 済が入っているインデックスを取得。
+				datarows[j] = ("",)  # 行ごと入れ替える。
+			datarange.setDataArray(datarows)  # シートに戻す。
 def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
