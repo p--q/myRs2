@@ -54,7 +54,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。
 	copieddatetxt = copieddatecell.getString()  # コピー日時セルの文字列を取得。
 	try:
-		copieddatetime = datetime.strptime(copieddatetxt, VARS.dateformat)  # コピーした日時を取得。
+		copieddatetime = datetime.strptime(copieddatetxt, VARS.dateformat)  # コピーした日時を取得。曜日の文字列が含まれるととOSによってValueErrorになる。
 	except:
 		copieddatetime = None
 	if copieddatetxt:
@@ -67,34 +67,35 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	try:
-		articledate = datetime.strptime(articledatetxt, "****%Y年%m月%d日(%a)****")  # 記事列の日付を取得。strptime()は0埋めは関係ない。
+		articledate = datetime.strptime(articledatetxt.split("(")[0], "****%Y年%m月%d日")  # 記事列の日付を取得。strptime()は0埋めは関係ないが曜日文字列はOS依存なので曜日は削除する。
 	except:
 		articledate = None
-	if articledate:
-		todaydate = date.today()  # 今日のdateオブジェクトを取得。
-		if articledate!=todaydate:  # 今日の日付でない時。
-			todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
-			datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
-			txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
-			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-			if txt:  # 記事の文字列があるときのみ。
-				newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
-				stringlength = VARS.stringlength  # 1セルあたりの文字数。
-				newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
-				dest_start_ridx = VARS.redrow + 1  # 移動先の開始行インデックス。
-				dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
-				dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, VARS.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
-				sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
-				sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
-				dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
-				dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
-				cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
-				todayarticle.clearContents(511)  # 本日の記事欄をクリア。
-			weekdays = "月", "火", "水", "木", "金", "土", "日"
-			datetxt = "****{}年{}月{}日({})****".format(todaydate.year, todaydate.month, todaydate.day, weekdays[todaydate.weekday()])  # 今日の日付を本日の記事欄に入力。
-			daterange.setString(datetxt)
-			cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.subjectcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、Subject列、記事列のセル範囲コレクションを取得。
-			cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
+	todaydate = date.today()  # 今日のdateオブジェクトを取得。
+	weekdays = "月", "火", "水", "木", "金", "土", "日"
+	articledatetxt = "****{}年{}月{}日({})****".format(todaydate.year, todaydate.month, todaydate.day, weekdays[todaydate.weekday()])
+	if not articledate:  # 日付が取得出来なかった時。
+		daterange.setString(articledatetxt)  # 今日の日付を本日の記事欄に入力。	
+		articledate = todaydate
+	if articledate!=todaydate:  # 今日の日付でない時。
+		todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
+		datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
+		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		if txt:  # 記事の文字列があるときのみ。
+			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
+			stringlength = VARS.stringlength  # 1セルあたりの文字数。
+			newdatarows.extend((txt[i:i+stringlength],) for i in range(0, len(txt), stringlength))  # 過去記事欄へ代入するデータ。
+			dest_start_ridx = VARS.redrow + 1  # 移動先の開始行インデックス。
+			dest_endbelow_ridx = dest_start_ridx + len(newdatarows)  # 移動先の最終行の下行の行インデックス。
+			dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, VARS.articlecolumn].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
+			sheet.insertCells(dest_rangeaddress, insert_rows)  # 赤行の下に空行を挿入。	
+			sheet[dest_start_ridx:dest_endbelow_ridx, :].clearContents(511)  # 挿入した行の内容をすべて削除。挿入セルは挿入した行の上のプロパティを引き継いでいるのでリセットしないといけない。
+			dest_range = sheet.queryIntersection(dest_rangeaddress)[0]  # 赤行の下の挿入行のセル範囲を取得。セル挿入後はアドレスから取得し直さないといけない。
+			dest_range.setDataArray(newdatarows)  # 過去の記事に挿入する。
+			cellranges.addRangeAddress(dest_range.getRangeAddress(), False)  # あとでプロパティを設定するセル範囲コレクションに追加する。
+			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
+		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.problemcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、プロブレム列、記事列のセル範囲コレクションを取得。
+		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
@@ -143,14 +144,14 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		c = formatArticleColumn(sheet[VARS.bluerow+1:VARS.skybluerow, VARS.sharpcolumn:VARS.articlecolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
 		datarows = sheet[VARS.bluerow:VARS.skybluerow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		copydatarows = [(datarows[0][4],)]  # 本日の記事の日付を取得。
-		deletedrowcount = getCopyDataRows(copydatarows, datarows[1:], VARS.bluerow+1)  # 削除された行数。
+		deletedrowcount = getCopyDataRows(copydatarows, datarows[1:], VARS.bluerow+1)  # クリップボードに取得する行の取得と空行の削除。削除された行数を返す。
 		if deletedrowcount>0:  # 削除した行があるとき。
 			startrow = VARS.skybluerow - deletedrowcount
 			newrangeaddress = sheet[startrow:startrow+deletedrowcount, :].getRangeAddress()  # 挿入するセル範囲アドレスを取得。
 			sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
 			sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。セル範囲アドレスから取得しないと行挿入後のセル範囲が異なってしまう。
 		newdatarows = formatProblemList(VARS.splittedrow, VARS.bluerow, "****ｻﾏﾘ****")  # プロブレム欄を整形。
-		for i in (VARS.problemcolumn, VARS.articlecolumn):  # Subject列と記事列について。
+		for i in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列と記事列について。
 			newrange = sheet[VARS.splittedrow:, i]
 			newrange.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。
 			newrange.getRows().setPropertyValue("OptimalHeight", True)  # 内容を折り返した後の行の高さを調整。
@@ -159,7 +160,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		cellranges.setPropertyValue("VertJustify", CellVertJustify2.CENTER)  # 縦位置を中央にする。
 		newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
-		copyCells(controller, copieddatecell, newdatarows)
+		copyCells(newdatarows)
 		now = datetime.now()
 		datetxt = "{}/{}/{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
 		copieddatecell.setString(datetxt)
@@ -168,7 +169,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		dummy, dummy, formatProblemList, copyCells = createCopyFuncs(xscriptcontext)
 		newdatarows = formatProblemList(VARS.splittedrow, VARS.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
-		copyCells(controller, copieddatecell, newdatarows)
+		copyCells(newdatarows)
 		selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
 	elif txt=="#分離":
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -357,19 +358,17 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 			return txt	
 	def getCopyDataRows(copydatarows, datarows, startrow):  # コピー用シートにコピーする行のリストを取得。
 		sheet = VARS.sheet
-		deletedrowcount = 0  # 空行の数。
-		ranges = []  # 空行のセル範囲のリスト。
+		rowindexes = []  # 空行の行インデックスのリスト。
 		for i, datarow in enumerate(datarows):
 			rowtxt = _getRowTxt(datarow)  # #列、日付列、Subject列、記事列を結合した文字列を取得。
 			if rowtxt:  # 空行でない時。
-				copydatarows.append((rowtxt,))  # ｺﾋﾟｰ用シートにコピーする行のリストに取得。
+				copydatarows.append((rowtxt,))  # クリップボードに取得する行のリストに取得。
 			else:  # 空行の時。
-				ranges.append(sheet[startrow+i, :])  # 削除行のセル範囲を取得。アドレスで取得するときは下から削除する必要がある。
-				deletedrowcount += 1	
-		cellranges = xscriptcontext.getDocument().createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], True)  # セル範囲を結合する。
-		[sheet.removeRange(i.getRangeAddress(), delete_rows) for i in cellranges]  # cellrangesにあるセル範囲の行を削除する。 		
-		return deletedrowcount  # 削除した空行数を返す。
+				rowindexes.append(startrow+i)  # 空行の行インデックスを取得。
+		if rowindexes:  # 空行がある時。
+			for i in rowindexes[::-1]:  # 後ろから行を取得。後ろからでないとすべて削除できない。
+				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)
+		return len(rowindexes)  # 削除した空行数を返す。
 	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。
 		c = 0  # 合計追加行数。	
 		datarangestartrow = datarange.getRangeAddress().StartRow  # datarangeの開始行インデックスを取得。
@@ -387,14 +386,17 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 			if articletxt:  # 文字列が取得出来た時。
 				newdatarows = [(articletxt[i:i+stringlength],) for i in range(0, len(articletxt), stringlength)]  # 文字列をセルあたりの文字数で分割。
 				diff = len(newdatarows) - len(articletxts)  # 追加行数を取得。
-				diff = 0 if diff<0 else diff  # 負の数の時は0にする。
-				c += diff  # 合計追加行数に追加。
-				endrowbelow = cellrange.getRangeAddress().EndRow + 1  # #ごとの終了行下の行インデックス。
 				if diff>0:  # 追加行がある時。
+					endrowbelow = cellrange.getRangeAddress().EndRow + 1  # #ごとの終了行下の行インデックス。
 					newrangeaddress = sheet[endrowbelow:endrowbelow+diff, :].getRangeAddress()  # 追加する行のセル範囲アドレス。
 					sheet.insertCells(newrangeaddress, insert_rows)  # 空行をプロブレムごとに挿入。	
-					sheet.queryIntersection(newrangeaddress).clearContents(511)  # セル範囲アドレスでは行がずれるので不可。
-				newarticlerows.extend(newdatarows)	# 新しい記事列に行を追加。	
+					sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。セル範囲アドレスでは行がずれるので不可。
+					c += diff  # 合計追加行数に追加。
+				elif diff<0:  # 行数が減る時。
+					newdatarows.extend([("",)]*-diff)  # 減った分の空行を追加。	
+			else:
+				newdatarows = [("",)]*len(articletxts)  # 文字列が取得できなかった時は空行を追加。
+			newarticlerows.extend(newdatarows)	# 新しい記事列に行を追加。	
 		if newarticlerows:  # 新しい行があるとき。空行だけのときはエラーになるので。
 			newrange = sheet[datarangestartrow:datarangestartrow+len(newarticlerows), VARS.articlecolumn]  # 記事列のセル範囲を取得。
 			newrange.clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
@@ -406,23 +408,10 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 		newdatarows = [(title,)]  # タイトルを取得。	
 		getCopyDataRows(newdatarows, datarows, startrow)  # プロブレム欄の記事列を整形。
 		return newdatarows
-	def copyCells(controller, copieddatecell, newdatarows):
-		sheetname = "ｺﾋﾟｰ用"
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
-		sheets = doc.getSheets()  # シートコレクションを取得。	
-		if not sheetname in sheets:  # コピー用シートがない時。
-			sheets.insertNewByName(sheetname, len(sheets))  # コピー用シートを挿入。
-		copysheet = xscriptcontext.getDocument().getSheets()[sheetname]  # コピー用シートを取得。
-		copysheet.clearContents(511)  # シート内容をクリア。
-		pasterange = copysheet[:len(newdatarows), :len(newdatarows[0])]  # コピー用シートのペーストするセル範囲を取得。。
-		pasterange.setDataArray(newdatarows)  # コピー用シートにペーストする。
-		pasterange.getColumns().setPropertyValue("Width", copieddatecell.getColumns().getPropertyValue("Width"))  # 単位は1/100mm
-		pasterange.setPropertyValue("IsTextWrapped", True)  # ペーストしたセルの内容を折り返す。	
-		pasterange.getRows().setPropertyValue("OptimalHeight", True)  # ペーストした行の高さを調整。
-		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
-		controller.select(pasterange)  # ペーストしたセル範囲を取得。シートが切り替わってしまう。
-		dispatcher.executeDispatch(controller.getFrame(), ".uno:Copy", "", 0, ())  # ペーストしたセルをコピー。
-		controller.setActiveSheet(VARS.sheet)  # カルテシートに戻る.
+	def copyCells(newdatarows):
+		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
+		txt = "\n".join(i[0] for i in newdatarows)
+		systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにコピーする。シートのコピーからだとペーストできないアプリがある。クリップボードが開けないと言われる。			
 	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source

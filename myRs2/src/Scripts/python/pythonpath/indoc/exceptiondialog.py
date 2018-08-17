@@ -3,21 +3,25 @@
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, platform, subprocess, traceback, unohelper
 from com.sun.star.awt import XMouseListener
-from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
-from com.sun.star.awt import Point  # Struct
+from com.sun.star.awt import Key, MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
+from com.sun.star.awt import KeyEvent, Point  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
 from com.sun.star.util import URL  # Struct
 from com.sun.star.util import MeasureUnit  # 定数
 from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 def createDialog(xscriptcontext):
+	docwindow = xscriptcontext.getDocument().getCurrentController().getFrame().getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
+	keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=docwindow)  # EscキーのKeyEventを取得。選択状態でエラーになるとそのままになるのでEscキーを押しておく。
+	toolkit = docwindow.getToolkit()  # ツールキットを取得。
+	toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
+	toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
 	traceback.print_exc()  # PyDevのコンソールにトレースバックを表示。stderrToServer=Trueが必須。
 	#  ダイアログに表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
 	lines = traceback.format_exc().split("\n")  # トレースバックを改行で分割。
 	h = 20  # FixedTextコントロールの高さ。ma単位。2行分。	
-	docwindow = xscriptcontext.getDocument().getCurrentController().getFrame().getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
 	dialogwidth = 380  # ウィンドウの幅。ma単位。
 	dialog, addControl = dialogCreator(xscriptcontext, {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "Title": lines[0], "Name": "exceptiondialog", "Moveable": True})  # Heightは後で設定し直す。
-	dialog.createPeer(docwindow.getToolkit(), docwindow)  # ダイアログを描画。親ウィンドウを渡す。
+	dialog.createPeer(toolkit, docwindow)  # ダイアログを描画。親ウィンドウを渡す。
 	mouselistener = MouseListener(xscriptcontext)
 	controlheight = 0  # コントロールの高さ。ma単位。
 	for i in lines[1:]:  # 2行目以降イテレート。
