@@ -72,9 +72,9 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		articledate = None
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
 	weekdays = "月", "火", "水", "木", "金", "土", "日"
-	articledatetxt = "****{}年{}月{}日({})****".format(todaydate.year, todaydate.month, todaydate.day, weekdays[todaydate.weekday()])
+	todaytxt = "****{}年{}月{}日({})****".format(todaydate.year, todaydate.month, todaydate.day, weekdays[todaydate.weekday()])
 	if not articledate:  # 日付が取得出来なかった時。
-		daterange.setString(articledatetxt)  # 今日の日付を本日の記事欄に入力。	
+		daterange.setString(todaytxt)  # 今日の日付を本日の記事欄に入力。	
 		articledate = todaydate
 	if articledate!=todaydate:  # 今日の日付でない時。
 		todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
@@ -99,6 +99,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			todayarticle.clearContents(511)  # 本日の記事欄をクリア。
 		cellranges.addRangeAddresses([todayarticle[:, i].getRangeAddress() for i in (VARS.datecolumn, VARS.problemcolumn, VARS.articlecolumn)], False)  # 本日の記事のDate列、プロブレム列、記事列のセル範囲コレクションを取得。
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
+		daterange.setString(todaytxt)  # 今日の日付を本日の記事欄に入力。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
@@ -190,7 +191,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 				if ":" in datatxt:  # コロンがある時。
 					ds, datatxt = datatxt.split(":", 1)  # 最初のコロンで分割。
 					datecell, subjectcell = handleDS(functionaccess, ds, datecell, subjectcell)
-				datarow = "", "#", datecell, "", subjectcell, "", datatxt
+				datarow = "", "#", datecell, subjectcell, "", datatxt
 			newdatarows.append(datarow)
 		datarange.setDataArray(newdatarows)
 		sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
@@ -198,6 +199,9 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		sheet[VARS.splittedrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
 		sheet[VARS.splittedrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
 	elif txt=="問題ﾘｽﾄへ変換":
+		
+		
+		
 		cellranges = sheet[VARS.redrow+1:, VARS.articlecolumn].queryContentCells(CellFlags.STRING)  # Article列の文字列が入っているセルに限定して抽出。
 		if len(cellranges):  # セル範囲が取得出来た時。
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。

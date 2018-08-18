@@ -11,7 +11,8 @@ from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIR
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
-from com.sun.star.table.CellHoriJustify import LEFT  # enum
+from com.sun.star.table.CellHoriJustify import LEFT, CENTER  # enum
+from com.sun.star.table import CellVertJustify2  # 定数
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Ichiran():  # シート固有の値。
@@ -48,6 +49,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		if i.getString().endswith("面談"):
 			if not sheet[i.getPosition().Row, VARS.idcolumn].getString() in yoteiids:  # 予定シートにないIDの時。
 				i.getParent().clearContents(CellFlags.ANNOTATION)
+	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))  # チェック列固定行より下、全て上下左右中央揃えにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
