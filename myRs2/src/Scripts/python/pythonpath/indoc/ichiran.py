@@ -80,8 +80,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
 		cellranges = sheet[VARS.splittedrow:, VARS.idcolumn].queryContentCells(CellFlags.STRING)  # ID列に文字列が入っているセルを取得。
 		headerrow = sheet[VARS.menurow, VARS.checkstartcolumn:VARS.memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
-		eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol\
-			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG")]  # headerrowタプルでのインデックスを取得。
+		eketsucol, dokueicol, ketuekicol, gazocol, shochicol, echocol, ecgcol, wardcol\
+			= [headerrow.index(i) for i in ("ｴ結", "読影", "血液", "画像", "処置", "ｴｺ", "ECG", "病棟")]  # headerrowタプルでのインデックスを取得。
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。	
 		keikavars = keika.VARS
 		dayrow = keikavars.dayrow
@@ -107,8 +107,9 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					for i in commons.GAZOd:  # 読影のある画像。
 						if i in s:
 							if not i in datarows[r][gazocol]:  # すでにない時のみ。
-								datarows[r][gazocol] += i											
-							datarows[r][dokueicol] = "○"
+								datarows[r][gazocol] += i			
+							if datarows[r][wardcol] not in ("療", "包"):					
+								datarows[r][dokueicol] = "読"
 					for i in commons.ECHOs:  # エコー。
 						if i in s:
 							if not i in datarows[r][echocol]:  # すでにない時のみ。
@@ -221,9 +222,9 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	c = selection.getCellAddress().Column  # selectionの行と列のインデックスを取得。		
 	dic = {\
-		"4F": ["", "待", "○", "包"],\
+		"病棟": ["", "待", "療", "包"],\
 		"ｴ結": ["", "ｴ", "済"],\
-		"読影": ["", "読", "済", "無"],\
+		"読影": ["", "未", "読", "済"],\
 		"退処": ["", "済", "△", "待"],\
 		"血液": ["", "尿", "○", "済"],\
 		"ECG": ["", "E", "済"],\
@@ -377,7 +378,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			if txt=="ｶﾅ名":  # ｶﾅ名、のセルの時。
 				addMenuentry("ActionTrigger", {"Text": "ﾌﾘｶﾞﾅ辞書設定", "CommandURL": baseurl.format("entry12")}) 
 			elif txt=="読影":
-				addMenuentry("ActionTrigger", {"Text": "済をすべて消去", "CommandURL": baseurl.format("entry14")}) 	
+				addMenuentry("ActionTrigger", {"Text": "済をリセット", "CommandURL": baseurl.format("entry14")}) 	
 			return EXECUTE_MODIFIED
 	elif startrow in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # タイトル行の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
@@ -530,23 +531,25 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		selection.clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
 		
-		
 		pass
+	
 	elif entrynum==13:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
-	elif entrynum==14:  # その列の済をすべて消去。
-		splittedrow = VARS.splittedrow
-		c = selection.getCellAddress().Column  # 選択セルの列インデックスを取得。
-		datarange = sheet[splittedrow:VARS.emptyrow, c]
+	elif entrynum==14:  # 読影列の済をリセット。読影列の済を消去し、4F列が○の時未にする。
+		headerrow = sheet[VARS.menurow, VARS.checkstartcolumn:VARS.memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
+		wardcol, = [headerrow.index(i) for i in ("病棟",)]  # headerrowタプルでのインデックスを取得。
 		searchdescriptor = sheet.createSearchDescriptor()
-		searchdescriptor.setSearchString("済")  # 戻り値はない。	
-		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
-		if cellranges:		
-			datarows = list(datarange.getDataArray())  # タプルのリストでデータ行を取得。行ごと入れ替える。
+		searchdescriptor.setSearchString("療")  # 戻り値はない。	
+		splittedrow = VARS.splittedrow
+		cellranges = sheet[splittedrow:VARS.emptyrow, VARS.checkstartcolumn+wardcol].findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+		if cellranges:  # 病棟列に寮が入っているセルがある時。
+			c = selection.getCellAddress().Column  # 選択セルの列インデックスを取得。
+			datarange = sheet[splittedrow:VARS.emptyrow, c]  
+			datarows = list(datarange.getDataArray())  # 選択列の行のタプルをリストにして取得。
 			for i in cellranges.getCells():
-				j = i.getCellAddress().Row - splittedrow  # 済が入っているインデックスを取得。
-				datarows[j] = ("",)  # 行ごと入れ替える。
-			datarange.setDataArray(datarows)  # シートに戻す。
+				j = i.getCellAddress().Row - splittedrow  # 病棟列に療が入っているインデックスを取得。				
+				datarows[j] = ("未",)  # 行ごと入れ替える。
+			datarange.setDataArray(datarows)  # シートに戻す。				
 def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):

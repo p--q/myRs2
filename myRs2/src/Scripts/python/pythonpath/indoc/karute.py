@@ -78,8 +78,11 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		articledate = todaydate
 	if articledate!=todaydate:  # 今日の日付でない時。
 		todayarticle = sheet[VARS.bluerow+1:VARS.skybluerow, :]  # 青行とスカイブルー行の間の行のセル範囲。
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
 		datarows = todayarticle[:, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 本日の記事欄のセルをすべて取得。
-		txt = "".join(map(str, chain.from_iterable(datarows)))  # 本日の記事欄を文字列にしてすべて結合。
+		txt = "".join(getRowTxt(functionaccess, i) for i in datarows)  # 1行の列を連結して文字列を返す。日付シリアル値を文字列に変換する。
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		if txt:  # 記事の文字列があるときのみ。
 			newdatarows = [(articledatetxt,)]  # 先頭行に日付を入れる。
@@ -337,6 +340,14 @@ def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newd
 	newdatarows.append(datarow)  # プロブレムの1行目を追加。
 	if len(articlecells)>1:  # 複数行ある時。
 		newdatarows.extend(("", "", "", "", "", i) for i in articlecells[1:])	 # 2行目以降について処理。
+		
+def getRowTxt(functionaccess, datarow):  # 1行の列を連結して文字列を返す。日付シリアル値を文字列に変換する。
+	sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[2], datarow[4]  # #列、日付列、Problem列、記事列を取得。
+	if datecol and isinstance(datecol, float):  # 日付列がfloat型のとき。
+		datecol = "{} ".format("/".join([str(int(functionaccess.callFunction(i, (datecol,)))) for i in ("YEAR", "MONTH", "DAY")]))  # シリアル値をシート関数で年/月/日の文字列にする。引数のdatecolはfloatのままでよい。
+	if subjectcol and subjectcol!="#":   # Subject列、かつ、#でないとき
+		subjectcol = "{}: ".format(subjectcol)	# コロンを連結する。
+	return "{}{}{}{}".format(sharpcol, datecol, subjectcol, articlecol)  # #列、Date列、Subject列、記事列を結合。		
 def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関数。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -344,13 +355,6 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
-	def _getRowTxt(datarow):  # 1行の列を連結して文字列を返す。
-		sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[2], datarow[4]  # #列、日付列、Subject列、記事列を取得。
-		if datecol and isinstance(datecol, float):  # 日付列がfloat型のとき。
-			datecol = "{} ".format("/".join([str(int(functionaccess.callFunction(i, (datecol,)))) for i in ("YEAR", "MONTH", "DAY")]))  # シリアル値をシート関数で年/月/日の文字列にする。引数のdatecolはfloatのままでよい。
-		if subjectcol and subjectcol!="#":   # Subject列、かつ、#でないとき
-			subjectcol = "{}: ".format(subjectcol)	# コロンを連結する。
-		return "{}{}{}{}".format(sharpcol, datecol, subjectcol, articlecol)  # #列、Date列、Subject列、記事列を結合。
 	def _fullwidth_halfwidth(txt):	# 全角を半角に変換する得。
 		if txt and isinstance(txt, str):  # 空文字でなくかつ文字列の時。
 			return transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
@@ -360,7 +364,7 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 		sheet = VARS.sheet
 		rowindexes = []  # 空行の行インデックスのリスト。
 		for i, datarow in enumerate(datarows):
-			rowtxt = _getRowTxt(datarow)  # #列、日付列、Subject列、記事列を結合した文字列を取得。
+			rowtxt = getRowTxt(functionaccess, datarow)  # #列、日付列、Problem列、記事列を結合した文字列を取得。
 			if rowtxt:  # 空行でない時。
 				copydatarows.append((rowtxt,))  # クリップボードに取得する行のリストに取得。
 			else:  # 空行の時。
