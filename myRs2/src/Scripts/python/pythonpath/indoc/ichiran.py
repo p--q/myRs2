@@ -184,7 +184,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 			doc.getCurrentController().setActiveSheet(sheets[idtxt])  # カルテシートをアクティブにする。
 		else:  # 在院日数列が空欄の時、または、カルテシートがない時。
 			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。	
-				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
+				kanjitxt, kanatxt = fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
 				karutesheet = commons.getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue)  # カルテシートを取得。
 				doc.getCurrentController().setActiveSheet(karutesheet)  # カルテシートをアクティブにする。	
 			else:
@@ -206,7 +206,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		else:
 			return True  # セル編集モードにする。		
 	elif c==VARS.datecolumn:  # 入院日列の時。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "入院日", "YYYY/MM/DD")		
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "入院日", "YYYY-MM-DD")		
 	elif c==VARS.hospdayscolumn:  
 		newsheetname = "".join([idtxt, "経"])  # 経過シート名を取得。
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
@@ -214,8 +214,8 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 		if hospdays and newsheetname in sheets:  # 経過列がすでにあり、かつ、経過シートがある時。
 			doc.getCurrentController().setActiveSheet(sheets[newsheetname])  # 経過シートをアクティブにする。
 		else:  # 経過シートがなければ作成する。
-			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。									
-				fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
+			if all((idtxt, kanjitxt, kanatxt, datevalue)):  # ID、漢字名、カナ名、入院日、すべてが揃っている時。								
+				kanjitxt, kanatxt = fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue)
 				keikasheet = commons.getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
@@ -253,7 +253,7 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 	color = commons.COLORS["silver"] if "済" in newtxt else -1
 	selection.setPropertyValue("CharColor", color)			
 	return False  # セル編集モードにしない。
-def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue):
+def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, datevalue):  # kanjitxtとkanatxtは半角にして返す。
 	sheet = VARS.sheet
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -269,8 +269,10 @@ def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, da
 	cell.setFormula("=TODAY()+1-{}".format(cellstringaddress))  #  在院日数列に式を代入。	
 	createFormatKey = commons.formatkeyCreator(xscriptcontext.getDocument())
 	cell.setPropertyValue("NumberFormat", createFormatKey('0" ";[RED]-0" "'))  # 在院日数列の書式を設定。 
-	datarow = "未", "", idtxt, kanjitxt.strip().replace("　", " "), kanatxt, datevalue  # 他の列を追加。								
+	kanjitxt = kanjitxt.strip().replace("　", " ")  # 前後のスペースを削除して、文字列間の全角スペースを半角スペースに変換する。
+	datarow = "未", "", idtxt, kanjitxt, kanatxt, datevalue  # 他の列を追加。								
 	sheet[r, :VARS.hospdayscolumn].setDataArray((datarow,))
+	return kanjitxt, kanatxt
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
@@ -328,7 +330,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 						flg = True
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in datecolumncells], False)
-		cellranges.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		cellranges.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 		if flg:
 			ranges = [sheet[titlerows[2]+1:, idcolumn:hospdayscolumn]]
 			if splittedrow<titlerows[0]:
@@ -488,7 +490,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				entvars = ent.VARS  # 退院シートの定数を取得。		
 				entvars.setSheet(entsheet)
 				entsheet[entvars.emptyrow, entvars.idcolumn:entvars.idcolumn+len(datarow)].setDataArray((datarow,))  # 退院シートにデータを代入。
-				entsheet[entvars.emptyrow, entvars.datecolumn:entvars.keikacolumn].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY/MM/DD'))  # 追加した行の日付書式を設定。
+				entsheet[entvars.emptyrow, entvars.datecolumn:entvars.keikacolumn].setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY-MM-DD'))  # 追加した行の日付書式を設定。
 				if entvars.splittedrow<entvars.emptyrow:
 					searchdescriptor = sheet.createSearchDescriptor()
 					searchdescriptor.setSearchString(idtxt)  # 戻り値はない。

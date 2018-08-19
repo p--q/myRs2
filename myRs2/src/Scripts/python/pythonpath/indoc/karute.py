@@ -1,8 +1,8 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+import re
 from datetime import date, datetime
-from itertools import chain
 from indoc import commons, datedialog, historydialog, staticdialog
 from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
@@ -27,7 +27,7 @@ class Karute():  # シート固有の定数設定。
 		self.replacedatecolumn = 8  # 日付前へ列インデックス。
 		self.splittedcolumn = 9  # 分割列インデックス。コントローラーから動的取得が正しく出来ない。
 		self.stringlength = 125  # 1セルあたりの文字数。
-		self.dateformat = "%Y/%m/%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
+		self.dateformat = "%Y-%m-%d %H:%M:%S Copied"  # 記事をコピーした日時の書式。
 	def setSheet(self, sheet): # 逐次変化する値。
 		self.sheet = sheet	
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
@@ -121,6 +121,10 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 	sheets = doc.getSheets()  # シートコレクションを取得。	
 	controller = doc.getCurrentController()
 	sheet = VARS.sheet
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+	getCopyDataRows, formatArticleColumn, formatProblemList, copyCells, fullwidth_halfwidth = createCopyFuncs(xscriptcontext, functionaccess)
 	if txt=="一覧へ":
 		controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
 	elif txt=="経過へ":
@@ -144,7 +148,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 			else:
 				commons.showErrorMessageBox(controller, "IDが取得できませんでした。")		
 	elif txt=="COPY":
-		getCopyDataRows, formatArticleColumn, formatProblemList, copyCells = createCopyFuncs(xscriptcontext)
+		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
+		copieddatecell.setPropertyValue("CellBackColor", -1)  # コピー日時セルの背景色をクリア。
 		c = formatArticleColumn(sheet[VARS.bluerow+1:VARS.skybluerow, VARS.sharpcolumn:VARS.articlecolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
 		datarows = sheet[VARS.bluerow:VARS.skybluerow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		copydatarows = [(datarows[0][4],)]  # 本日の記事の日付を取得。
@@ -163,93 +168,55 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in (sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.problemcolumn+1], sheet[VARS.bluerow+1:VARS.skybluerow, VARS.sharpcolumn:VARS.problemcolumn+1])], False)  # プロブレム欄、本日の記事欄をセル範囲を取得。
 		cellranges.setPropertyValue("VertJustify", CellVertJustify2.CENTER)  # 縦位置を中央にする。
 		newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
-		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
 		copyCells(newdatarows)
 		now = datetime.now()
-		datetxt = "{}/{}/{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
+		datetxt = "{}-{}-{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
 		copieddatecell.setString(datetxt)
 		copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 	elif txt=="退院ｻﾏﾘ":
-		dummy, dummy, formatProblemList, copyCells = createCopyFuncs(xscriptcontext)
 		newdatarows = formatProblemList(VARS.splittedrow, VARS.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
 		copyCells(newdatarows)
 		selection.setPropertyValue("CellBackColor", commons.COLORS["lime"])  # 退院ｻﾏﾘボタンの背景色を変更。
-	elif txt=="#分離":
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
-		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
+	elif txt=="#分離":  # 記事列のセルの内容を#、日付、プロブレムに分解してセルに代入し直す。
 		datarange = sheet[VARS.splittedrow:VARS.bluerow, :VARS.articlecolumn+1]
-		datarows = datarange.getDataArray()
-		newdatarows = []
-		for datarow in datarows:
-			datatxt = datarow[VARS.articlecolumn]  # Article列の文字列を取得。
-			if datatxt.startswith("#"):  # #がある時。
-				datecell, subjectcell = "", ""
-				if len(datatxt)>1:  # #以外の文字もある時。
-					datatxt = datatxt[1:]  # #を除く。
-				if ":" in datatxt:  # コロンがある時。
-					ds, datatxt = datatxt.split(":", 1)  # 最初のコロンで分割。
-					datecell, subjectcell = handleDS(functionaccess, ds, datecell, subjectcell)
-				datarow = "", "#", datecell, subjectcell, "", datatxt
-			newdatarows.append(datarow)
-		datarange.setDataArray(newdatarows)
-		sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
-		createFormatKey = commons.formatkeyCreator(doc)		
-		sheet[VARS.splittedrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-		sheet[VARS.splittedrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
+		datarows = datarange.getDataArray()  # 行のタプルをリストで取得。
+		separateDS(doc, functionaccess, fullwidth_halfwidth, datarows)
 	elif txt=="問題ﾘｽﾄへ変換":
-		
-		
-		
 		cellranges = sheet[VARS.redrow+1:, VARS.articlecolumn].queryContentCells(CellFlags.STRING)  # Article列の文字列が入っているセルに限定して抽出。
 		if len(cellranges):  # セル範囲が取得出来た時。
-			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-			functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。		
-			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-			transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
-			newdatarows = [] 
 			emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 最終行インデックス+1を取得。
-			datarange = sheet[VARS.redrow+1:emptyrow, VARS.articlecolumn]
-			datarows = datarange.getDataArray()
-			stringlength = VARS.stringlength  # 1セルあたりの文字数。
-			sharpcell, datecell, subjectcell, articletxts = "", "", "", []
-			for datatxt in map(str, chain.from_iterable(datarows)):
-				if datatxt:  # 空文字でない時。
-					datatxt = transliteration.transliterate(datatxt, 0, len(datatxt), [])[0]  # 半角に変換。
-					if datatxt.startswith("#"):  # #がある時。
-						if articletxts:  # すでに取得したArticle列の行がある時。
-							addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows)  # 新しいデータ行に追加する。	
-							sharpcell, datecell, subjectcell, articletxts = "", "", "", []	# 変数をリセットする。					
-						sharpcell = "#"	# #を取得。
-						if ":" in datatxt:  # コロンがある時。
-							ds, articletxt = datatxt[1:].split(":", 1)  # 最初のコロンで1回分割。
-							articletxt and articletxts.append(articletxt)  # コロンの後ろがある時articletxtsに追加。
-							datecell, subjectcell = handleDS(functionaccess, ds, datecell, subjectcell)
-						else:  # コロンがない時。		
-							articletxts.append(datatxt[1:])  # #を除いてArticle列の文字列のリストに取得。	
-					else:  # #がない時。
-						if not datatxt.startswith("****"):  # ****から始まっていない時。
-							articletxts.append(datatxt)  # Article列の文字列のリストに追加。
-			if articletxts:  # すでに取得したArticle列の行がある時。
-				addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows)  # 最後のプロブレムを処理。
+			datarange = sheet[VARS.redrow+1:emptyrow, :VARS.articlecolumn+1]  # 赤行より下の文字のセル範囲を取得。
+			datarows = datarange.getDataArray()  # ソース行を取得。次の行でシート上のデータはクリアする。			
+			datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。	
 			problemrange = sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1]
 			cellranges = problemrange.queryContentCells(CellFlags.STRING)
-			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow
-			endrowbelow = emptyrow + len(newdatarows)	
-			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
+			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow  # 青行おり上の範囲の最下行の下行を取得。
+			endrowbelow = emptyrow + len(datarows)  # 挿入後の最下行の下行インデックス。	
+			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # 空行を挿入。	
 			sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
-			sheet[emptyrow:endrowbelow, VARS.sharpcolumn:VARS.sharpcolumn+len(newdatarows[0])].setDataArray(newdatarows)
-			createFormatKey = commons.formatkeyCreator(doc)		
-			sheet[emptyrow:endrowbelow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (createFormatKey('YYYY/MM/DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-			datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。	
+			separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, emptyrow)
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 	return False  # セルを編集モードにしない。
+def separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, startrow=VARS.splittedrow):
+	newdatarows = []
+	handleDS = createHandleDS(functionaccess)
+	for datarow in datarows:
+		articletxt = datarow[VARS.articlecolumn].strip()
+		if articletxt:
+			articletxt = fullwidth_halfwidth(articletxt)  # Article列の文字列を半角にして取得。
+			if articletxt.startswith("#"):  # 記事列が#から始まっているセルの時。
+				datetxt, problemtxt, newarticletxt = handleDS(articletxt.lstrip("#"))
+				datarow = "", "#", datetxt, problemtxt, "", newarticletxt
+		if not articletxt.startswith("****"):
+			newdatarows.append(datarow)
+	sheet = VARS.sheet
+	sheet[startrow:startrow+len(newdatarows), :VARS.articlecolumn+1].setDataArray(newdatarows)
+	sheet[startrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
 def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える処理。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
@@ -266,15 +233,22 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			selection.setString("#")
 			selection.setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))
 	elif c==VARS.datecolumn:  # 日付列の時。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY/MM/DD")	
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-MM-DD")	
 	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
+		txt = selection.getString()
+		if not txt:
+			selection.setString("#")
+			return False
+		elif txt=="#":
+			selection.setString("")
+			return False
 		return True  # セル編集モードにする。
 	elif c==VARS.phrasecolumn:  # 定型句列インデックスの時。
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumn)
 		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
 		selection.setString("")  # 日付挿入列の文字列をクリア。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY/M/D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
 		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
 		sheet = VARS.sheet
@@ -327,16 +301,62 @@ def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列を
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
 	articlecell.setString("".join([articlecell.getString(), selection.getString()]))  # 新規日付を代入。
-def handleDS(functionaccess, ds, datecell, subjectcell):
-	if " " in ds:  # スペースがある時。
-		datetxt, subjectcell = ds.split(" ", 1)  # 最初のスペースで1回分割。
-	else:  # スペースがない時とりあえず日付として処理する。CellFlags.STRING+CellFlags.VALUE+CellFlags.DATETIME+CellFlags.FORMULA
-		datetxt = ds
-	if len(datetxt)>4 and datetxt[:4].isdigit():  # 最初の4文字がすべて数値の時。年月から始まっていると判断する。
-		datecell = int(functionaccess.callFunction("DATEVALUE", (datetxt.replace(datetxt[4], "/"),)))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
-	else:
-		subjectcell = ds  # スペースで分割した時の最初の要素が年月でない時はすべてSubject。
-	return datecell, subjectcell
+def createHandleDS(functionaccess):
+	rgpat = r"^((([HS][0-3]?|20\d)\d[\.\-\/][01]?\d[\.\-\/][0-3]?\d)|(([HS][0-3]?|20\d)\d[\.\-\/][01]?\d)|(([HS][0-3]?|20\d)\d))[^\.\d]"  # 日付を取得する正規表現パターン。数字とピリオド以外が続く時のみ取得。
+	rgx = re.compile(rgpat)	
+	seprgx = re.compile(r"[\.\-\/]")  # 日付区切り。
+	def _convertYear(y):
+		if y.startswith("H"):
+			return str(1988+int(y[1:]))  # 平成を西暦に変換して文字列で取得。
+		elif y.startswith("S"):
+			return str(1925+int(y[1:]))  # 昭和を西暦に変換して文字列で取得。
+		return y
+	def handleDS(articletxt):  # articletxtは#を除いた記事列。
+		"""処理できるパターン、問題か記事かは後ろにコロンがついているかで判別する。年月日の区切り文字は.か-か/。
+		記事
+		問題:
+		問題:記事
+		H28記事
+		H28問題:
+		H28問題:記事	
+		H28.8記事
+		H28.8問題:
+		H28.8問題:記事		
+		H28.8.10記事
+		H28.8.10問題:
+		H28.8.10問題:記事		
+		2018記事
+		2018問題:
+		2018問題:記事	
+		2018.8記事
+		2018.8問題:
+		2018.8問題:記事		
+		2018.8.10記事
+		2018.8.10問題:
+		2018.8.10問題:記事	
+		"""
+		datetxt, problemtxt, newarticletxt = "", "", ""
+		m = rgx.match(articletxt)  # 日付だけのときはNoneが返る。
+		ms = []
+		if m:  # 日付から始まっている時。
+			ms = m.groups()  # 0:いずれかの年月日パターン、1: 年月日、3: 年月、5: 年
+			if ms[1]:  # 年月日の時は日付シリアル値に変換する。
+				y, m, d = seprgx.split(ms[1])
+				datetxt = int(functionaccess.callFunction("DATEVALUE", ("-".join([_convertYear(y), m, d]),)))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。区切り文字は/.-のいずれもOK。
+			elif ms[3]:  # 年月の時。
+				y, m = seprgx.split(ms[3])
+				datetxt = "-".join([_convertYear(y), m])
+			elif ms[5]:  # 年の時。
+				datetxt = _convertYear(ms[5])
+			else:
+				datetxt = ms[0]	
+			articletxt = articletxt[len(ms[0]):]  # 日付を切除。
+		if ":" in articletxt:
+			problemtxt, newarticletxt = [i.strip() for i in articletxt.split(":", 1)]	
+		else:
+			newarticletxt = articletxt
+		return datetxt, problemtxt, newarticletxt
+	return handleDS
 def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newdatarows):
 	articletxt = "".join(articletxts).lstrip().replace("\n", "")  # 先頭の空白とセル内の改行文字も除去する。
 	articlecells = [articletxt[i:i+stringlength] for i in range(0, len(articletxt), stringlength)]  # 文字列を制限したArticle列のジェネレーター。
@@ -344,7 +364,6 @@ def addDataRow(stringlength, sharpcell, datecell, subjectcell, articletxts, newd
 	newdatarows.append(datarow)  # プロブレムの1行目を追加。
 	if len(articlecells)>1:  # 複数行ある時。
 		newdatarows.extend(("", "", "", "", "", i) for i in articlecells[1:])	 # 2行目以降について処理。
-		
 def getRowTxt(functionaccess, datarow):  # 1行の列を連結して文字列を返す。日付シリアル値を文字列に変換する。
 	sharpcol, datecol, subjectcol, articlecol = datarow[0], datarow[1], datarow[2], datarow[4]  # #列、日付列、Problem列、記事列を取得。
 	if datecol and isinstance(datecol, float):  # 日付列がfloat型のとき。
@@ -352,14 +371,13 @@ def getRowTxt(functionaccess, datarow):  # 1行の列を連結して文字列を
 	if subjectcol and subjectcol!="#":   # Subject列、かつ、#でないとき
 		subjectcol = "{}: ".format(subjectcol)	# コロンを連結する。
 	return "{}{}{}{}".format(sharpcol, datecol, subjectcol, articlecol)  # #列、Date列、Subject列、記事列を結合。		
-def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関数。
+def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関数を返す関数。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-	stringlength = VARS.stringlength  # 1セルあたりの文字数。
-	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
+	stringlength = VARS.stringlength  # 1セルあたりの文字数。		
 	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 	transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。
-	def _fullwidth_halfwidth(txt):	# 全角を半角に変換する得。
+	def fullwidth_halfwidth(txt):	# 全角を半角に変換する得。
 		if txt and isinstance(txt, str):  # 空文字でなくかつ文字列の時。
 			return transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
 		else:  # 空文字または文字列でないときはそのまま返す。
@@ -374,14 +392,23 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 			else:  # 空行の時。
 				rowindexes.append(startrow+i)  # 空行の行インデックスを取得。
 		if rowindexes:  # 空行がある時。
+			
+			
+			
+			
 			for i in rowindexes[::-1]:  # 後ろから行を取得。後ろからでないとすべて削除できない。
+				
+				
 				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)
+				
+				
+				
 		return len(rowindexes)  # 削除した空行数を返す。
 	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。
 		c = 0  # 合計追加行数。	
 		datarangestartrow = datarange.getRangeAddress().StartRow  # datarangeの開始行インデックスを取得。
 		datarows = datarange.getDataArray()  # datarangeの行のタプルを取得。
-		datarows = [[_fullwidth_halfwidth(j) for j in i] for i in datarows]  # 取得した行のタプルを半角にする。		
+		datarows = [[fullwidth_halfwidth(j) for j in i] for i in datarows]  # 取得した行のタプルを半角にする。		
 		datarange.setDataArray(datarows)  # datarangeに代入し直す。
 		articlecells = [str(i[4]) for i in datarows]  # 記事列の行を文字列にして1次元リストで取得。
 		newarticlerows = []  # 記事列代入するための行のリスト。
@@ -420,13 +447,13 @@ def createCopyFuncs(xscriptcontext):  # コピーのための関数を返す関�
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 		txt = "\r\n".join(i[0] for i in newdatarows)  # Windowsのために\rも付ける。
 		systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにコピーする。シートのコピーからだとペーストできないアプリがある。クリップボードが開けないと言われる。			
-	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells
+	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells, fullwidth_halfwidth
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	controller = eventobject.Source
 	selection = controller.getSelection()
-	sheet = controller.getActiveSheet()
-	VARS.setSheet(sheet)
-	drowBorders(xscriptcontext, selection)  # 枠線の作成。
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。
+		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
+		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -464,6 +491,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 	elif contextmenuname=="colheader":  # 列ヘッダーの時。
 		pass
 	elif contextmenuname=="sheettab":  # シートタブの時。
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Remove"})
+		addMenuentry("ActionTrigger", {"CommandURL": ".uno:RenameTable"})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Move"})
 	return EXECUTE_MODIFIED  # このContextMenuInterceptorでコンテクストメニューのカスタマイズを終わらす。
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	

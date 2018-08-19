@@ -114,7 +114,7 @@ def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
 		karutedatecell = karutesheet[karutevars.splittedrow, karutevars.datecolumn]
 		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
 		createFormatKey = formatkeyCreator(doc)
-		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY-MM-DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 		karutesheet[:karutevars.splittedrow, karutevars.articlecolumn].setDataArray((("",), (" ".join((idtxt, kanjitxt, kanatxt)),)))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
 def getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue):
