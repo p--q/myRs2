@@ -232,6 +232,8 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			selection.setString("#")
 			selection.setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))
 	elif c==VARS.datecolumn:  # 日付列の時。
+		if not selection.getValue():  # 文字列のときはセルの値が0.0で返る。
+			return True  # セル編集モードにする。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-MM-DD")	
 	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
 		txt = selection.getString()

@@ -72,7 +72,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	col0 = [""]*7  # 全てに空文字を挿入。
 	cellvalue = enhancedmouseevent.Target.getValue()  # セルの値を取得。
 	centerday = None
-	if cellvalue and isinstance(cellvalue, float):  # セルの値がfloat型のとき。datevalueと決めつける。
+	if cellvalue and isinstance(cellvalue, float):  # セルの値がfloat型のとき。datevalueと決めつける。文字列のときは0.0が返る。
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		if cellvalue!=functionaccess.callFunction("TODAY", ()):  # セルの数値が今日でない時。
 			centerday = date(*[int(functionaccess.callFunction(i, (cellvalue,))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年、月、日に変換してdateオブジェクトにする。
