@@ -1,4 +1,5 @@
 @echo off
+pushd %~dp0
 cd tools
 echo.
 echo Do not close the error dialog until finished.
