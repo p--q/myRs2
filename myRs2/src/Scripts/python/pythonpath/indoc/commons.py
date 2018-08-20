@@ -147,7 +147,12 @@ def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が�
 	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
 	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
 	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。		
-# 	
+def getClipboardtxt(systemclipboard):  # クリップボードの文字列を取得。取得出来なかった時はNoneを返す。引数はcom.sun.star.datatransfer.clipboard.SystemClipboardのインスタンス。
+	transferable = systemclipboard.getContents()
+	for dataflavor in transferable.getTransferDataFlavors():
+		if dataflavor.MimeType=="text/plain;charset=utf-16":
+			return transferable.getTransferData(dataflavor)					
+	return None
 # 	
 # 	
 # 	

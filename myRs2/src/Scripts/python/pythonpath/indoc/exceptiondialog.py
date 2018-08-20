@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-import os, platform, subprocess, traceback, unohelper, sys
+import os, platform, subprocess, traceback, unohelper
 from com.sun.star.awt import XMouseListener
 from com.sun.star.awt import Key, MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
 from com.sun.star.awt import KeyEvent, Point  # Struct
@@ -38,7 +38,6 @@ def createDialog(xscriptcontext):
 	dialog.setPosSize(0, 0, 0, controlrectangle.Y+controlrectangle.Height, PosSize.HEIGHT)  # 最後の行からダイアログの高さを再設定。
 	dialog.execute()
 	dialog.dispose()	
-	sys.exit()
 class MouseListener(unohelper.Base, XMouseListener):  # Editコントロールではうまく動かない。
 	def __init__(self, xscriptcontext):
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。

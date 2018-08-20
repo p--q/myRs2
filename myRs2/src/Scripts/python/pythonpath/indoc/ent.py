@@ -55,13 +55,8 @@ def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 		elif txt=="改行削除":
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
-			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-			transferable = systemclipboard.getContents()
-			clipboardtxt = ""
-			for dataflavor in transferable.getTransferDataFlavors():
-				if dataflavor.MimeType=="text/plain;charset=utf-16":
-					clipboardtxt = transferable.getTransferData(dataflavor)
-					break					
+			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
+			clipboardtxt = commons.getClipboardtxt(systemclipboard)
 			if clipboardtxt:
 				outputs = []
 				buffer = []
