@@ -349,36 +349,42 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
-		detectDuplicates(selection)  # 薬名の重複をチェック。
-def detectDuplicates(selection):  # 薬名の重複をチェック。	
+		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。
+def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェック。	
+	
+	
+	
+	
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行のインデックスを取得。		
-# 	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
-# 		if c>VARS.splittedcolumn-1:
-# 			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
-# 			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
-# 			count = datarows.count(datarow)
-# 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 			controller = doc.getCurrentController()  # コントローラの取得。
-# 			componentwindow = controller.ComponentWindow			
-# 			if count>1:  # 同じデータ行が複数ある時。
-# 				if count==2:  # 重複行が2個だけの時。
-# 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
-# 					if drow<r:  # 重複行が上の時。
-# 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-# 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
-# 						if msgbox.execute()==MessageBoxResults.YES:
-# 							sheet = VARS.sheet
-# 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-# 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-# 							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
-# 						return		
-# 					else:
-# 						msg = "重複行が選択行の下方にあります。"	
-# 				else:  # 重複行が3個以上ある時。
-# 					msg = "重複行が3行以上あります。"	
-# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 				msgbox.execute()		
+	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
+		if c>VARS.splittedcolumn-1:
+			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
+			count = datarows.count(datarow)
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			controller = doc.getCurrentController()  # コントローラの取得。
+			componentwindow = controller.ComponentWindow			
+			if count>1:  # 同じデータ行が複数ある時。
+				if count==2:  # 重複行が2個だけの時。
+					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
+					if drow<r:  # 重複行が上の時。
+						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
+						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+						if msgbox.execute()==MessageBoxResults.YES:
+							sheet = VARS.sheet
+							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
+							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
+							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
+						return		
+					else:
+						msg = "重複行が選択行の下方にあります。"	
+				else:  # 重複行が3個以上ある時。
+					msg = "重複行が3行以上あります。"	
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+				msgbox.execute()		
+				
+				
 				
 				
 						
