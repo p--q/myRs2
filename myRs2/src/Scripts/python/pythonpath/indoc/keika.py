@@ -48,11 +48,12 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			VARS.setSheet(selection.getSpreadsheet())
+			
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(selection)  # 枠線の作成。
 # 				detectDuplicates(enhancedmouseevent, xscriptcontext)  # 薬名の重複をチェック。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+				VARS.setSheet(selection.getSpreadsheet())
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r<VARS.splittedrow:  # 分割行より上、の時。
@@ -389,13 +390,13 @@ def callback_wClickBottomRight(mouseevent, xscriptcontext):
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
-		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
-		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
-				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
-			return  # すでに枠線が書いてあったら何もしない。
+# 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
+# 		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
+# 		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
+# 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
+# 			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
+# 		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
 		drowBorders(selection)  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
@@ -845,9 +846,15 @@ def createSetRangesProperty(doc, sheet, r):
 				cellranges.setPropertyValue(*prop)  # セル範囲コレクションのプロパティを変更。
 	return setRangesProperty
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
+	currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択範囲の枠線を取得。
+	if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
+		currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
+		return  # すでに枠線が書いてあったら何もしない。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
-	sheet = VARS.sheet
+# 	sheet = VARS.sheet
+	sheet = selection.getSpreadsheet()
+	
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。
@@ -857,6 +864,7 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 		else:  # 分割列含む右の時は縦線を引くだけ。
 			sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。				
 	else:  # 分割行以下の時。
+		VARS.setSheet(sheet)
 		if r==VARS.blackrow:  # 黒行の時。
 			return  # 線を消すだけ。
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
