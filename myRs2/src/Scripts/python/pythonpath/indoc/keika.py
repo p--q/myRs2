@@ -5,7 +5,7 @@ from itertools import chain
 from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
-from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
@@ -119,9 +119,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		clipboardtxt = commons.getClipboardtxt(systemclipboard)
 		if not clipboardtxt:  # クリップボードの文字列が取得出来なかった時。メッセージボックスを出して終わる。
 			msg = "クリップボードから文字列を取得できませんでした。"
-			componentwindow = doc.getCurrentController().ComponentWindow		
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()			
+			commons.showErrorMessageBox(controller, msg)
 			return False  # セル編集モードにしない。	
 		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。		
@@ -179,9 +177,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 						yoho = "起床時"					
 		if not newdatarows:	
 			msg = "薬品名に変換できませんでした。"
-			componentwindow = doc.getCurrentController().ComponentWindow		
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()			
+			commons.showErrorMessageBox(controller, msg)			
 			return False  # セル編集モードにしない。				
 		newdatarows.reverse()  # 行を昇順に戻す。
 		edgerow = VARS.emptyrow+len(newdatarows)		
@@ -516,7 +512,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
-	componentwindow = controller.ComponentWindow
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	VARS.setSheet(sheet)
 	selection = controller.getSelection()
@@ -540,6 +535,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection, "m")
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
+		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
 			rangeaddress = selection.getRangeAddress()
@@ -575,6 +571,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+		componentwindow = controller.ComponentWindow
 		keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
 		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
@@ -590,9 +587,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				startindex = i  # 選択セルを含む左の最初のインスリン開始セルの列インデックスを取得。
 				break
 		else:  # 開始セルが取得出来なかった時。
-			msg = "開始セルが取得できませんでした。"					
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()	
+			msg = "開始セルが取得できませんでした。"		
+			commons.showErrorMessageBox(controller, msg)
 			return
 		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
 		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
@@ -602,9 +598,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				break
 			j = i
 		if j==0:  # 開始時のインスリン量が取得出来なかった時。
-			msg = "開始時のインスリン量が取得できませんでした。"					
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()	
+			msg = "開始時のインスリン量が取得できませんでした。"		
+			commons.showErrorMessageBox(controller, msg)			
 			return
 		startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量。
 		dayu = sum([int(i)+e for i in startunits.split("-") if int(i)>0])  # インスリンの1日消費量を取得。	

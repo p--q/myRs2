@@ -6,7 +6,7 @@ from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # シート関数ではアルゴリズムが難しい。
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
-from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
@@ -488,8 +488,7 @@ def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcellda
 		cell.setString("")  # 面談列の文字列をクリア。
 	else:
 		msg = "IDが一覧に見つかりません。"	
-		componentwindow = doc.getCurrentController().ComponentWindow
-		componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)	
+		commons.showErrorMessageBox(doc.getCurrentController(), msg)
 def getCelldatetime(xscriptcontext, celladdress):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			

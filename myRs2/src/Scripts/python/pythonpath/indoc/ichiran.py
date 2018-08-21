@@ -5,7 +5,7 @@ import os, unohelper, glob
 from itertools import chain
 from indoc import commons, keika, ent, datedialog
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
-from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
@@ -353,9 +353,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 			cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
 		if nonkanacells:
 			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
-			componentwindow = doc.getCurrentController().ComponentWindow		
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()		
+			commons.showErrorMessageBox(doc.getCurrentController(), msg)	
 def refreshCounts():  # カウントを更新する。
 	sheet = VARS.sheet
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
@@ -587,8 +585,6 @@ def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 			return True
 		else:
 			msg = "シート「{}」が存在しません。".format(sheetname)	
-			componentwindow = controller.ComponentWindow
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()	
+			commons.showErrorMessageBox(controller, msg)	
 			return False
 	return detachSheet
