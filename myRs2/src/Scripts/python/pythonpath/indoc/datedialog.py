@@ -72,7 +72,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	col0 = [""]*7  # 全てに空文字を挿入。
 	cellvalue = enhancedmouseevent.Target.getValue()  # セルの値を取得。
 	centerday = None
-	if cellvalue and isinstance(cellvalue, float):  # セルの値がfloat型のとき。datevalueと決めつける。
+	if cellvalue and isinstance(cellvalue, float):  # セルの値がfloat型のとき。datevalueと決めつける。文字列のときは0.0が返る。
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		if cellvalue!=functionaccess.callFunction("TODAY", ()):  # セルの数値が今日でない時。
 			centerday = date(*[int(functionaccess.callFunction(i, (cellvalue,))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年、月、日に変換してdateオブジェクトにする。
@@ -96,7 +96,7 @@ def addDays(gridcontrol, centerday, col0, daycount=7):
 	startday = centerday - timedelta(days=1)*todayindex  # 開始dateを取得。
 	dategene = (startday+timedelta(days=i) for i in range(daycount))  # daycount分のdateオブジェクトのジェネレーターを取得。
 	weekdays = "月", "火", "水", "木", "金", "土", "日"
-	datarows = tuple(zip(col0, ("{}/{}/{}({})".format(i.year, i.month, i.day, weekdays[i.weekday()]) for i in dategene)))  # 列インデックス0に語句、列インデックス1に日付を入れる。
+	datarows = tuple(zip(col0, ("{}-{}-{}({})".format(i.year, i.month, i.day, weekdays[i.weekday()]) for i in dategene)))  # 列インデックス0に語句、列インデックス1に日付を入れる。
 	griddatamodel = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModel
 	griddatamodel.removeAllRows()  # グリッドコントロールの行を全削除。
 	griddatamodel.addRows(("",)*len(datarows), datarows)  # グリッドに行を追加。	
@@ -128,7 +128,7 @@ class TextListener(unohelper.Base, XTextListener):
 		gridcontrol, = self.args
 		todayindex = 7//2  # 本日と同じインデックスを取得。
 		datetxt = gridcontrol.getModel().getPropertyValue("GridDataModel").getCellData(1, todayindex)  # 中央行の日付文字列を取得。
-		centerday = date(*map(int, datetxt.split("(")[0].split("/")))
+		centerday = date(*map(int, datetxt.split("(")[0].split("-")))
 		val = numericfield.getValue()  # 数値フィールドの値を取得。		
 		diff = val - self.val  # 前値との差を取得。
 		centerday += timedelta(days=7*diff)  # 週を移動。
@@ -171,7 +171,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
 								formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。
 							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
-						selection.setFormula(datetxt.split("(")[0].replace("/", "-"))  # 2018/8/7の書式で式としてセルに代入。
+						selection.setFormula(datetxt.split("(")[0])  # 2018-8-7の書式で式としてセルに代入。
 						if callback is not None:  # コールバック関数が与えられている時。
 							callback(mouseevent, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。

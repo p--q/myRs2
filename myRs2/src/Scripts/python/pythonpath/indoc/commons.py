@@ -84,8 +84,8 @@ def formatkeyCreator(doc):  # ドキュメントを引数にする。
 	return createFormatKey
 def createBorders():# 枠線の作成。
 	noneline = BorderLine2(LineStyle=BorderLineStyle.NONE)
-	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["violet"])
-	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=62, Color=COLORS["magenta3"])	
+	firstline = BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=45, Color=COLORS["violet"])
+	secondline =  BorderLine2(LineStyle=BorderLineStyle.DASHED, LineWidth=45, Color=COLORS["magenta3"])	
 	tableborder2 = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=True, IsRightLineValid=True)
 	topbottomtableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=True, IsBottomLineValid=True, IsLeftLineValid=False, IsRightLineValid=False)
 	leftrighttableborder = TableBorder2(TopLine=firstline, LeftLine=firstline, RightLine=secondline, BottomLine=secondline, IsTopLineValid=False, IsBottomLineValid=False, IsLeftLineValid=True, IsRightLineValid=True)
@@ -114,7 +114,7 @@ def getKaruteSheet(doc, idtxt, kanjitxt, kanatxt, datevalue):
 		karutedatecell = karutesheet[karutevars.splittedrow, karutevars.datecolumn]
 		karutedatecell.setValue(datevalue)  # カルテシートに入院日を入力。
 		createFormatKey = formatkeyCreator(doc)
-		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY/MM/DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+		karutedatecell.setPropertyValues(("NumberFormat", "HoriJustify"), (createFormatKey('YYYY-MM-DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
 		karutesheet[:karutevars.splittedrow, karutevars.articlecolumn].setDataArray((("",), (" ".join((idtxt, kanjitxt, kanatxt)),)))  # カルテシートのコピー日時をクリア。ID名前を入力。
 	return karutesheet	
 def getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue):
@@ -147,7 +147,12 @@ def toOtherEntry(sheet, rangeaddress, edgerow, dest_row):  # 新規行挿入が�
 	sourcerangeaddress = sourcerange.getRangeAddress()  # コピー元セル範囲アドレスを取得。行挿入後にアドレスを取得しないといけない。
 	sheet.moveRange(sheet[dest_row, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。			
 	sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。		
-# 	
+def getClipboardtxt(systemclipboard):  # クリップボードの文字列を取得。取得出来なかった時はNoneを返す。引数はcom.sun.star.datatransfer.clipboard.SystemClipboardのインスタンス。
+	transferable = systemclipboard.getContents()
+	for dataflavor in transferable.getTransferDataFlavors():
+		if dataflavor.MimeType=="text/plain;charset=utf-16":
+			return transferable.getTransferData(dataflavor)					
+	return None
 # 	
 # 	
 # 	

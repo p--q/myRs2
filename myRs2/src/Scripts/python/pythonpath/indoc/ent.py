@@ -25,13 +25,12 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "ﾘｽﾄに戻る"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	sheet = selection.getSpreadsheet()
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
 				drowBorders(selection)  # 枠線の作成。
 			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
-				VARS.setSheet(sheet)
+				VARS.setSheet(selection.getSpreadsheet())
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。
 				if r<VARS.splittedrow:
@@ -55,13 +54,8 @@ def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 		elif txt=="改行削除":
 			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
-			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-			transferable = systemclipboard.getContents()
-			clipboardtxt = ""
-			for dataflavor in transferable.getTransferDataFlavors():
-				if dataflavor.MimeType=="text/plain;charset=utf-16":
-					clipboardtxt = transferable.getTransferData(dataflavor)
-					break					
+			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
+			clipboardtxt = commons.getClipboardtxt(systemclipboard)
 			if clipboardtxt:
 				outputs = []
 				buffer = []
@@ -115,23 +109,33 @@ def mousePressedWSectionB(enhancedmouseevent, xscriptcontext):
 		controller.setActiveSheet(ichiransheet)
 	return False  # セル編集モードにしない。			
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	controller = eventobject.Source
-	VARS.setSheet(controller.getActiveSheet())
-	selection = controller.getSelection()
+# 	controller = eventobject.Source
+# 	VARS.setSheet(controller.getActiveSheet())
+# 	selection = controller.getSelection()
+# 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
+# 		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
+# 		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
+# 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
+# 			return  # すでに枠線が書いてあったら何もしない。
+
+	selection = eventobject.Source.getSelection()
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		drowBorders(selection)  # 枠線の作成。
+def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
 		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
 		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
 				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
-			return  # すでに枠線が書いてあったら何もしない。
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		drowBorders(selection)  # 枠線の作成。
-def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
+			return  # すでに枠線が書いてあったら何もしない。	
+		
 	noneline, dummy, topbottomtableborder, dummy = commons.createBorders()
-	VARS.sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	sheet = selection.getSpreadsheet()
+	VARS.setSheet(sheet)
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	r = selection[0, 0].getCellAddress().Row
 	if VARS.splittedrow<r<VARS.emptyrow:
 		rangeaddress = selection.getRangeAddress()
-		VARS.sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。					
+		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。					
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
