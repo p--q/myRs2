@@ -49,7 +49,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。シングルクリックの時はselectionChanged()メソッドで事足りる。
-				VARS.setSheet(selection.getSpreadsheet())
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r<VARS.splittedrow:  # 分割行より上、の時。
@@ -64,40 +63,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return True  # セル編集モードにする。
 					else:	
 						return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
-	return True  # セル編集モードにする。	
-def detectDuplicates(enhancedmouseevent, xscriptcontext):  # 薬名の重複をチェック。	
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	celladdress = selection.getCellAddress()
-	r, c = celladdress.Row, celladdress.Column  # selectionの行のインデックスを取得。		
-# 	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
-# 		if c>VARS.splittedcolumn-1:
-# 			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
-# 			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
-# 			count = datarows.count(datarow)
-# 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 			controller = doc.getCurrentController()  # コントローラの取得。
-# 			componentwindow = controller.ComponentWindow			
-# 			if count>1:  # 同じデータ行が複数ある時。
-# 				if count==2:  # 重複行が2個だけの時。
-# 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
-# 					if drow<r:  # 重複行が上の時。
-# 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-# 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
-# 						if msgbox.execute()==MessageBoxResults.YES:
-# 							sheet = VARS.sheet
-# 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-# 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-# 							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
-# 						return		
-# 					else:
-# 						msg = "重複行が選択行の下方にあります。"	
-# 				else:  # 重複行が3個以上ある時。
-# 					msg = "重複行が3行以上あります。"	
-# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 				msgbox.execute()		
-				
-				
-							
+	return True  # セル編集モードにする。				
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -385,10 +351,41 @@ def callback_wClickBottomRight(mouseevent, xscriptcontext):
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
-		
-# 		detectDuplicates(enhancedmouseevent, xscriptcontext)  # 薬名の重複をチェック。
-		
+		detectDuplicates(selection)  # 薬名の重複をチェック。
+def detectDuplicates(selection):  # 薬名の重複をチェック。	
+	celladdress = selection.getCellAddress()
+	r, c = celladdress.Row, celladdress.Column  # selectionの行のインデックスを取得。		
+# 	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
+# 		if c>VARS.splittedcolumn-1:
+# 			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+# 			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
+# 			count = datarows.count(datarow)
+# 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+# 			controller = doc.getCurrentController()  # コントローラの取得。
+# 			componentwindow = controller.ComponentWindow			
+# 			if count>1:  # 同じデータ行が複数ある時。
+# 				if count==2:  # 重複行が2個だけの時。
+# 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
+# 					if drow<r:  # 重複行が上の時。
+# 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
+# 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
+# 						if msgbox.execute()==MessageBoxResults.YES:
+# 							sheet = VARS.sheet
+# 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
+# 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
+# 							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
+# 						return		
+# 					else:
+# 						msg = "重複行が選択行の下方にあります。"	
+# 				else:  # 重複行が3個以上ある時。
+# 					msg = "重複行が3行以上あります。"	
+# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+# 				msgbox.execute()		
+				
+				
+						
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
@@ -825,7 +822,7 @@ def createSetRangesProperty(doc, sheet, r):
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
-	sheet = selection.getSpreadsheet()
+	sheet = VARS.sheet
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。

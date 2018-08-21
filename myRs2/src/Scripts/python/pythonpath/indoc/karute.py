@@ -104,10 +104,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			VARS.setSheet(selection.getSpreadsheet())
-			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(xscriptcontext, selection)  # 枠線の作成。
-			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
 				r = selection.getCellAddress().Row  # 選択セルの行インデックスを取得。	
 				if r<VARS.splittedrow or r==VARS.redrow:  # 分割行より上、または、赤行の時。
 					return wClickMenu(enhancedmouseevent, xscriptcontext)
@@ -447,10 +444,9 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 		systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにコピーする。シートのコピーからだとペーストできないアプリがある。クリップボードが開けないと言われる。			
 	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells, fullwidth_halfwidth
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	controller = eventobject.Source
-	selection = controller.getSelection()
+	selection = eventobject.Source.getSelection()
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。
-		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
+		VARS.setSheet(selection.getSpreadsheet())			
 		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
@@ -547,7 +543,7 @@ def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題�
 def drowBorders(xscriptcontext, selection):  # selectionを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-	sheet = VARS.sheet	
+	sheet = VARS.sheet
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
 	sheet[:, :].setPropertyValue("TopBorder2", noneline) # 1辺をNONEにするだけですべての枠線が消える。
 	if r<VARS.splittedrow or r>VARS.redrow:  # 分割行より上、または、赤行より下の時。
