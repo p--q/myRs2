@@ -54,7 +54,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
