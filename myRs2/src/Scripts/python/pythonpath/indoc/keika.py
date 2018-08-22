@@ -5,7 +5,7 @@ from itertools import chain
 from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
-from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX, WARNINGBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
@@ -345,72 +345,46 @@ def callback_wClickBottomRight(mouseevent, xscriptcontext):
 	else:  # 文字列がない時。
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	selection = eventobject.Source.getSelection()
-	VARS.setSheet(selection.getSpreadsheet())		
+	selection = eventobject.Source.getSelection()  # 必ずしもセル範囲とは限らない。
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
 		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。
 	elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
 def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェック。	
 	sheet = VARS.sheet
 	splittedrow = VARS.splittedrow
-	celladdress = selection.getCellAddress()		
-	if celladdress.Row>=VARS.emptyrow and celladdress.Column<VARS.splittedcolumn:   # 空行以下、かつ、分割列より左の時。
-		datarows = sheet[splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+	celladdress = selection.getCellAddress()	
+	emptyrow = VARS.emptyrow  # selectionChanged()はselect()を使うと発火して最終行が更新されるのでここで取得しておく。	
+	if celladdress.Row>=emptyrow and celladdress.Column==VARS.yakucolumn:   # 空行以下、かつ、薬列の時。
+		datarows = sheet[splittedrow:emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
 		idxes = []  # 削除する行インデックスのリスト。
 		datarowlength = len(datarows)
-		newemptyrow = VARS.emptyrow
+		newemptyrow = emptyrow
 		for i in set(datarows):  # ユニークなデータ行をイテレート。
 			if datarows.count(i)>1:  # 重複データ行がある時。
 				j = 0  # 重複行インデックスを初期化。
 				while j<datarowlength and i in datarows[j:]:  # インデックスj以降に行iが存在する間。
-					j = datarows[j:].index(i)  # 重複行インデックスを取得。
-					sourceidx = splittedrow + 1 
+					j += datarows[j:].index(i)  # 重複行インデックスを取得。
+					sourceidx = splittedrow + j
 					sheet.moveRange(sheet[newemptyrow, 0].getCellAddress(), sheet[sourceidx, :].getRangeAddress())  # 行の内容を最下行に移動。	
 					idxes.append(sourceidx)  # 移動元インデックスを、削除する行インデックスのリストに追加。
 					newemptyrow += 1  # 最下行の空行を更新。
 					j += 1  # 検索開始行インデックスを更新。
-		idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。
-		for i in idxes:
-			sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
-		if idxes:
-			msg = "重複のある{}行を最下行に移動しました。".format(len(idxes))	
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()				
-			# 行を移動したことをダイアログに表示する。
-		
-		
-		
-		
-# 		datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
-# 		count = datarows.count(datarow)
-# 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 		controller = doc.getCurrentController()  # コントローラの取得。
-# 		componentwindow = controller.ComponentWindow			
-# 		if count>1:  # 同じデータ行が複数ある時。
-# 			if count==2:  # 重複行が2個だけの時。
-# 				drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
-# 				if drow<r:  # 重複行が上の時。
-# 					msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-# 					msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
-# 					if msgbox.execute()==MessageBoxResults.YES:
-# 						sheet = VARS.sheet
-# 						sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-# 						sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-# 						sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
-# 					return		
-# 				else:
-# 					msg = "重複行が選択行の下方にあります。"	
-# 			else:  # 重複行が3個以上ある時。
-# 				msg = "重複行が3行以上あります。"	
-# 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 			msgbox.execute()		
-				
-				
-				
-				
-						
+		if idxes:			
+			idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。昇順に並んでいるわけではないので[::-1]は不可。
+			controller = xscriptcontext.getDocument().getCurrentController()	
+			controller.select(sheet["A1"])  # 選択行を削除してメッセージボックスを表示するとマウスをクリックしたままドラッグした状態になってしまうことの対策。
+			for i in idxes:
+				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
+			rowc = len(idxes)
+			controller.select(sheet[emptyrow-rowc:emptyrow, VARS.yakucolumn:VARS.splittedcolumn])  # 移動させた行を選択状態にする。
+			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
+			componentwindow = controller.ComponentWindow
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			msgbox.execute()							
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
@@ -433,37 +407,33 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		splittedcolumn = VARS.splittedcolumn
 		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
 			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
-				if c>splittedcolumn-1:  # 分割列を含む右の時。
-					if r>dayrow:  # 日付行より下の時。
-						cell = sheet[r, c]
-						txt = cell.getString()
-						txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-						if txt!=txt2:  # 変換前と異なる時はセルに代入。
-							cell.setString(txt2)
-						if r<splittedrow:  # 分割行より上の時。
-							if txt:  # セルに文字列がある時。
-								skybluecells.append(cell)
-								if len(txt)>1:  # 文字数が1個の時は中央揃えにする。
-									leftcells.append(cell)
-								else:
-									centercells.append(cell)	
-							else:
-								colorlesscells.append(cell)
-						else:
-							if txt:
-								if len(txt)>1:
-									leftcells.append(cell)
-								else:
-									centercells.append(cell)
+				if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
+					continue
+				cell = sheet[r, c]  # セルを取得。
+				txt = cell.getString()
+				if txt:  # セルに文字列がある時のみ。
+					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+					if txt!=txt2:  # 変換前と異なる時はセルに代入。
+						cell.setString(txt2)	
+					stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
+					if len(txt)>stringlength:
+						leftcells.append(cell)  # 左揃えにする。				
+					else:
+						centercells.append(cell)  # 中央揃えにする。				
+					if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
+						skybluecells.append(cell)  # 背景色を設定。
+				elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
+					colorlesscells.append(cell)  # 背景色を消す。			
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 		setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
 		setRangeProp(doc, colorlesscells, "CellBackColor", -1)
 		setRangeProp(doc, leftcells, "HoriJustify", LEFT)
 		setRangeProp(doc, centercells, "HoriJustify", CENTER)
 def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リストの#を検索するセル範囲。
-	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-	cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
-	cellranges.setPropertyValue(propname, propvalue)						
+	if ranges:
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # rangesの要素がないとエラーになる。
+		cellranges.setPropertyValue(propname, propvalue)						
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。

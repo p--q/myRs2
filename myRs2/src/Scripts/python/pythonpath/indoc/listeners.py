@@ -90,7 +90,7 @@ class SelectionChangeListener(unohelper.Base, XSelectionChangeListener):
 				return  # 何もしない。
 			else:  # キャッシュのセル範囲と一致しない時。
 				self.selectionrangeaddress = selectionrangeaddress  # キャッシュを更新。
-		invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)		
+		invokeModuleMethod(eventobject.Source.getActiveSheet().getName(), "selectionChanged", eventobject, self.xscriptcontext)	
 	def disposing(self, eventobject):
 		eventobject.Source.removeSelectionChangeListener(self)		
 class ChangesListener(unohelper.Base, XChangesListener):
