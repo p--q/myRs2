@@ -376,18 +376,25 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 		if idxes:			
 			idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。昇順に並んでいるわけではないので[::-1]は不可。
 			controller = xscriptcontext.getDocument().getCurrentController()				
-# 			controller.select("A1")  # 選択行を削除してメッセージボックスを表示するとマウスをクリックしたままドラッグした状態になってしまうことの対策。
-
-			
-					
 			for i in idxes:
 				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
 			rowc = len(idxes)	
 			controller.select(sheet[emptyrow-rowc:emptyrow, VARS.yakucolumn:VARS.splittedcolumn])  # 移動させた行を選択状態にする。
+
+			
+
+
 			
 			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
 			componentwindow = controller.ComponentWindow
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			
+			
+# 			mouseevent = MouseEvent(Buttons=MouseButton.LEFT, ClickCount=1, PopupTrigger=False, X=0, Y=0, Modifiers=0, Source=componentwindow)
+# 			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
+# 			toolkit.mousePress(mouseevent)  # キーを離す、をシミュレート。	
+# 			toolkit.mouseRelease(mouseevent)  # キーを離す、をシミュレート。			
+			
 			msgbox.execute()							
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
