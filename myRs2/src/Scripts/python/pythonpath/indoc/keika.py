@@ -388,6 +388,11 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
 			componentwindow = controller.ComponentWindow
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+	
+# 			doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
+# 			docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
+# 			containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。	
+# 			msgbox = containerwindow.getToolkit().createMessageBox(containerwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
 			
 			
 # 			mouseevent = MouseEvent(Buttons=MouseButton.LEFT, ClickCount=1, PopupTrigger=False, X=0, Y=0, Modifiers=0, Source=componentwindow)
@@ -395,7 +400,9 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 # 			toolkit.mousePress(mouseevent)  # キーを離す、をシミュレート。	
 # 			toolkit.mouseRelease(mouseevent)  # キーを離す、をシミュレート。			
 			
-			msgbox.execute()							
+			msgbox.execute()	
+			
+									
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
