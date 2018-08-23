@@ -375,12 +375,16 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 					j += 1  # 検索開始行インデックスを更新。
 		if idxes:			
 			idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。昇順に並んでいるわけではないので[::-1]は不可。
-			controller = xscriptcontext.getDocument().getCurrentController()	
-			controller.select(sheet["A1"])  # 選択行を削除してメッセージボックスを表示するとマウスをクリックしたままドラッグした状態になってしまうことの対策。
+			controller = xscriptcontext.getDocument().getCurrentController()				
+# 			controller.select("A1")  # 選択行を削除してメッセージボックスを表示するとマウスをクリックしたままドラッグした状態になってしまうことの対策。
+
+			
+					
 			for i in idxes:
 				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
-			rowc = len(idxes)
+			rowc = len(idxes)	
 			controller.select(sheet[emptyrow-rowc:emptyrow, VARS.yakucolumn:VARS.splittedcolumn])  # 移動させた行を選択状態にする。
+			
 			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
 			componentwindow = controller.ComponentWindow
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
