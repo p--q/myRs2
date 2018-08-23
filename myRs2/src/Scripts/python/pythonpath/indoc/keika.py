@@ -5,7 +5,7 @@ from itertools import chain
 from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
-from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX, WARNINGBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
@@ -48,8 +48,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。シングルクリックの時はselectionChanged()メソッドで事足りる。
-				VARS.setSheet(selection.getSpreadsheet())
+			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r<VARS.splittedrow:  # 分割行より上、の時。
@@ -64,40 +63,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 						return True  # セル編集モードにする。
 					else:	
 						return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
-	return True  # セル編集モードにする。	
-def detectDuplicates(enhancedmouseevent, xscriptcontext):  # 薬名の重複をチェック。	
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	celladdress = selection.getCellAddress()
-	r, c = celladdress.Row, celladdress.Column  # selectionの行のインデックスを取得。		
-# 	if VARS.splittedrow-1<r<VARS.emptyrow and r!=VARS.blackrow:   # 分割行以下空行より上、かつ、黒行でない時。
-# 		if c>VARS.splittedcolumn-1:
-# 			datarows = VARS.sheet[VARS.splittedrow:VARS.emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
-# 			datarow = datarows[r-VARS.splittedrow]  # クリックした行のデータを取得。
-# 			count = datarows.count(datarow)
-# 			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-# 			controller = doc.getCurrentController()  # コントローラの取得。
-# 			componentwindow = controller.ComponentWindow			
-# 			if count>1:  # 同じデータ行が複数ある時。
-# 				if count==2:  # 重複行が2個だけの時。
-# 					drow = datarows.index(datarow) + VARS.splittedrow  # 最初の重複行インデックスを取得。
-# 					if drow<r:  # 重複行が上の時。
-# 						msg = "重複行が選択行の上にあります。\n\n選択行を削除してその行を使いますか?"
-# 						msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
-# 						if msgbox.execute()==MessageBoxResults.YES:
-# 							sheet = VARS.sheet
-# 							sourcerangeaddress = sheet[drow, :].getRangeAddress()  # コピー元セル範囲アドレスを取得。
-# 							sheet.moveRange(sheet[r, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。	
-# 							sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動したソース行を削除。						
-# 						return		
-# 					else:
-# 						msg = "重複行が選択行の下方にあります。"	
-# 				else:  # 重複行が3個以上ある時。
-# 					msg = "重複行が3行以上あります。"	
-# 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-# 				msgbox.execute()		
-				
-				
-							
+	return True  # セル編集モードにする。				
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
@@ -153,9 +119,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		clipboardtxt = commons.getClipboardtxt(systemclipboard)
 		if not clipboardtxt:  # クリップボードの文字列が取得出来なかった時。メッセージボックスを出して終わる。
 			msg = "クリップボードから文字列を取得できませんでした。"
-			componentwindow = doc.getCurrentController().ComponentWindow		
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()			
+			commons.showErrorMessageBox(controller, msg)
 			return False  # セル編集モードにしない。	
 		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。		
@@ -213,9 +177,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 						yoho = "起床時"					
 		if not newdatarows:	
 			msg = "薬品名に変換できませんでした。"
-			componentwindow = doc.getCurrentController().ComponentWindow		
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()			
+			commons.showErrorMessageBox(controller, msg)			
 			return False  # セル編集モードにしない。				
 		newdatarows.reverse()  # 行を昇順に戻す。
 		edgerow = VARS.emptyrow+len(newdatarows)		
@@ -383,12 +345,57 @@ def callback_wClickBottomRight(mouseevent, xscriptcontext):
 	else:  # 文字列がない時。
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
-	selection = eventobject.Source.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+	selection = eventobject.Source.getSelection()  # 必ずしもセル範囲とは限らない。
+	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
-		
-# 		detectDuplicates(enhancedmouseevent, xscriptcontext)  # 薬名の重複をチェック。
-		
+		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。
+	elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
+		VARS.setSheet(selection.getSpreadsheet())		
+		drowBorders(selection)  # 枠線の作成。
+def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェック。	
+	sheet = VARS.sheet
+	splittedrow = VARS.splittedrow
+	celladdress = selection.getCellAddress()	
+	emptyrow = VARS.emptyrow  # selectionChanged()はselect()を使うと発火して最終行が更新されるのでここで取得しておく。	
+	if celladdress.Row>=emptyrow and celladdress.Column==VARS.yakucolumn:   # 空行以下、かつ、薬列の時。
+		datarows = sheet[splittedrow:emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+		idxes = []  # 削除する行インデックスのリスト。
+		datarowlength = len(datarows)
+		newemptyrow = emptyrow
+		for i in set(datarows):  # ユニークなデータ行をイテレート。
+			if datarows.count(i)>1:  # 重複データ行がある時。
+				j = 0  # 重複行インデックスを初期化。
+				while j<datarowlength and i in datarows[j:]:  # インデックスj以降に行iが存在する間。
+					j += datarows[j:].index(i)  # 重複行インデックスを取得。
+					sourceidx = splittedrow + j
+					sheet.moveRange(sheet[newemptyrow, 0].getCellAddress(), sheet[sourceidx, :].getRangeAddress())  # 行の内容を最下行に移動。	
+					idxes.append(sourceidx)  # 移動元インデックスを、削除する行インデックスのリストに追加。
+					newemptyrow += 1  # 最下行の空行を更新。
+					j += 1  # 検索開始行インデックスを更新。
+		if idxes:			
+			idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。昇順に並んでいるわけではないので[::-1]は不可。
+			controller = xscriptcontext.getDocument().getCurrentController()				
+			for i in idxes:
+				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
+			rowc = len(idxes)	
+			controller.select(sheet[emptyrow-rowc:emptyrow, VARS.yakucolumn:VARS.splittedcolumn])  # 移動させた行を選択状態にする。
+
+			
+
+
+			
+			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
+			componentwindow = controller.ComponentWindow
+			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
+			
+			
+# 			mouseevent = MouseEvent(Buttons=MouseButton.LEFT, ClickCount=1, PopupTrigger=False, X=0, Y=0, Modifiers=0, Source=componentwindow)
+# 			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
+# 			toolkit.mousePress(mouseevent)  # キーを離す、をシミュレート。	
+# 			toolkit.mouseRelease(mouseevent)  # キーを離す、をシミュレート。			
+			
+			msgbox.execute()							
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
@@ -411,37 +418,33 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		splittedcolumn = VARS.splittedcolumn
 		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
 			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
-				if c>splittedcolumn-1:  # 分割列を含む右の時。
-					if r>dayrow:  # 日付行より下の時。
-						cell = sheet[r, c]
-						txt = cell.getString()
-						txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-						if txt!=txt2:  # 変換前と異なる時はセルに代入。
-							cell.setString(txt2)
-						if r<splittedrow:  # 分割行より上の時。
-							if txt:  # セルに文字列がある時。
-								skybluecells.append(cell)
-								if len(txt)>1:  # 文字数が1個の時は中央揃えにする。
-									leftcells.append(cell)
-								else:
-									centercells.append(cell)	
-							else:
-								colorlesscells.append(cell)
-						else:
-							if txt:
-								if len(txt)>1:
-									leftcells.append(cell)
-								else:
-									centercells.append(cell)
+				if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
+					continue
+				cell = sheet[r, c]  # セルを取得。
+				txt = cell.getString()
+				if txt:  # セルに文字列がある時のみ。
+					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+					if txt!=txt2:  # 変換前と異なる時はセルに代入。
+						cell.setString(txt2)	
+					stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
+					if len(txt)>stringlength:
+						leftcells.append(cell)  # 左揃えにする。				
+					else:
+						centercells.append(cell)  # 中央揃えにする。				
+					if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
+						skybluecells.append(cell)  # 背景色を設定。
+				elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
+					colorlesscells.append(cell)  # 背景色を消す。			
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 		setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
 		setRangeProp(doc, colorlesscells, "CellBackColor", -1)
 		setRangeProp(doc, leftcells, "HoriJustify", LEFT)
 		setRangeProp(doc, centercells, "HoriJustify", CENTER)
 def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リストの#を検索するセル範囲。
-	cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-	cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
-	cellranges.setPropertyValue(propname, propvalue)						
+	if ranges:
+		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # rangesの要素がないとエラーになる。
+		cellranges.setPropertyValue(propname, propvalue)						
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -519,7 +522,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュー番号の処理を振り分ける。引数でこれ以上に取得できる情報はない。	
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
-	componentwindow = controller.ComponentWindow
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	VARS.setSheet(sheet)
 	selection = controller.getSelection()
@@ -543,6 +545,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection, "m")
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
+		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
 			rangeaddress = selection.getRangeAddress()
@@ -578,6 +581,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+		componentwindow = controller.ComponentWindow
 		keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
 		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
@@ -593,9 +597,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				startindex = i  # 選択セルを含む左の最初のインスリン開始セルの列インデックスを取得。
 				break
 		else:  # 開始セルが取得出来なかった時。
-			msg = "開始セルが取得できませんでした。"					
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()	
+			msg = "開始セルが取得できませんでした。"		
+			commons.showErrorMessageBox(controller, msg)
 			return
 		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
 		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
@@ -605,9 +608,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				break
 			j = i
 		if j==0:  # 開始時のインスリン量が取得出来なかった時。
-			msg = "開始時のインスリン量が取得できませんでした。"					
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			msgbox.execute()	
+			msg = "開始時のインスリン量が取得できませんでした。"		
+			commons.showErrorMessageBox(controller, msg)			
 			return
 		startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量。
 		dayu = sum([int(i)+e for i in startunits.split("-") if int(i)>0])  # インスリンの1日消費量を取得。	
@@ -825,7 +827,7 @@ def createSetRangesProperty(doc, sheet, r):
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
-	sheet = selection.getSpreadsheet()
+	sheet = VARS.sheet
 	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
 	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
 	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。

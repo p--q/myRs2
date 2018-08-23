@@ -6,7 +6,7 @@ from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # シート関数ではアルゴリズムが難しい。
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
-from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.table.CellHoriJustify import CENTER, LEFT  # enum
@@ -231,22 +231,30 @@ def createSetRangesProperty(doc):
 	return setRangesProperty
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択範囲がセルの時。矢印キーでセルを移動した時。マウスクリックハンドラから呼ばれると何回も発火するのでその対応。
-		currenttableborder2 = selection.getPropertyValue("TableBorder2")  # 選択セルの枠線を取得。
-		if all((currenttableborder2.TopLine.Color==currenttableborder2.LeftLine.Color==commons.COLORS["violet"],\
-				currenttableborder2.RightLine.Color==currenttableborder2.BottomLine.Color==commons.COLORS["magenta3"])):  # 枠線の色を確認。
-			return  # すでに枠線が書いてあったら何もしない。
 	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		VARS.setSheet(selection.getSpreadsheet())  # シートを切り替えた時点でselectionChanged()メソッドが発火するためここで渡しておかないといけない。
+		VARS.setSheet(selection.getSpreadsheet())
 		drowBorders(selection)  # 枠線の作成。
+def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
+	sheet = VARS.sheet
+	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
+	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
+	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。
+	if VARS.datarow-1<r<VARS.emptyrow:
+		if VARS.datacolumn-1<c<VARS.firstemptycolumn:
+			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.datacolumn:VARS.firstemptycolumn].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
+			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
+		if VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
+			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
+			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			VARS.setSheet(selection.getSpreadsheet())
-			if enhancedmouseevent.ClickCount==1:  # シングルクリックの時。
-				drowBorders(selection)  # 枠線の作成。
-			elif enhancedmouseevent.ClickCount==2:  # ダブルクリックの時
+			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
 				celladdress = selection.getCellAddress()
 				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 				if r==VARS.menurow:
@@ -394,22 +402,6 @@ def setCellProp(selection):
 			selection.clearContents(511)
 	else:
 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
-def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
-	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
-	r, c = celladdress.Row, celladdress.Column # selectionの行と列のインデックスを取得。		
-	sheet = VARS.sheet
-	noneline, tableborder2, topbottomtableborder, leftrighttableborder = commons.createBorders()
-	sheet[:, :].setPropertyValue("TopBorder2", noneline)  # 1辺をNONEにするだけですべての枠線が消える。
-	rangeaddress = selection.getRangeAddress() # 選択範囲のセル範囲アドレスを取得。
-	if VARS.datarow-1<r<VARS.emptyrow:
-		if VARS.datacolumn-1<c<VARS.firstemptycolumn:
-			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
-			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.datacolumn:VARS.firstemptycolumn].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	
-			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
-		if VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-			sheet[VARS.monthrow:VARS.emptyrow, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。	
-			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
-			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
@@ -496,8 +488,7 @@ def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcellda
 		cell.setString("")  # 面談列の文字列をクリア。
 	else:
 		msg = "IDが一覧に見つかりません。"	
-		componentwindow = doc.getCurrentController().ComponentWindow
-		componentwindow.getToolkit().createMessageBox(componentwindow, ERRORBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)	
+		commons.showErrorMessageBox(doc.getCurrentController(), msg)
 def getCelldatetime(xscriptcontext, celladdress):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
