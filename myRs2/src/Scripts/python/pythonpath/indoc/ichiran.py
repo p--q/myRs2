@@ -51,20 +51,19 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				i.getParent().clearContents(CellFlags.ANNOTATION)
 	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))  # チェック列固定行より下、全て上下左右中央揃えにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
-					return wClickMenu(enhancedmouseevent, xscriptcontext)
-				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
-					return False # 何もしない。
-				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
-					return wClickIDCol(enhancedmouseevent, xscriptcontext)
-				elif c<VARS.memostartcolumn:  # チェック列の時。
-					return wClickCheckCol(enhancedmouseevent, xscriptcontext)
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+			if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
+				return wClickMenu(enhancedmouseevent, xscriptcontext)
+			elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
+				return False # 何もしない。
+			elif c<VARS.checkstartcolumn:  # チェック列より左の時。
+				return wClickIDCol(enhancedmouseevent, xscriptcontext)
+			elif c<VARS.memostartcolumn:  # チェック列の時。
+				return wClickCheckCol(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。

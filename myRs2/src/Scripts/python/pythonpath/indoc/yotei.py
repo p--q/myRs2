@@ -251,17 +251,16 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
 			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-				if r==VARS.menurow:
-					return wClickMenu(enhancedmouseevent, xscriptcontext)
-				elif VARS.datarow-1<r<VARS.emptyrow:
-					if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-						return wClickCell(enhancedmouseevent, xscriptcontext)
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+			if r==VARS.menurow:
+				return wClickMenu(enhancedmouseevent, xscriptcontext)
+			elif VARS.datarow-1<r<VARS.emptyrow:
+				if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+					return wClickCell(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。

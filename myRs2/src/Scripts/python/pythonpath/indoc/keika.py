@@ -45,24 +45,23 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
 	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-				if r<VARS.splittedrow:  # 分割行より上、の時。
-					if c<VARS.splittedcolumn:  # 分割列より左、の時。
-						return wClickMenu(enhancedmouseevent, xscriptcontext)
-					else: 
-						return wClickUpperRight(enhancedmouseevent, xscriptcontext)
-				elif r!=VARS.blackrow:  # 黒行でない時。
-					if c>VARS.splittedcolumn-1:  # 分割行含む右列。
-						return wClickBottomRight(enhancedmouseevent, xscriptcontext)
-					elif c==VARS.yakucolumn:  # 薬名列の時。
-						return True  # セル編集モードにする。
-					else:	
-						return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+			if r<VARS.splittedrow:  # 分割行より上、の時。
+				if c<VARS.splittedcolumn:  # 分割列より左、の時。
+					return wClickMenu(enhancedmouseevent, xscriptcontext)
+				else: 
+					return wClickUpperRight(enhancedmouseevent, xscriptcontext)
+			elif r!=VARS.blackrow:  # 黒行でない時。
+				if c>VARS.splittedcolumn-1:  # 分割行含む右列。
+					return wClickBottomRight(enhancedmouseevent, xscriptcontext)
+				elif c==VARS.yakucolumn:  # 薬名列の時。
+					return True  # セル編集モードにする。
+				else:	
+					return wClickBottomLeft(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。				
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。

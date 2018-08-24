@@ -24,19 +24,18 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
 	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "ﾘｽﾄに戻る"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。
-				if r<VARS.splittedrow:
-					return mousePressedWSectionM(enhancedmouseevent, xscriptcontext)			
-				elif r<VARS.emptyrow:
-					return mousePressedWSectionB(enhancedmouseevent, xscriptcontext)
-				else:  # ID列が空欄の時。キーボードからの入力は想定しない。
-					sortRows(c)  # 昇順にソート。
-					return False  # セル編集モードにしない。	
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。
+			if r<VARS.splittedrow:
+				return mousePressedWSectionM(enhancedmouseevent, xscriptcontext)			
+			elif r<VARS.emptyrow:
+				return mousePressedWSectionB(enhancedmouseevent, xscriptcontext)
+			else:  # ID列が空欄の時。キーボードからの入力は想定しない。
+				sortRows(c)  # 昇順にソート。
+				return False  # セル編集モードにしない。	
 	return True  # セル編集モードにする。	
 def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
