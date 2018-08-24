@@ -348,17 +348,19 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 	selection = eventobject.Source.getSelection()  # 必ずしもセル範囲とは限らない。
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 		VARS.setSheet(selection.getSpreadsheet())		
-		drowBorders(selection)  # 枠線の作成。
-		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。
+		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。drowBorders()はこの中で実行。選択範囲が変わるのでdrowBorders()が実行される。
 	elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
 		VARS.setSheet(selection.getSpreadsheet())		
 		drowBorders(selection)  # 枠線の作成。
 def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェック。	
-	sheet = VARS.sheet
-	splittedrow = VARS.splittedrow
 	celladdress = selection.getCellAddress()	
 	emptyrow = VARS.emptyrow  # selectionChanged()はselect()を使うと発火して最終行が更新されるのでここで取得しておく。	
 	if celladdress.Row>=emptyrow and celladdress.Column==VARS.yakucolumn:   # 空行以下、かつ、薬列の時。
+		controller = xscriptcontext.getDocument().getCurrentController()		
+		indicator = controller.getStatusIndicator()  # メッセージボックスではマウス選択状態のままになってしまうのでステータスインジケーターを使う。		
+		indicator.start("重複行をチェック。", 0)  # ステータスバーに表示する文字列とプログレスバーの目盛りを設定。setValue()が1回ではバーが表示されない模様。	
+		sheet = VARS.sheet
+		splittedrow = VARS.splittedrow
 		datarows = sheet[splittedrow:emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
 		idxes = []  # 削除する行インデックスのリスト。
 		datarowlength = len(datarows)
@@ -373,36 +375,17 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 					idxes.append(sourceidx)  # 移動元インデックスを、削除する行インデックスのリストに追加。
 					newemptyrow += 1  # 最下行の空行を更新。
 					j += 1  # 検索開始行インデックスを更新。
-		if idxes:			
+		if idxes:		
+			rowc = len(idxes)	
 			idxes.sort(reverse=True)  # 削除する行インデックスを降順にソート。昇順に並んでいるわけではないので[::-1]は不可。
-			controller = xscriptcontext.getDocument().getCurrentController()				
 			for i in idxes:
 				sheet.removeRange(sheet[i, :].getRangeAddress(), delete_rows)  # 移動したソース行を削除。
-			rowc = len(idxes)	
 			controller.select(sheet[emptyrow-rowc:emptyrow, VARS.yakucolumn:VARS.splittedcolumn])  # 移動させた行を選択状態にする。
-
-			
-
-
-			
-			msg = "重複のある{}行を最下行に移動しました。".format(rowc)	
-			componentwindow = controller.ComponentWindow
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-	
-# 			doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   
-# 			docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
-# 			containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。	
-# 			msgbox = containerwindow.getToolkit().createMessageBox(containerwindow, WARNINGBOX, MessageBoxButtons.BUTTONS_OK, "myRs", msg)
-			
-			
-# 			mouseevent = MouseEvent(Buttons=MouseButton.LEFT, ClickCount=1, PopupTrigger=False, X=0, Y=0, Modifiers=0, Source=componentwindow)
-# 			toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-# 			toolkit.mousePress(mouseevent)  # キーを離す、をシミュレート。	
-# 			toolkit.mouseRelease(mouseevent)  # キーを離す、をシミュレート。			
-			
-			msgbox.execute()	
-			
-									
+		indicator.end()  # reset()の前にend()しておかないと元に戻らない。
+		indicator.reset()  # ここでリセットしておかないと例外が発生した時にリセットする機会がない。		
+		if idxes:
+			return  # 選択範囲が変わってdrowBorders()が実行されているので、ここで終わる。
+	drowBorders(selection)  # 枠線の作成。
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
@@ -844,7 +827,6 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 		else:  # 分割列含む右の時は縦線を引くだけ。
 			sheet[:, rangeaddress.StartColumn:rangeaddress.EndColumn+1].setPropertyValue("TableBorder2", leftrighttableborder)  # 列の左右に枠線を引く。				
 	else:  # 分割行以下の時。
-		VARS.setSheet(sheet)
 		if r==VARS.blackrow:  # 黒行の時。
 			return  # 線を消すだけ。
 		sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。	

@@ -1,37 +1,75 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
+# ノンモダルダイアログ。UnoControlDialogとかメッセージボックスだとマウスをクリックした状態のままになってしまうことがある。
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, platform, subprocess, traceback, unohelper
+from indoc import dialogcommons
 from com.sun.star.awt import XMouseListener
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum
+from com.sun.star.beans import NamedValue  # Struct
 from com.sun.star.util import URL  # Struct
+from com.sun.star.util import XCloseListener
 from com.sun.star.style.VerticalAlignment import MIDDLE  # enum
 def createDialog(xscriptcontext):  # 選択範囲を削除して、フレームを変更するとマウスボタン押してドラッグしている状態になったままになっている。
-	docwindow = xscriptcontext.getDocument().getCurrentController().getFrame().getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
 	traceback.print_exc()  # PyDevのコンソールにトレースバックを表示。stderrToServer=Trueが必須。
 	#  ダイアログに表示する。raiseだとPythonの構文エラーはエラーダイアログがでてこないので。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+	doc = xscriptcontext.getDocument()  # マクロを起動した時のドキュメントのモデルを取得。   	
+	docframe = doc.getCurrentController().getFrame()  # モデル→コントローラ→フレーム、でドキュメントのフレームを取得。
+	containerwindow = docframe.getContainerWindow()  # ドキュメントのウィンドウ(コンテナウィンドウ=ピア)を取得。
+	maTopx = dialogcommons.createConverters(containerwindow)  # ma単位をピクセルに変換する関数を取得。	
 	lines = traceback.format_exc().split("\n")  # トレースバックを改行で分割。
 	h = 20  # FixedTextコントロールの高さ。ma単位。2行分。	
 	dialogwidth = 380  # ウィンドウの幅。ma単位。
-	dialog, addControl = dialogCreator(xscriptcontext, {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "Title": lines[0], "Name": "exceptiondialog", "Moveable": True})  # Heightは後で設定し直す。
-	dialog.createPeer(docwindow.getToolkit(), docwindow)  # ダイアログを描画。親ウィンドウを渡す。
+	controlcontainerprops = {"PositionX": 20, "PositionY": 120, "Width": dialogwidth, "Height": 10, "BackgroundColor": 0xF0F0F0}  # Heightは後で設定し直す。PositionXとPositionYはTaskCreatorに渡したら0にする。
+	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
 	mouselistener = MouseListener(xscriptcontext)
 	controlheight = 0  # コントロールの高さ。ma単位。
+	subjs = []  # マウスリスナーのサブジェクトのリスト。
 	for i in lines[1:]:  # 2行目以降イテレート。
 		if i:  # 空行は除外。
 			fixedtextprops = [{"PositionX": 0, "PositionY": controlheight, "Width": dialogwidth, "Height": h, "Label": i, "MultiLine": True, "NoLabel": True, "VerticalAlign": MIDDLE}]
 			if i.lstrip().startswith("File "):  # File から始まる行の時。	
 				fixedtextprops[0]["TextColor"] = 0x0000FF  # 文字色をblue3にする。
 				fixedtextprops.append({"addMouseListener": mouselistener})
+				fixedtextcontrol = addControl("FixedText", *fixedtextprops)
+				subjs.append(fixedtextcontrol)  # マウスリスナーをつけたコントロールに追加する。
 			elif not i.startswith(" "):  # スペース以外から始まる時。
 				fixedtextprops[0]["TextColor"] = 0xFF0000  # 文字色をred3にする。
-			fixedtextcontrol = addControl("FixedText", *fixedtextprops)
+				fixedtextcontrol = addControl("FixedText", *fixedtextprops)
+			else:
+				fixedtextcontrol = addControl("FixedText", *fixedtextprops)
 			controlheight += h
-	controlrectangle = fixedtextcontrol.getPosSize()  # コントロール間の間隔を幅はX、高さはYから取得。
-	dialog.setPosSize(0, 0, 0, controlrectangle.Y+controlrectangle.Height, PosSize.HEIGHT)  # 最後の行からダイアログの高さを再設定。
-	dialog.execute()
-	dialog.dispose()	
+	controlrectangle = fixedtextcontrol.getPosSize()  # コントロール間の間隔を幅はX、高さはYから取得。最後に追加したコントロールから取得。
+	controlcontainer.setPosSize(0, 0, 0, controlrectangle.Y+controlrectangle.Height, PosSize.HEIGHT)  # 最後の行からダイアログの高さを再設定。
+	rectangle = controlcontainer.getPosSize()  # コントロールコンテナのRectangle Structを取得。px単位。
+	controlcontainer.setPosSize(0, 0, 0, 0, PosSize.POS)  # コントロールコンテナの位置をTaskCreatorのウィンドウの原点にする。
+	taskcreator = smgr.createInstanceWithContext('com.sun.star.frame.TaskCreator', ctx)
+	args = NamedValue("PosSize", rectangle), NamedValue("FrameName", "exceptiondialog")  # , NamedValue("MakeVisible", True)  # TaskCreatorで作成するフレームのコンテナウィンドウのプロパティ。
+	dialogframe = taskcreator.createInstanceWithArguments(args)  # コンテナウィンドウ付きの新しいフレームの取得。サイズ変更は想定しない。
+	dialogframe.setTitle(lines[0])  # フレームのタイトルを設定。
+	docframe.getFrames().append(dialogframe) # 新しく作ったフレームを既存のフレームの階層に追加する。
+	dialogwindow = dialogframe.getContainerWindow()  # ダイアログのコンテナウィンドウを取得。
+	toolkit = dialogwindow.getToolkit()  # ピアからツールキットを取得。 	
+	controlcontainer.createPeer(toolkit, dialogwindow) # ウィンドウにコントロールコンテナを描画。
+	controlcontainer.setVisible(True)  # コントロールの表示。
+	dialogwindow.setVisible(True) # ウィンドウの表示。これ以降WindowListenerが発火する。
+	args = mouselistener, subjs
+	dialogframe.addCloseListener(CloseListener(args))  # CloseListener。ノンモダルダイアログのリスナー削除用。		
+class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイアログのリスナー削除用。
+	def __init__(self, args):
+		self.args = args
+	def queryClosing(self, eventobject, getsownership):  # ノンモダルダイアログを閉じる時に発火。
+		mouselistener, subjs = self.args
+		for i in subjs:
+			i.removeMouseListener(mouselistener)
+		eventobject.Source.removeCloseListener(self)
+	def notifyClosing(self, eventobject):
+		pass
+	def disposing(self, eventobject):  
+		pass
 class MouseListener(unohelper.Base, XMouseListener):  # Editコントロールではうまく動かない。
 	def __init__(self, xscriptcontext):
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -86,42 +124,3 @@ class MouseListener(unohelper.Base, XMouseListener):  # Editコントロール�
 		pass
 	def disposing(self, eventobject):
 		eventobject.Source.removeMouseListener(self)	
-def dialogCreator(xscriptcontext, dialogprops):  # ダイアログと、それにコントロールを追加する関数を返す。まずダイアログモデルのプロパティを取得。
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-	dialog = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialog", ctx)  # ダイアログの生成。
-	dialogmodel = smgr.createInstanceWithContext("com.sun.star.awt.UnoControlDialogModel", ctx)  # ダイアログモデルの生成。
-	dialogmodel.setPropertyValues(tuple(dialogprops.keys()), tuple(dialogprops.values()))  # ダイアログモデルのプロパティを設定。
-	dialog.setModel(dialogmodel)  # ダイアログにダイアログモデルを設定。
-	dialog.setVisible(False)  # 描画中のものを表示しない。
-	def addControl(controltype, props, attrs=None):  # props: コントロールモデルのプロパティ、attr: コントロールの属性。
-		controlmodel = _createControlModel(controltype, props)  # コントロールモデルの生成。
-		dialogmodel.insertByName(props["Name"], controlmodel)  # ダイアログモデルにモデルを追加するだけでコントロールも作成される。
-		control = dialog.getControl(props["Name"])  # コントロールコンテナに追加された後のコントロールを取得。
-		if attrs is not None:  # Dialogに追加したあとでないと各コントロールへの属性は追加できない。
-			for key, val in attrs.items():  # メソッドの引数がないときはvalをNoneにしている。
-				if val is None:
-					getattr(control, key)()
-				else:
-					getattr(control, key)(val)
-		return control  # 追加したコントロールを返す。
-	def _createControlModel(controltype, props):  # コントロールモデルの生成。
-		if not "Name" in props:
-			props["Name"] = _generateSequentialName(controltype)  # Nameがpropsになければ通し番号名を生成。
-		controlmodel = dialogmodel.createInstance("com.sun.star.awt.UnoControl{}Model".format(controltype))  # コントロールモデルを生成。UnoControlDialogElementサービスのためにUnoControlDialogModelからの作成が必要。
-		if props:
-			values = props.values()  # プロパティの値がタプルの時にsetProperties()でエラーが出るのでその対応が必要。
-			if any(map(isinstance, values, [tuple]*len(values))):
-				[setattr(controlmodel, key, val) for key, val in props.items()]  # valはリストでもタプルでも対応可能。XMultiPropertySetのsetPropertyValues()では[]anyと判断されてタプルも使えない。
-			else:
-				controlmodel.setPropertyValues(tuple(props.keys()), tuple(values))
-		return controlmodel
-	def _generateSequentialName(controltype):  # コントロールの連番名の作成。
-		i = 1
-		flg = True
-		while flg:
-			name = "{}{}".format(controltype, i)
-			flg = dialog.getControl(name)  # 同名のコントロールの有無を判断。
-			i += 1
-		return name
-	return dialog, addControl  # コントロールコンテナとそのコントロールコンテナにコントロールを追加する関数を返す。
