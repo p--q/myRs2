@@ -472,7 +472,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		kanadirpath = os.path.join(dirpath, k)  # 最初のカナ文字のフォルダへのパス。
 		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
 			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
-		detachSheet = createDatachSheet(desktop, controller, doc, sheets, kanadirpath)
+		detachSheet = createDetachSheet(desktop, controller, doc, sheets, kanadirpath)
 		componentwindow = controller.ComponentWindow
 		if entrynum==1:  # 退院リストへ。
 			msg = "{} {}のシートをファイルに切り出します。".format(kanjitxt, kanatxt)
@@ -560,7 +560,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				j = i.getCellAddress().Row - splittedrow  # 病棟列に療が入っているインデックスを取得。				
 				datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
-def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
+def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。
