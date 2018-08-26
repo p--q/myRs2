@@ -573,7 +573,7 @@ def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 			del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
 			systempath = os.path.join(kanadirpath, "{}.ods".format(newsheetname))
 			if os.path.exists(systempath):  # すでにファイルが存在する時。
-				msg = "シート{}はすでにバックアップ済です。\n上書きしますか？"
+				msg = "{}はすでにバックアップ済です。\n上書きしますか？".format(newsheetname)
 				componentwindow = controller.ComponentWindow
 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
 				if msgbox.execute()!=MessageBoxResults.YES:			
