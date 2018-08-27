@@ -158,7 +158,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 					else:
 						sheet[r, c].setString(fixedtxt)  # セルに代入。
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(mouseevent, xscriptcontext, fixedtxt)								
+						callback(mouseevent, xscriptcontext, rowdata[0])								
 				gridpopupmenu = self.gridpopupmenu		
 				for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
