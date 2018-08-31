@@ -272,8 +272,8 @@ def fillColumns(enhancedmouseevent, xscriptcontext, idtxt, kanjitxt, kanatxt, da
 	return kanjitxt, kanatxt
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。
-		VARS.setSheet(selection.getSpreadsheet())			
+	VARS.setSheet(selection.getSpreadsheet())  # setSheet()を実行するのはここだけ。		
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。		
 		drowBorders(selection)  # 枠線の作成。
 def drowBorders(selection):  # ターゲットを交点とする行列全体の外枠線を描く。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上端のセルアドレスを取得。
@@ -308,7 +308,6 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		datecolumncells = []	
 		nonkanacells = []
 		sheet = selection.getSpreadsheet()
-		VARS.setSheet(sheet)
 		rangeaddress = selection.getRangeAddress()	
 		flg = False
 		titlerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
