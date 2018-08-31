@@ -17,5 +17,9 @@ def documentOnLoad(xscriptcontext):  # ドキュメントを開いた時。リ�
 	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])  # カウントの文字色を設定。
 	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])  # カウントの文字色を設定。	
 	controller.setActiveSheet(sheet)  # 一覧シートをアクティブにする。
+	namedranges = doc.getPropertyValue("NamedRanges")  # ドキュメントのNamedRangesを取得。
+	for i in namedranges.getElementNames():  # namedrangesをイテレートするとfor文中でnamedrangesを操作してはいけない。
+		if not namedranges[i].getReferredCells():
+			namedranges.removeByName(i)  # 参照範囲がエラーの名前を削除する。	
 def documentUnLoad(xscriptcontext):  # ドキュメントを閉じた時。リスナー削除後。
 	pass
