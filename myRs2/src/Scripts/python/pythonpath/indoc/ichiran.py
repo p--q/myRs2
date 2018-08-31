@@ -1,9 +1,9 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-import os, unohelper, glob
+import glob, os, unohelper 
 from itertools import chain
-from indoc import commons, keika, ent, datedialog
+from indoc import commons, datedialog, ent, keika
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
@@ -147,7 +147,8 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
 	sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, hospdays = sheet[r, :VARS.checkstartcolumn].getDataArray()[0]  # 日付はfloatで返ってくる。	
-	datevalue = datevalue and int(datevalue)  # 計算しにくいのでdatevalueがあるときはfloatを整数にしておく。	
+	if isinstance(datevalue , float):  # 入院日列がfloatの時。つまり日付シリアル値が取得出来た時。
+		datevalue = int(datevalue)  # 計算しにくいのでdatevalueがあるときはfloatを整数にしておく。	
 	if c==VARS.sumicolumn:  # 済列の時。
 		if hospdays:  # 在院日数列が空セルでない時。
 			items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
@@ -374,7 +375,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
@@ -446,7 +446,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	selection = controller.getSelection()  # 選択範囲を取得。
 	rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 	r = rangeaddress.StartRow

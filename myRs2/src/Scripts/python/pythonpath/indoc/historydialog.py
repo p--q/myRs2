@@ -244,7 +244,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
 					sheet[r, c].setString(rowdata[0])  # グリッドコントロールは1列と決めつけて、その最初の要素をセルに代入。
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(mouseevent, xscriptcontext)							
+						callback(rowdata[0], xscriptcontext)							
 					nextcell = sheet[r+1, c]  # 下のセルを取得。
 					controller.select(nextcell)  # 下のセルを選択。
 					nexttxt = nextcell.getString()  # 下のセルの文字列を取得。

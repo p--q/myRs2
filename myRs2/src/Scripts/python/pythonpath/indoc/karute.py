@@ -210,8 +210,8 @@ def separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, startrow=VARS
 	sheet = VARS.sheet
 	sheet[startrow:startrow+len(newdatarows), :VARS.articlecolumn+1].setDataArray(newdatarows)
 	sheet[startrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
-	sheet[startrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-	sheet[startrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)('YYYY-M-D'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Problem列の書式設定。左寄せにする。
 def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える処理。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
@@ -228,9 +228,8 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			selection.setString("#")
 			selection.setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))
 	elif c==VARS.datecolumn:  # 日付列の時。
-		if not selection.getValue():  # 文字列のときはセルの値が0.0で返る。
-			return True  # セル編集モードにする。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-MM-DD")	
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-M-D")	
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せにする。
 	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
 		txt = selection.getString()
 		if not txt:
@@ -276,31 +275,28 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			problemtxt = "履歴"
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
 	return False  # セルを編集モードにしない。	
-def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
-	sheet = VARS.sheet
+def callback_phrasecolumn(gridcelltxt, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	r = selection.getCellAddress().Row  # 選択行インデックスを取得。
-	txt = sheet[r, VARS.problemcolumn].getString()
 	sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
-	if txt.startswith("#"):  # #から始まっている時。
+	if gridcelltxt.startswith("#"):  # #から始まっている時。
 		sharptxt = "#"
-		txt = txt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
-	if txt.startswith("today"):  # todayで始まっている時。
+		gridcelltxt = gridcelltxt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
+	if gridcelltxt.startswith("today"):  # todayで始まっている時。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
-		txt = txt[len("today"):]  # todayを削る。
-	if ":" in txt:
-		problemtxt, articletxt = txt.split(":", 1)
+		gridcelltxt = gridcelltxt[len("today"):]  # todayを削る。
+	if ":" in gridcelltxt:
+		problemtxt, articletxt = gridcelltxt.split(":", 1)
 	else:
-		articletxt = txt
+		articletxt = gridcelltxt
 	datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
 	VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
-def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
+def callback_insertdatecolumn(datetxt, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
-	articlecell.setString("".join([articlecell.getString(), selection.getString()]))  # 新規日付を代入。
+	articlecell.setString("".join([articlecell.getString(), datetxt]))  # 新規日付を代入。
 def createHandleDS(functionaccess):
 	rgpat = r"^((([HS][0-3]?|20\d)\d[\.\-\/][01]?\d[\.\-\/][0-3]?\d)|(([HS][0-3]?|20\d)\d[\.\-\/][01]?\d)|(([HS][0-3]?|20\d)\d))[^\.\d]"  # 日付を取得する正規表現パターン。数字とピリオド以外が続く時のみ取得。
 	rgx = re.compile(rgpat)	
@@ -450,16 +446,22 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	r = selection[0, 0].getCellAddress().Row  # 選択範囲の左上隅のセルアドレスを取得。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上隅のセルアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column
 	if contextmenuname=="cell":  # セルのとき
 		if r>VARS.splittedrow-1:  # 分割行以下の時。
+			if c==VARS.datecolumn and selection.supportsService("com.sun.star.sheet.SheetCell"):  # 日付列のセルの時。
+				if selection.getValue()>0:  # 文字列でないとき。文字列の時は0.0が返る。
+					addMenuentry("ActionTrigger", {"Text": "年-月", "CommandURL": baseurl.format("entry8")}) 	
+					addMenuentry("ActionTrigger", {"Text": "年", "CommandURL": baseurl.format("entry9")}) 		
+					addMenuentry("ActionTrigger", {"Text": "年-月-日", "CommandURL": baseurl.format("entry10")}) 	
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
 			commons.cutcopypasteMenuEntries(addMenuentry)
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
@@ -492,7 +494,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	selection = controller.getSelection()
 	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
 		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
@@ -531,6 +532,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		selection.clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==7:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+		
+		
+	elif entrynum==8:  # 年-月、書式にする。
+		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY-M')) 
+	elif entrynum==9:  # 月、書式にする。
+		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY')) 
+	elif entrynum==10:  # 年-月-日、書式にする。
+		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY-M-D')) 
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。

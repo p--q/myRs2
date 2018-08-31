@@ -218,11 +218,10 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
 	return False  # セル編集モードにしない。		
-def callback_wClickUpperRight(mouseevent, xscriptcontext):	
+def callback_wClickUpperRight(gridcelltxt, xscriptcontext):	
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	txt = selection.getString()
-	if txt:  # セルに文字列がある時。
-		horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+	if gridcelltxt:  # セルに文字列がある時。
+		horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
 	else:
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
@@ -282,25 +281,23 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 			defaultrows.extend(weekdays)
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomLeft0(mouseevent, xscriptcontext):
+def callback_wClickBottomLeft0(gridcelltxt, xscriptcontext):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	r = selection.getCellAddress().Row
 	sheet = VARS.sheet
-	txt = sheet[r, VARS.yakucolumn].getString()
-	if ":" in txt:
-		txts = txt.split(":"),
+	if ":" in gridcelltxt:
+		txts = gridcelltxt.split(":"),
 		columnlength = len(txts[0])
 		if columnlength<VARS.splittedcolumn-VARS.yakucolumn+1:
 			sheet[r, VARS.yakucolumn:VARS.yakucolumn+columnlength].setDataArray(txts)
-	if txt.endswith(":検査値"):
+	if gridcelltxt.endswith(":検査値"):
 		sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
-def callback_wClickBottomLeft(mouseevent, xscriptcontext, fixedtxt=None):
+def callback_wClickBottomLeft(gridcelltxt, xscriptcontext, fixedtxt=None):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	txt = selection.getString()	
-	if txt:  # セルに文字列がある時。
-		horijustify	= LEFT if len(txt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
+	if gridcelltxt:  # セルに文字列がある時。
+		horijustify	= LEFT if len(gridcelltxt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
 		selection.setPropertyValue("HoriJustify", horijustify)  
-		if txt=="皮下注":
+		if gridcelltxt=="皮下注":
 			VARS.sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
 def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 	r = enhancedmouseevent.Target.getCellAddress().Row
@@ -319,23 +316,22 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 		defaultrows = "止", "変", "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "点滴", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomRight(mouseevent, xscriptcontext):	
+def callback_wClickBottomRight(gridcelltxt, xscriptcontext):	
 	sheet = VARS.sheet
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	txt = selection.getString()
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-	if txt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
+	if gridcelltxt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
 		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, CENTER))  # 背景を消して中央揃えにする。		
 		sheet[r, c+1:].clearContents(511)
 		if r>VARS.blackrow:  # 黒行より下の時。
 			rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
 			commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
-	elif txt=="処方":
+	elif gridcelltxt=="処方":
 		selection.setString("")
 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
-	elif txt:  # 上記以外の文字列の時。
-		horijustify	= LEFT if len(txt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+	elif gridcelltxt:  # 上記以外の文字列の時。
+		horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
 		if selection.getPropertyValue("CellBackColor")==-1:  # 背景色がまだない時。
 			color = "lime" if sheet[r, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
 			selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], horijustify))  
@@ -437,7 +433,6 @@ def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リス�
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
@@ -512,7 +507,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	selection = controller.getSelection()
 	if entrynum==3:  # 日付追加。selectionは単一セル。	
 		setDates(xscriptcontext, doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。

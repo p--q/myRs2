@@ -72,7 +72,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	col0 = [""]*7  # 全てに空文字を挿入。
 	cellvalue = enhancedmouseevent.Target.getValue()  # セルの値を取得。
 	centerday = None
-	if cellvalue and isinstance(cellvalue, float):  # セルの値がfloat型のとき。datevalueと決めつける。文字列のときは0.0が返る。
+	if cellvalue>0:  # セルの値が0より大きい時、日付シリアル値と断定する。文字列のときは0.0が返る。
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		if cellvalue!=functionaccess.callFunction("TODAY", ()):  # セルの数値が今日でない時。
 			centerday = date(*[int(functionaccess.callFunction(i, (cellvalue,))) for i in ("YEAR", "MONTH", "DAY")])  # シリアル値をシート関数で年、月、日に変換してdateオブジェクトにする。
@@ -171,9 +171,10 @@ class MouseListener(unohelper.Base, XMouseListener):
 							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
 								formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。
 							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
-						selection.setFormula(datetxt.split("(")[0])  # 2018-8-7の書式で式としてセルに代入。
+						datetxt = datetxt.split("(")[0]  # 2018-8-7の形式で日付を取得。
+						selection.setFormula(datetxt)  # 日付の書式で式としてセルに代入。
 						if callback is not None:  # コールバック関数が与えられている時。
-							callback(mouseevent, xscriptcontext)
+							callback(datetxt, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 					if itemtext.startswith("セル入力で閉じる"):

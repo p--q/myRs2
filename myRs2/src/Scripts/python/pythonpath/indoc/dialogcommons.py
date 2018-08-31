@@ -6,7 +6,7 @@ from com.sun.star.awt import Point  # Struct
 from com.sun.star.frame import XFrameActionListener
 from com.sun.star.frame.FrameAction import FRAME_UI_DEACTIVATING  # enum
 from com.sun.star.util import MeasureUnit  # 定数
-SHEETNAME = "config"  # データを保存するシート名。
+SHEETNAME = "__config__"  # データを保存するシート名。
 def saveData(doc, rangename, obj):	# configシートの名前rangenameにobjをJSONにして保存する。グローバル変数SHEETNAMEを使用。
 	namedranges = doc.getPropertyValue("NamedRanges")  # ドキュメントのNamedRangesを取得。
 	if rangename in namedranges:  # 名前がある時。
