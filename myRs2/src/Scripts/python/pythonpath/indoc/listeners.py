@@ -3,7 +3,7 @@
 # embeddedmacro.pyから呼び出した関数ではXSCRIPTCONTEXTは使えない。デコレーターも使えない。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)でブレークする。
 import unohelper  # オートメーションには必須(必須なのはuno)。
 from indoc.commons import getModule # 相対インポートはできない。
-from indoc import exceptiondialog
+from indoc import exceptiondialog2
 from com.sun.star.awt import XEnhancedMouseClickHandler
 from com.sun.star.document import XDocumentEventListener
 from com.sun.star.sheet import XActivationEventListener
@@ -19,7 +19,7 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 			return getattr(m, methodname)(*args)  # その関数を実行。
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
 	except:  # UNO APIのメソッド以外のエラーはダイアログがでないのでここで捉える。
-		exceptiondialog.createDialog(args[-1])  # XSCRIPTCONTEXTを渡す。
+		exceptiondialog2.createDialog(args[-1])  # XSCRIPTCONTEXTを渡す。
 def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
 	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 

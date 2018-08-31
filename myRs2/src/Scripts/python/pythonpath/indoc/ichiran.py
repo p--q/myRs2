@@ -51,20 +51,19 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				i.getParent().clearContents(CellFlags.ANNOTATION)
 	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))  # チェック列固定行より下、全て上下左右中央揃えにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
-					return wClickMenu(enhancedmouseevent, xscriptcontext)
-				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
-					return False # 何もしない。
-				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
-					return wClickIDCol(enhancedmouseevent, xscriptcontext)
-				elif c<VARS.memostartcolumn:  # チェック列の時。
-					return wClickCheckCol(enhancedmouseevent, xscriptcontext)
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+			if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
+				return wClickMenu(enhancedmouseevent, xscriptcontext)
+			elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
+				return False # 何もしない。
+			elif c<VARS.checkstartcolumn:  # チェック列より左の時。
+				return wClickIDCol(enhancedmouseevent, xscriptcontext)
+			elif c<VARS.memostartcolumn:  # チェック列の時。
+				return wClickCheckCol(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -473,7 +472,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		kanadirpath = os.path.join(dirpath, k)  # 最初のカナ文字のフォルダへのパス。
 		if not os.path.exists(kanadirpath):  # カタカナフォルダがないとき。
 			os.mkdir(kanadirpath)  # カタカナフォルダを作成。 
-		detachSheet = createDatachSheet(desktop, controller, doc, sheets, kanadirpath)
+		detachSheet = createDetachSheet(desktop, controller, doc, sheets, kanadirpath)
 		componentwindow = controller.ComponentWindow
 		if entrynum==1:  # 退院リストへ。
 			msg = "{} {}のシートをファイルに切り出します。".format(kanjitxt, kanatxt)
@@ -561,7 +560,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				j = i.getCellAddress().Row - splittedrow  # 病棟列に療が入っているインデックスを取得。				
 				datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
-def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
+def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。
@@ -574,7 +573,7 @@ def createDatachSheet(desktop, controller, doc, sheets, kanadirpath):
 			del sheets[newsheetname]  # 切り出したカルテシートを削除する。 
 			systempath = os.path.join(kanadirpath, "{}.ods".format(newsheetname))
 			if os.path.exists(systempath):  # すでにファイルが存在する時。
-				msg = "シート{}はすでにバックアップ済です。\n上書きしますか？"
+				msg = "{}はすでにバックアップ済です。\n上書きしますか？".format(newsheetname)
 				componentwindow = controller.ComponentWindow
 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
 				if msgbox.execute()!=MessageBoxResults.YES:			

@@ -101,15 +101,14 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		cellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。	
 		daterange.setString(todaytxt)  # 今日の日付を本日の記事欄に入力。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				r = selection.getCellAddress().Row  # 選択セルの行インデックスを取得。	
-				if r<VARS.splittedrow or r==VARS.redrow:  # 分割行より上、または、赤行の時。
-					return wClickMenu(enhancedmouseevent, xscriptcontext)
-				elif r<VARS.redrow and r not in (VARS.bluerow, VARS.skybluerow):  # 分割行以下赤行より上、かつ、タイトル行でない時。
-					return wClickCol(enhancedmouseevent, xscriptcontext)
+			r = selection.getCellAddress().Row  # 選択セルの行インデックスを取得。	
+			if r<VARS.splittedrow or r==VARS.redrow:  # 分割行より上、または、赤行の時。
+				return wClickMenu(enhancedmouseevent, xscriptcontext)
+			elif r<VARS.redrow and r not in (VARS.bluerow, VARS.skybluerow):  # 分割行以下赤行より上、かつ、タイトル行でない時。
+				return wClickCol(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。
 def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。

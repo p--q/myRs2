@@ -251,17 +251,16 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 			sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, VARS.templatestartcolumn:VARS.templateendcolumnedge].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。		
 			selection.setPropertyValue("TableBorder2", tableborder2)  # 選択範囲の消えた枠線を引き直す。	
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ボタンのとき
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-			if enhancedmouseevent.ClickCount==2:  # ダブルクリックの時。まずselectionChanged()が発火している。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-				if r==VARS.menurow:
-					return wClickMenu(enhancedmouseevent, xscriptcontext)
-				elif VARS.datarow-1<r<VARS.emptyrow:
-					if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-						return wClickCell(enhancedmouseevent, xscriptcontext)
+			celladdress = selection.getCellAddress()
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+			if r==VARS.menurow:
+				return wClickMenu(enhancedmouseevent, xscriptcontext)
+			elif VARS.datarow-1<r<VARS.emptyrow:
+				if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
+					return wClickCell(enhancedmouseevent, xscriptcontext)
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -376,17 +375,26 @@ def callback_wClickCell(mouseevent, xscriptcontext):
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	setCellProp(selection)
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
-	changes = changesevent.Changes	
-	for change in changes:
+	selection = None
+	for change in changesevent.Changes:
 		if change.Accessor=="cell-change":  # セルの値が変化した時。マクロで変更したときはセル範囲が入ってくる時がある。
-			selection = change.ReplacedElement  # 値を変更したセルを取得。	
-			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-				if VARS.datarow-1<r<VARS.emptyrow:
-					if VARS.datacolumn-1<c<VARS.firstemptycolumn or VARS.templatestartcolumn-1<c<VARS.templateendcolumnedge:
-						setCellProp(selection)
+			selection = change.ReplacedElement  # 値を変更したセルを取得。
 			break
+	if selection and selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+		celladdress = selection.getCellAddress()
+		r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+		offdayc = VARS.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
+		if VARS.datarow<=r<VARS.emptyrow:  # 予定セルまたはテンプレートセルのある行の時。
+			if VARS.datacolumn-1<c<VARS.firstemptycolumn or offdayc<c<VARS.templateendcolumnedge:  # 予定セルまたはテンプレートセルのある列の時。
+				setCellProp(selection)
+		elif celladdress.Column==offdayc and selection.getValue()>0:  # 選択セルが休日設定のある列、かつ、選択セルに0より大きい数値が入っている。の時。 
+			sheet = selection.getSpreadsheet()
+			searchdescriptor = sheet.createSearchDescriptor()
+			searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
+			searchedcell = sheet[VARS.emptyrow:, offdayc].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。
+			if searchedcell:  # 休日設定の開始セルがある時。
+				if celladdress.Row>searchedcell.getCellAddress().Row+1:  # 休日設定の開始行より下の時。
+					selection.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(xscriptcontext.getDocument())('YYYY-M-D'), LEFT))
 def setCellProp(selection):		
 	txt = selection.getString()	
 	if txt:  # セルに文字列がある時。
