@@ -221,7 +221,7 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	c = selection.getCellAddress().Column  # selectionの行と列のインデックスを取得。		
 	dic = {\
-		"病棟": ["", "待", "療", "包"],\
+		"病棟": ["", "待", "療", "包", "共"],\
 		"ｴ結": ["", "ｴ", "済"],\
 		"読影": ["", "未", "読", "済"],\
 		"退処": ["", "済", "△", "待"],\
@@ -229,7 +229,7 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 		"ECG": ["", "E", "済"],\
 		"糖尿": ["", "糖"],\
 		"熱発": ["", "熱"],\
-		"計書": ["", "済", "未"],\
+		"計書": ["", "済", "共", "未"],\
 		"面談": ["", "面"],\
 		"便指": ["", "済", "少", "無"]\
 	}
