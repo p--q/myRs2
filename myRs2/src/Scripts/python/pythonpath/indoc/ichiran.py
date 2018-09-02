@@ -231,7 +231,7 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 		"熱発": ["", "熱"],\
 		"計書": ["", "済", "共", "未"],\
 		"面談": ["", "面"],\
-		"便指": ["", "済", "少", "無"]\
+		"便指": ["", "済", "少", "無", "共"]\
 	}
 	header = VARS.sheet[VARS.menurow, c].getString()  # 行インデックス0のセルの文字列を取得。
 	newtxt = txt
