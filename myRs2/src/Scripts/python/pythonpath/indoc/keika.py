@@ -92,7 +92,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		else:
 			commons.showErrorMessageBox(controller, "IDが取得できませんでした。")	
 	elif txt=="薬品順":  # クリックするたびに終了順、昇順に並び替える。黒行の上のみ。
-		if VARS.splittedrow>VARS.blackrow:  # 分割行から黒行より上に行がある時のみ。
+		if VARS.splittedrow<VARS.blackrow:  # 分割行から黒行より上に行がある時のみ。
 			datarange = sheet[VARS.splittedrow:VARS.blackrow, :]  # 黒行より上の行のセル範囲を取得。
 			controller.select(datarange)  # ソートするセル範囲を取得。
 			if selection.getPropertyValue("CellBackColor")==-1:  # ボタンの背景色がない時、薬名列の昇順でソート。
