@@ -11,7 +11,7 @@ from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.table import CellVertJustify2  # 定数
-from com.sun.star.table.CellHoriJustify import LEFT, CENTER  # enum
+from com.sun.star.table.CellHoriJustify import CENTER, LEFT, RIGHT  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Karute():  # シート固有の定数設定。
@@ -230,14 +230,12 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	elif c==VARS.datecolumn:  # 日付列の時。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-M-D")	
 		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せにする。
-	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
-		txt = selection.getString()
-		if not txt:
-			selection.setString("#")
-			return False
-		elif txt=="#":
+	elif c in (VARS.problemcolumn,):  # プロブレム列の時。
+		if selection.getString()=="#":
 			selection.setString("")
-			return False
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せにする。
+		return True  # セル編集モードにする。
+	elif c in (VARS.articlecolumn,):  # 記事列の時。
 		return True  # セル編集モードにする。
 	elif c==VARS.phrasecolumn:  # 定型句列インデックスの時。
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumn)
@@ -456,12 +454,16 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 	r, c = celladdress.Row, celladdress.Column
 	if contextmenuname=="cell":  # セルのとき
 		if r>VARS.splittedrow-1:  # 分割行以下の時。
-			if c==VARS.datecolumn and selection.supportsService("com.sun.star.sheet.SheetCell"):  # 日付列のセルの時。
-				if selection.getValue()>0:  # 文字列でないとき。文字列の時は0.0が返る。
-					addMenuentry("ActionTrigger", {"Text": "年-月", "CommandURL": baseurl.format("entry8")}) 	
-					addMenuentry("ActionTrigger", {"Text": "年", "CommandURL": baseurl.format("entry9")}) 		
-					addMenuentry("ActionTrigger", {"Text": "年-月-日", "CommandURL": baseurl.format("entry10")}) 	
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。		
+			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				if c in (VARS.datecolumn, VARS.problemcolumn):  # 日付列またはプロブレム列の時。
+					if c==VARS.datecolumn and selection.getValue()>0:  # 日付列、かつ、文字列でない、の時。文字列の時は0.0が返る。
+						addMenuentry("ActionTrigger", {"Text": "年-月", "CommandURL": baseurl.format("entry8")}) 	
+						addMenuentry("ActionTrigger", {"Text": "年", "CommandURL": baseurl.format("entry9")}) 		
+						addMenuentry("ActionTrigger", {"Text": "年-月-日", "CommandURL": baseurl.format("entry10")}) 	
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+					if selection.getString()!="#":  # セルの文字列が#ではない時のみ。
+						addMenuentry("ActionTrigger", {"Text": "#", "CommandURL": baseurl.format("entry11")})		
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。			
 			commons.cutcopypasteMenuEntries(addMenuentry)
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
@@ -495,51 +497,53 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
-	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+	if entrynum in (1, 2, 3, 4, 5):
 		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-	elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
-		dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
-		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
-	elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
-		dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
-		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-	elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
-		problemranges = getProblemRanges(doc, sheet[VARS.skybluerow+1:VARS.redrow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
-		problemranges = getProblemRanges(doc, sheet[VARS.skybluerow+1:VARS.redrow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
+			dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
+		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
+			dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 	elif entrynum==6:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==7:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
-		
-		
-	elif entrynum==8:  # 年-月、書式にする。
-		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY-M')) 
-	elif entrynum==9:  # 月、書式にする。
-		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY')) 
-	elif entrynum==10:  # 年-月-日、書式にする。
-		selection.setPropertyValue("NumberFormat", commons.formatkeyCreator(doc)('YYYY-M-D')) 
+	elif entrynum in (8, 9, 10):
+		formatkey = ""
+		if entrynum==8:  # 年-月、書式にする。
+			formatkey = 'YYYY-M'
+		elif entrynum==9:  # 月、書式にする。
+			formatkey = 'YYYY'
+		elif entrynum==10:  # 年-月-日、書式にする。
+			formatkey = 'YYYY-M-D'
+		if formatkey:
+			selection.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)(formatkey), LEFT, CellVertJustify2.CENTER)) 
+	elif entrynum==11:  # #を代入。
+		selection.setString("#")
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER)) 
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。
