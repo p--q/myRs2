@@ -341,10 +341,11 @@ def callback_wClickBottomRight(gridcelltxt, xscriptcontext):
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()  # 必ずしもセル範囲とは限らない。
-	VARS.setSheet(selection.getSpreadsheet())		
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
+		VARS.setSheet(selection.getSpreadsheet())		
 		detectDuplicates(selection, xscriptcontext)  # 薬名の重複をチェック。drowBorders()はこの中で実行。選択範囲が変わるのでdrowBorders()が実行される。
 	elif selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択範囲がセル範囲の時。	
+		VARS.setSheet(selection.getSpreadsheet())	
 		drowBorders(selection)  # 枠線の作成。
 def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェック。	
 	celladdress = selection.getCellAddress()	

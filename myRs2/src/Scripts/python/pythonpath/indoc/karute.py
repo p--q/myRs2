@@ -440,8 +440,8 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells, fullwidth_halfwidth
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
-	VARS.setSheet(selection.getSpreadsheet())		
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。		
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。	
+		VARS.setSheet(selection.getSpreadsheet())			
 		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
