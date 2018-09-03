@@ -67,7 +67,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	try:
-		articledate = datetime.strptime(articledatetxt.split("(")[0], "****%Y年%m月%d日")  # 記事列の日付を取得。strptime()は0埋めは関係ないが曜日文字列はOS依存なので曜日は削除する。
+		articledate = datetime.strptime(articledatetxt.split("(")[0], "****%Y年%m月%d日").date()  # 記事列の日付を取得。strptime()は0埋めは関係ないが曜日文字列はOS依存なので曜日は削除する。
 	except:
 		articledate = None
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。

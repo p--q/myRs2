@@ -112,7 +112,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 						if i in s:
 							if not i in datarows[r][echocol]:  # すでにない時のみ。
 								datarows[r][echocol] += i		
-							datarows[r][eketsucol] = "○"	
+							datarows[r][eketsucol] = "ｴ"	
 					for i in commons.SHOCHIs:  # 処置。
 						if i in s:
 							if not i in datarows[r][shochicol]:  # すでにない時のみ。
