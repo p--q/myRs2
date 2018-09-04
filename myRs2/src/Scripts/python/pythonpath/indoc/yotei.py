@@ -1,9 +1,9 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import commons, staticdialog, ichiran, transientdialog, keika
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # シート関数ではアルゴリズムが難しい。
+from indoc import commons, ichiran, keika, staticdialog, transientdialog
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
@@ -67,11 +67,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲をカット。	
 				controller.select(sheet[monthrow, datacolumn])  # ペーストする左上セルを選択。
 				dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。	
-				componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
-				keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
-				toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-				toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
-				toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+				commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 				controller.select(sheet[emptyrow, datacolumn])			
 		elif diff<0:  # 先頭日付が未来の時はここで終わる。
 			return
@@ -371,7 +367,7 @@ def wClickCell(enhancedmouseevent, xscriptcontext):
 	defaultrows = "2F", "3F", "強", "新", "閉", "外", "会", "手", "ｸﾘｱ", "x", "/"
 	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "予定", defaultrows, callback=callback_wClickCell)	
 	return False  # セル編集モードにしない。	
-def callback_wClickCell(mouseevent, xscriptcontext):	
+def callback_wClickCell(gridcelltxt, xscriptcontext):	
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 	setCellProp(selection)
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
@@ -413,7 +409,6 @@ def setCellProp(selection):
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
@@ -448,7 +443,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	selection = controller.getSelection()
 	ichiransheet = doc.getSheets()["一覧"]
 	if entrynum==1:  # クリア。	
@@ -467,8 +461,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
 		defaultrows = [" ".join(i) for i in ichirandatarows]
 		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, fixedtxt="面", callback=callback_wClickGrid)
-def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
-	idtxt = gridcelldata.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
+def callback_wClickGrid(gridcelltxt, xscriptcontext):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
+	idtxt = gridcelltxt.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	sheet = doc.getCurrentController().getActiveSheet()
 	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
@@ -488,7 +482,7 @@ def callback_wClickGrid(mouseevent, xscriptcontext, gridcelldata):  # gridcellda
 				return
 	setCellProp(selection)	
 	celladdress = selection.getCellAddress()
-	annotations.insertNew(celladdress, gridcelldata)  # gridcelldataをセル注釈を挿入。
+	annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
 	ichiransheet = doc.getSheets()["一覧"]
 	cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
 	if cell:	

@@ -252,7 +252,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 					else:
 						sheet[r, c].setString(rowdata[0])  # セルに代入。
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(mouseevent, xscriptcontext)						
+						callback(rowdata[0], xscriptcontext)						
 					if not flg:	
 						controller.select(sheet[r+1, c])  # 下のセルを選択。	
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
@@ -266,7 +266,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向							
 	def mouseReleased(self, mouseevent):
 		pass
-	def mouseEntered(self, mouseevent):
+	def mouseEntered(self, mouseevent): 
 		pass
 	def mouseExited(self, mouseevent):
 		pass

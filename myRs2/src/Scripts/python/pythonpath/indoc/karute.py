@@ -4,14 +4,14 @@
 import re
 from datetime import date, datetime
 from indoc import commons, datedialog, historydialog, staticdialog
-from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
+from com.sun.star.awt import Key, MouseButton  # 定数
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.sheet import CellFlags  # 定数
 from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
 from com.sun.star.sheet.CellInsertMode import ROWS as insert_rows  # enum
 from com.sun.star.table import CellVertJustify2  # 定数
-from com.sun.star.table.CellHoriJustify import LEFT, CENTER  # enum
+from com.sun.star.table.CellHoriJustify import CENTER, LEFT, RIGHT  # enum
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
 class Karute():  # シート固有の定数設定。
@@ -33,9 +33,11 @@ class Karute():  # シート固有の定数設定。
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
 		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
-		self.bluerow = next(gene)  # 青3行インデックス。
-		self.skybluerow = next(gene)  # スカイブルー行インデックス。
-		self.redrow = next(gene)  # 赤3行インデックス。
+		headers = next(gene, None), next(gene, None), next(gene, None)
+		if None in headers:  # Noneがある時。
+			rownames = "青", "スカイブルー", "赤"
+			raise RuntimeError("{0}行が取得できません。\n{0}色の背景色のID列に何らかの文字列をいれてください。".format(rownames[headers.index(None)]))
+		self.bluerow, self.skybluerow, self.redrow = headers
 VARS = Karute()		
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 	doc = xscriptcontext.getDocument()
@@ -62,12 +64,12 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
 			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
 		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
-			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
+			copieddatecell.setPropertyValue("CharColor", commons.COLORS["red3"])  # 文字色を赤色にする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
 	try:
-		articledate = datetime.strptime(articledatetxt.split("(")[0], "****%Y年%m月%d日")  # 記事列の日付を取得。strptime()は0埋めは関係ないが曜日文字列はOS依存なので曜日は削除する。
+		articledate = datetime.strptime(articledatetxt.split("(")[0], "****%Y年%m月%d日").date()  # 記事列の日付を取得。strptime()は0埋めは関係ないが曜日文字列はOS依存なので曜日は削除する。
 	except:
 		articledate = None
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
@@ -210,16 +212,15 @@ def separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, startrow=VARS
 	sheet = VARS.sheet
 	sheet[startrow:startrow+len(newdatarows), :VARS.articlecolumn+1].setDataArray(newdatarows)
 	sheet[startrow:VARS.bluerow, VARS.sharpcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # #列の書式設定。左寄せにする。
-	sheet[startrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
-	sheet[startrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Subject列の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)('YYYY-M-D'), LEFT, CellVertJustify2.CENTER))  # カルテシートの入院日の書式設定。左寄せにする。
+	sheet[startrow:VARS.bluerow, VARS.problemcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # Problem列の書式設定。左寄せにする。
 def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える処理。
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
 	if c==0:  # 行挿入列の時。
-		sheet = VARS.sheet
-		sheet.insertCells(sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
-		sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
+		VARS.sheet.insertCells(VARS.sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
+		VARS.sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
 	elif c==VARS.sharpcolumn:  # 区切列の時。
 		txt = selection.getString()  # クリックしたセルの文字列を取得。
 		if txt:
@@ -228,17 +229,14 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			selection.setString("#")
 			selection.setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))
 	elif c==VARS.datecolumn:  # 日付列の時。
-		if not selection.getValue():  # 文字列のときはセルの値が0.0で返る。
-			return True  # セル編集モードにする。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-MM-DD")	
-	elif c in (VARS.problemcolumn, VARS.articlecolumn):  # プロブレム列または記事列の時。
-		txt = selection.getString()
-		if not txt:
-			selection.setString("#")
-			return False
-		elif txt=="#":
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付入力", "YYYY-M-D")	
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せにする。
+	elif c in (VARS.problemcolumn,):  # プロブレム列の時。
+		if selection.getString()=="#":
 			selection.setString("")
-			return False
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せにする。
+		return True  # セル編集モードにする。
+	elif c in (VARS.articlecolumn,):  # 記事列の時。
 		return True  # セル編集モードにする。
 	elif c==VARS.phrasecolumn:  # 定型句列インデックスの時。
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumn)
@@ -248,10 +246,9 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
 		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
-		sheet = VARS.sheet
-		datetxt = sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
+		datetxt = VARS.sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
 		if datetxt:  # 日付文字列が取得出来た時。
-			articlecell = sheet[r, VARS.articlecolumn]  # 記事セルを取得。
+			articlecell = VARS.sheet[r, VARS.articlecolumn]  # 記事セルを取得。
 			articletxt = articlecell.getString()  # 記事セルの文字列を取得。
 			if articletxt:  # 記事列のセルに文字列がある時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -262,45 +259,53 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
 					articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。				
 					txts = articletxt.rsplit("｡", 1)  # 右から｡で1回分割。	
-					if len(txts)>1:  # "｡"がない時は何もしない。
+					if len(txts)>1:  # "｡"がある時。
 						if txts[-1]:  # 日付の直前が｡でない時。
 							articletxt = "".join((txts[0], "｡", datetxt, " ", txts[1]))  # ｡の後ろに日付を移動させる。
 						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
 							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
 							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
 								articletxt = "".join((txts2[0], "｡", datetxt, " ", txts2[1], "｡"))
-						articlecell.setString(articletxt)
+							else:
+								articletxt = "".join((datetxt, " ", txts2[0], "｡"))  # 先頭に日付を移動させる。
+					else:  # "｡"がない時。
+						articletxt = "".join((datetxt, " ", txts[0]))  # 先頭に日付を移動させる。
+					articlecell.setString(articletxt)	
+				controller = xscriptcontext.getDocument().getCurrentController()		
+				controller.select(articlecell)
+				commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。	
 	elif c==VARS.historycolumn:  # 履歴列の時。
 		problemtxt = VARS.sheet[r, VARS.problemcolumn].getString()
 		if not problemtxt:
 			problemtxt = "履歴"
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
 	return False  # セルを編集モードにしない。	
-def callback_phrasecolumn(mouseevent, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
-	sheet = VARS.sheet
+def callback_phrasecolumn(gridcelltxt, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	r = selection.getCellAddress().Row  # 選択行インデックスを取得。
-	txt = sheet[r, VARS.problemcolumn].getString()
 	sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
-	if txt.startswith("#"):  # #から始まっている時。
+	if gridcelltxt.startswith("#"):  # #から始まっている時。
 		sharptxt = "#"
-		txt = txt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
-	if txt.startswith("today"):  # todayで始まっている時。
+		gridcelltxt = gridcelltxt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
+	if gridcelltxt.startswith("today"):  # todayで始まっている時。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
 		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
-		txt = txt[len("today"):]  # todayを削る。
-	if ":" in txt:
-		problemtxt, articletxt = txt.split(":", 1)
+		gridcelltxt = gridcelltxt[len("today"):]  # todayを削る。
+	if ":" in gridcelltxt:
+		problemtxt, articletxt = gridcelltxt.split(":", 1)
 	else:
-		articletxt = txt
+		articletxt = gridcelltxt
 	datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
 	VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
-def callback_insertdatecolumn(mouseevent, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+def callback_insertdatecolumn(datetxt, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
+	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
-	articlecell.setString("".join([articlecell.getString(), selection.getString()]))  # 新規日付を代入。
+	articlecell.setString("".join([articlecell.getString(), datetxt]))  # 新規日付を代入。
+	controller = doc.getCurrentController()
+	controller.select(articlecell)
+	commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。
 def createHandleDS(functionaccess):
 	rgpat = r"^((([HS][0-3]?|20\d)\d[\.\-\/][01]?\d[\.\-\/][0-3]?\d)|(([HS][0-3]?|20\d)\d[\.\-\/][01]?\d)|(([HS][0-3]?|20\d)\d))[^\.\d]"  # 日付を取得する正規表現パターン。数字とピリオド以外が続く時のみ取得。
 	rgx = re.compile(rgpat)	
@@ -444,22 +449,32 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 	return getCopyDataRows, formatArticleColumn, formatProblemList, copyCells, fullwidth_halfwidth
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()
-	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。
+	if selection.supportsService("com.sun.star.sheet.SheetCellRange"):  # 選択オブジェクトがセル範囲であることを確認する。シート削除したときにエラーになるので。	
 		VARS.setSheet(selection.getSpreadsheet())			
 		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
 	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
 	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
 	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	r = selection[0, 0].getCellAddress().Row  # 選択範囲の左上隅のセルアドレスを取得。
+	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上隅のセルアドレスを取得。
+	r, c = celladdress.Row, celladdress.Column
 	if contextmenuname=="cell":  # セルのとき
 		if r>VARS.splittedrow-1:  # 分割行以下の時。
+			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
+				if c in (VARS.datecolumn, VARS.problemcolumn):  # 日付列またはプロブレム列の時。
+					if c==VARS.datecolumn and selection.getValue()>0:  # 日付列、かつ、文字列でない、の時。文字列の時は0.0が返る。
+						addMenuentry("ActionTrigger", {"Text": "年-月", "CommandURL": baseurl.format("entry8")}) 	
+						addMenuentry("ActionTrigger", {"Text": "年", "CommandURL": baseurl.format("entry9")}) 		
+						addMenuentry("ActionTrigger", {"Text": "年-月-日", "CommandURL": baseurl.format("entry10")}) 	
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+					if selection.getString()!="#":  # セルの文字列が#ではない時のみ。
+						addMenuentry("ActionTrigger", {"Text": "#", "CommandURL": baseurl.format("entry11")})		
+			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。			
 			commons.cutcopypasteMenuEntries(addMenuentry)
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
@@ -492,45 +507,54 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	VARS.setSheet(sheet)
 	selection = controller.getSelection()
-	if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+	if entrynum in (1, 2, 3, 4, 5):
 		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-	elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
-		dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
-		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
-	elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
-		dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
-		problemranges = getProblemRanges(doc, sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。		
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-	elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
-		problemranges = getProblemRanges(doc, sheet[VARS.skybluerow+1:VARS.redrow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-			sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
-	elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
-		dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
-		problemranges = getProblemRanges(doc, sheet[VARS.skybluerow+1:VARS.redrow, VARS.sharpcolumn:VARS.articlecolumn+1], selection)  # 問題ごとのセル範囲コレクションを取得。
-		for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
-			sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
-			sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+		if entrynum==1:  # 現リストの最下行へ。青行の上に移動する。セクションC。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==2:  # 過去ﾘｽﾄへ移動。スカイブルー行の下に移動する。セクションC。
+			dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。					
+		elif entrynum==3:  # 過去ﾘｽﾄにｺﾋﾟｰ。スカイブルー行の下にコピーする。
+			dest_start_ridx = VARS.skybluerow + 1  # 移動先開始行インデックス。
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+		elif entrynum==4:  # 現ﾘｽﾄへ移動。青行の上に移動する。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.moveRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
+				sheet.removeRange(sourcerangeaddress, delete_rows)  # 移動した問題リストの行を削除。			
+		elif entrynum==5:  # 現ﾘｽﾄにｺﾋﾟｰ。青行の上にコピーする。
+			dest_start_ridx = VARS.bluerow  # 移動先開始行インデックス。	
+			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
+				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
+				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
 	elif entrynum==6:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==7:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+	elif entrynum in (8, 9, 10):
+		formatkey = ""
+		if entrynum==8:  # 年-月、書式にする。
+			formatkey = 'YYYY-M'
+		elif entrynum==9:  # 月、書式にする。
+			formatkey = 'YYYY'
+		elif entrynum==10:  # 年-月-日、書式にする。
+			formatkey = 'YYYY-M-D'
+		if formatkey:
+			selection.setPropertyValues(("NumberFormat", "HoriJustify", "VertJustify"), (commons.formatkeyCreator(doc)(formatkey), LEFT, CellVertJustify2.CENTER)) 
+	elif entrynum==11:  # #を代入。
+		selection.setString("#")
+		selection.setPropertyValues(("HoriJustify", "VertJustify"), (RIGHT, CellVertJustify2.CENTER)) 
 def moveProblems(sheet, problemrange, dest_start_ridx):  # problemrange; 問題リストの塊。dest_start_ridx: 移動先開始行インデックス。
 	dest_endbelow_ridx = dest_start_ridx + len(problemrange.getRows())  # 移動先最終行の次の行インデックス。
 	dest_rangeaddress = sheet[dest_start_ridx:dest_endbelow_ridx, :].getRangeAddress()  # 挿入前にセル範囲アドレスを取得しておく。

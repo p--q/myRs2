@@ -4,6 +4,7 @@
 import os, unohelper
 from indoc import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.awt import MessageBoxButtons  # 定数
+from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
 from com.sun.star.datatransfer import XTransferable
 from com.sun.star.datatransfer import DataFlavor  # Struct
@@ -153,6 +154,12 @@ def getClipboardtxt(systemclipboard):  # クリップボードの文字列を取
 		if dataflavor.MimeType=="text/plain;charset=utf-16":
 			return transferable.getTransferData(dataflavor)					
 	return None
+def simulateKey(controller, keycode, keychar):	
+	componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
+	keyevent = KeyEvent(KeyCode=keycode, KeyChar=keychar, Modifiers=0, KeyFunc=0, Source=componentwindow)  # F2キーのKeyEventを取得。
+	toolkit = componentwindow.getToolkit()  # ツールキットを取得。
+	toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
+	toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。	
 # 	
 # 	
 # 	
