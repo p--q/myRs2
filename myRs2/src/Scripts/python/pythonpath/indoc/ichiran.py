@@ -10,8 +10,8 @@ from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.sheet import CellFlags  # 定数
-from com.sun.star.sheet.CellDeleteMode import ROWS as delete_rows  # enum
-from com.sun.star.table.CellHoriJustify import LEFT, CENTER  # enum
+from com.sun.star.sheet.CellDeleteMode import LEFT as delete_left, ROWS as delete_rows  # enum
+from com.sun.star.table.CellHoriJustify import LEFT  # enum
 from com.sun.star.table import CellVertJustify2  # 定数
 from com.sun.star.ui import ActionTriggerSeparatorType  # 定数
 from com.sun.star.ui.ContextMenuInterceptorAction import EXECUTE_MODIFIED  # enum
@@ -33,9 +33,11 @@ class Ichiran():  # シート固有の値。
 		cellranges = sheet[self.splittedrow:, self.idcolumn].queryContentCells(CellFlags.STRING)  # ID列の文字列が入っているセルに限定して抽出。
 		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
-		self.bluerow = next(gene)  # 青3行インデックス。
-		self.skybluerow = next(gene)  # スカイブルー行インデックス。
-		self.redrow = next(gene)  # 赤3行インデックス。	
+		headers = next(gene, None), next(gene, None), next(gene, None)
+		if None in headers:  # Noneがある時。
+			rownames = "青", "スカイブルー", "赤"
+			raise RuntimeError("{0}行が取得できません。\n{0}色の背景色のID列に何らかの文字列をいれてください。".format(rownames[headers.index(None)]))
+		self.bluerow, self.skybluerow, self.redrow = headers
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
 VARS = Ichiran()
@@ -49,7 +51,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		if i.getString().endswith("面談"):
 			if not sheet[i.getPosition().Row, VARS.idcolumn].getString() in yoteiids:  # 予定シートにないIDの時。
 				i.getParent().clearContents(CellFlags.ANNOTATION)
-	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (CENTER, CellVertJustify2.CENTER))  # チェック列固定行より下、全て上下左右中央揃えにする。
+	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # チェック列固定行より下、全て左寄せ、上下中央揃えにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -158,8 +160,6 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 			selection.setString(newtxt)
 			sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
 			refreshCounts()  # カウントを更新する。
-			if newtxt=="済":
-				xscriptcontext.getDocument().store()  # ドキュメントを保存する。
 	elif c==VARS.yocolumn:  # 予列の時。
 		if hospdays:  # 在院日数列が空セルでない時。
 			if yotxt:
@@ -221,7 +221,7 @@ def wClickCheckCol(enhancedmouseevent, xscriptcontext):
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	c = selection.getCellAddress().Column  # selectionの行と列のインデックスを取得。		
 	dic = {\
-		"病棟": ["", "待", "療", "包", "共"],\
+		"病棟": ["", "待", "療", "包", "共", "生"],\
 		"ｴ結": ["", "ｴ", "済"],\
 		"読影": ["", "未", "読", "済"],\
 		"退処": ["", "済", "△", "待"],\
@@ -411,7 +411,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry13")}) 
 		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry11")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if startrow>VARS.emptyrow-1:
@@ -524,7 +523,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==4:  # StableからUnstableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.skybluerow, VARS.redrow)
 	elif entrynum==5:  # Stableから新入院へ移動。 
-		commons.toNewEntry(sheet, rangeaddress, VARS.kybluerow, VARS.emptyrow)
+		commons.toNewEntry(sheet, rangeaddress, VARS.skybluerow, VARS.emptyrow)
 	elif entrynum==6:  # UnstableからStableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.redrow, VARS.skybluerow)
 	elif entrynum==7:  # Unstableから新入院へ移動。
@@ -536,13 +535,25 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==10:  # 新入院からUnstableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redrow)
 	elif entrynum==11:  # クリア。
-		selection.clearContents(511)  # 範囲をすべてクリアする。
+		splittedrow = VARS.splittedrow
+		edgerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
+		idcolumn = VARS.idcolumn
+		datecolumn = VARS.datecolumn
+		memostartcolumn = VARS.memostartcolumn
+		cellflags = CellFlags.VALUE + CellFlags.DATETIME + CellFlags.STRING + CellFlags.ANNOTATION + CellFlags.FORMULA
+		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+				if i>=splittedrow or i not in edgerows:  # 分割行を含む下行以外、または、色行以外の時。
+					if idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。
+						sheet[i, j].clearContents(cellflags)
+					elif j>=memostartcolumn:  # メモ列開始列含む右列の時。
+						sheet.removeRange(sheet[i, j].getRangeAddress(), delete_left)  # セルを削除して左にずらす。
+					else:  # それ以外の時。
+						sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
 		
 		pass
 	
-	elif entrynum==13:  # 値のみクリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
 	elif entrynum==14:  # 読影列の済をリセット。読影列の済を消去し、4F列が○の時未にする。
 		headerrow = sheet[VARS.menurow, VARS.checkstartcolumn:VARS.memostartcolumn].getDataArray()[0]  # チェック列のヘッダーのタプルを取得。
 		wardcol, = [headerrow.index(i) for i in ("病棟",)]  # headerrowタプルでのインデックスを取得。

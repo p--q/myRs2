@@ -4,7 +4,6 @@
 from itertools import chain
 from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
-from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import QUERYBOX, WARNINGBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
@@ -25,7 +24,11 @@ class Keika():  # シート固有の定数設定。
 		cellranges = sheet[:, self.yakucolumn].queryContentCells(CellFlags.STRING)  # 薬名列の文字列が入っているセルに限定して抽出。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # 薬名列の最終行インデックス+1を取得。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in (commons.COLORS["black"],))
-		self.blackrow = next(gene)  # 黒行インデックスを取得。	
+		headers = next(gene, None), 
+		if None in headers:  # Noneがある時。
+			rownames = "黒",
+			raise RuntimeError("{0}行が取得できません。\n{0}色の背景色のID列に何らかの文字列をいれてください。".format(rownames[headers.index(None)]))
+		self.blackrow, = headers  # 黒行インデックスを取得。	
 VARS = Keika()		
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
@@ -42,7 +45,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet[dayrow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
 	c = splittedcolumn + (todayvalue - startdatevalue)  # 今日の日付の列インデックスを取得。
 	if c<1024:
-		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["violet"])  # 日付行の上のセルの今日の背景色を設定。
+		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
 	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
@@ -120,9 +123,6 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			msg = "クリップボードから文字列を取得できませんでした。"
 			commons.showErrorMessageBox(controller, msg)
 			return False  # セル編集モードにしない。	
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))  # 全角文字を半角にする。		
-		clipboardtxt = transliteration.transliterate(clipboardtxt, 0, len(clipboardtxt), [])[0]  # 半角に変換。
 		newdatarows = []
 		yoho = ""
 		for rowtxt in clipboardtxt.split("\n")[::-1]:  # 改行文字で分割して下の行からイテレート。
@@ -319,26 +319,29 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 def callback_wClickBottomRight(gridcelltxt, xscriptcontext):	
 	sheet = VARS.sheet
 	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	celladdress = selection.getCellAddress()
-	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
 	if gridcelltxt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
-		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, CENTER))  # 背景を消して中央揃えにする。		
-		sheet[r, c+1:].clearContents(511)
-		if r>VARS.blackrow:  # 黒行より下の時。
-			rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
-			commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
+		endPrescription(selection, gridcelltxt)
 	elif gridcelltxt=="処方":
 		selection.setString("")
 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif gridcelltxt:  # 上記以外の文字列の時。
 		horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
 		if selection.getPropertyValue("CellBackColor")==-1:  # 背景色がまだない時。
-			color = "lime" if sheet[r, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
+			color = "lime" if sheet[selection.getCellAddress().Row, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
 			selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], horijustify))  
 		else:	
 			selection.setPropertyValue("HoriJustify", horijustify)
 	else:  # 文字列がない時。
 		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+def endPrescription(cell, txt):
+	cell.setString(txt)
+	celladdress = cell.getCellAddress()
+	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
+	cell.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, CENTER))  # 背景を消して中央揃えにする。		
+	VARS.sheet[r, c+1:].clearContents(511)
+	if r>VARS.blackrow:  # 黒行より下の時。
+		rangeaddress = cell.getRangeAddress()  # 選択範囲のアドレスを取得。
+		commons.toOtherEntry(VARS.sheet, rangeaddress, VARS.emptyrow, VARS.blackrow)  # 黒行の上へ移動。
 def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移動した時も発火する。
 	selection = eventobject.Source.getSelection()  # 必ずしもセル範囲とは限らない。
 	if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
@@ -356,7 +359,17 @@ def detectDuplicates(selection, xscriptcontext):  # 薬名の重複をチェッ�
 		indicator.start("重複行をチェック。", 0)  # ステータスバーに表示する文字列とプログレスバーの目盛りを設定。setValue()が1回ではバーが表示されない模様。	
 		sheet = VARS.sheet
 		splittedrow = VARS.splittedrow
-		datarows = sheet[splittedrow:emptyrow, VARS.yakucolumn:VARS.splittedcolumn].getDataArray()
+		datarange = sheet[splittedrow:emptyrow, VARS.yakucolumn:VARS.splittedcolumn]
+		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
+		datarows = []  # 半角に変換したデータ行を入れるタプル。
+		for datarow in datarange.getDataArray():  # 薬品列から固定列の左列まで行をイテレート。
+			txt = transliteration.transliterate(datarow[0], 0, len(datarow[0]), [])[0]  # 薬名を半角に変換	
+			newdatarow = txt, *datarow[1:]	
+			datarows.append(newdatarow)
+		datarange.setDataArray(datarows)  # シートに書き戻す。
 		idxes = []  # 削除する行インデックスのリスト。
 		datarowlength = len(datarows)
 		newemptyrow = emptyrow
@@ -387,11 +400,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
-	if selection:	
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
+	if selection:		
 		skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
 		colorlesscells = []  # 背景色を無色にするセルのリスト。
 		leftcells = []  # 左寄せにするセルのリスト。
@@ -407,10 +416,7 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 					continue
 				cell = sheet[r, c]  # セルを取得。
 				txt = cell.getString()
-				if txt:  # セルに文字列がある時のみ。
-					txt2 = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					if txt!=txt2:  # 変換前と異なる時はセルに代入。
-						cell.setString(txt2)	
+				if txt:  # セルに文字列がある時のみ。	
 					stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
 					if len(txt)>stringlength:
 						leftcells.append(cell)  # 左揃えにする。				
@@ -440,7 +446,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	del contextmenu[:]  # contextmenu.clear()は不可。
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
-	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+	r, c = celladdress.Row, celladdress.Column  # selectionの左上角セルの行と列のインデックスを取得。		
 	if contextmenuname=="cell":  # セルのとき		
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 単一セルの時。
@@ -459,6 +465,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
 				else:
+					if sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
+						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
+						addMenuentry("ActionTrigger", {"Text": "変", "CommandURL": baseurl.format("entry6")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 					addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
 					if sheetcell and yoho=="皮下注":  # 単一セルかつ用法列が皮下注の時。
 						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
@@ -466,8 +476,11 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
 					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が皮下注の時。
 						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 					addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
 					addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
+					addMenuentry("ActionTrigger", {"Text": "翌々週まで", "CommandURL": baseurl.format("entry2")})
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 					addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry25")}) 			
@@ -508,7 +521,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
 	selection = controller.getSelection()
-	if entrynum==3:  # 日付追加。selectionは単一セル。	
+	if entrynum==2:  # 翌々週まで。
+		colorizeSelectionRange(xscriptcontext, selection, "2w")
+	elif entrynum==3:  # 日付追加。selectionは単一セル。	
 		setDates(xscriptcontext, doc, sheet, selection, int(selection.getValue()))  # 経過シートの日付を設定。
 		if int(selection.getString())!=1:  # 日付が１日でない時。
 			celladdress = selection.getCellAddress()  # 選択セルアドレスを取得。
@@ -517,6 +532,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
 	elif entrynum==4:  # クリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(511)  # 範囲をすべてクリアする。
+	elif entrynum in (5, 6):  # 止 変
+		txt = "止" if entrynum==5 else "変"
+		rangeaddress = selection.getRangeAddress()
+		c = rangeaddress.StartColumn
+		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):
+			endPrescription(sheet[r, c], txt)
 	elif entrynum==7:  # 処方。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection)
 	elif entrynum==8:  # 7日間。selectionは単一セルか複数セル。
@@ -564,11 +585,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
-		componentwindow = controller.ComponentWindow
-		keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
-		toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-		toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
-		toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+		commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 	elif entrynum==22:  # インスリン残計算。選択セルは単一。
 		u = 300  # 1本単位。
 		e = 2  # 空打ち単位。
@@ -648,11 +665,9 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 		n = 6  # 内服の終了曜日。6:金曜日。
 		t = 3  # 点駅の終了曜日。3:火曜日。
 		if end=="w":  # 翌週の時。翌週の指定曜日まで。
-			if weekdayval==1:
-				weekdayval += 7  # 日曜日のときは翌週にまたがないように8にする。
-			newendc = startc + 7 - weekdayval
-			nendc = newendc + n  # 内服用。
-			tendc = newendc + t  # 点滴用。
+			nendc, tendc = getNewEndC(startc, weekdayval, n, t, 0)
+		elif end=="2w":  # 翌々週の時。翌々週の指定曜日まで。
+			nendc, tendc = getNewEndC(startc, weekdayval, n, t, 7)
 		elif end=="m":  # 翌月の時。翌月の指定曜日まで。
 			newdatevalue = int(functionaccess.callFunction("EOMONTH", (datevalue, 0))) + 8  # 翌月1日の1週間後の日付シリアル値を取得。
 			newweekdayval = int(functionaccess.callFunction("WEEKDAY", (newdatevalue,)))  # 日付のシリアル値から曜日の数字を取得。日曜日=1。
@@ -697,6 +712,13 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(tentekirangeaddress, False)
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])	
+def getNewEndC(startc, weekdayval, n, t, w):		
+	if weekdayval==1:
+		weekdayval += 7  # 日曜日のときは翌週にまたがないように8にする。
+	newendc = startc + 7 - weekdayval
+	nendc = newendc + n + w  # 内服用。
+	tendc = newendc + t + w  # 点滴用。		
+	return nendc, tendc
 def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # sheet:経過シート、cell: 日付開始セル、dateserial: 日付開始日のシリアル値。daycount: 経過シートに入力する日数。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			

@@ -4,7 +4,7 @@
 import re
 from datetime import date, datetime
 from indoc import commons, datedialog, historydialog, staticdialog
-from com.sun.star.awt import MouseButton  # MessageBoxButtons, MessageBoxResults # 定数
+from com.sun.star.awt import Key, MouseButton  # 定数
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct
 from com.sun.star.sheet import CellFlags  # 定数
@@ -33,9 +33,11 @@ class Karute():  # シート固有の定数設定。
 		cellranges = sheet[self.splittedrow:, self.datecolumn].queryContentCells(CellFlags.STRING)  # Date列の文字列が入っているセルに限定して抽出。
 		backcolors = commons.COLORS["blue3"], commons.COLORS["skyblue"], commons.COLORS["red3"]  # ジェネレーターに使うので順番が重要。
 		gene = (i.getCellAddress().Row for i in cellranges.getCells() if i.getPropertyValue("CellBackColor") in backcolors)
-		self.bluerow = next(gene)  # 青3行インデックス。
-		self.skybluerow = next(gene)  # スカイブルー行インデックス。
-		self.redrow = next(gene)  # 赤3行インデックス。
+		headers = next(gene, None), next(gene, None), next(gene, None)
+		if None in headers:  # Noneがある時。
+			rownames = "青", "スカイブルー", "赤"
+			raise RuntimeError("{0}行が取得できません。\n{0}色の背景色のID列に何らかの文字列をいれてください。".format(rownames[headers.index(None)]))
+		self.bluerow, self.skybluerow, self.redrow = headers
 VARS = Karute()		
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。
 	doc = xscriptcontext.getDocument()
@@ -62,7 +64,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		if copieddatetime.date()<now.date():  # 今日はまだコピーしていない時。
 			copieddatecell.setPropertyValues(("CharColor", "CellBackColor"), (-1, commons.COLORS["magenta3"]))  # 文字色をリセットして背景色をマゼンダにする。
 		elif now.hour>12 and copieddatetime.hour<12:  # 今日はコピーしていても、午後になって午前にしかコピーしていない時。
-			copieddatecell.setPropertyValue("CharColor", commons.COLORS["magenta3"])  # 文字色をマゼンダにする。背景色はコピーした時にすでにライムになっているはず。
+			copieddatecell.setPropertyValue("CharColor", commons.COLORS["red3"])  # 文字色を赤色にする。背景色はコピーした時にすでにライムになっているはず。
 	# 本日の記事を過去の記事に移動させる。
 	daterange = sheet[VARS.bluerow, VARS.articlecolumn]  # 本日の記事の日付セルを取得。
 	articledatetxt = daterange.getString()  # 本日の記事の日付セルの文字列を取得。
@@ -217,9 +219,8 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # ダブルクリックしたセルの行インデックス、列インデックスを取得。
 	if c==0:  # 行挿入列の時。
-		sheet = VARS.sheet
-		sheet.insertCells(sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
-		sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
+		VARS.sheet.insertCells(VARS.sheet[r+1, :].getRangeAddress(), insert_rows)  # ダブルクリックした行の下に空行を挿入。	
+		VARS.sheet[r+1, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。						
 	elif c==VARS.sharpcolumn:  # 区切列の時。
 		txt = selection.getString()  # クリックしたセルの文字列を取得。
 		if txt:
@@ -245,10 +246,9 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
 		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
-		sheet = VARS.sheet
-		datetxt = sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
+		datetxt = VARS.sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
 		if datetxt:  # 日付文字列が取得出来た時。
-			articlecell = sheet[r, VARS.articlecolumn]  # 記事セルを取得。
+			articlecell = VARS.sheet[r, VARS.articlecolumn]  # 記事セルを取得。
 			articletxt = articlecell.getString()  # 記事セルの文字列を取得。
 			if articletxt:  # 記事列のセルに文字列がある時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -259,14 +259,21 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				if articletxt.endswith(datetxt):  # 記事列の最後が日付挿入列の日付で終わっている時。
 					articletxt = articletxt[:-len(datetxt)].rstrip()  # すでにある日付を削って、後ろの空白を削る。				
 					txts = articletxt.rsplit("｡", 1)  # 右から｡で1回分割。	
-					if len(txts)>1:  # "｡"がない時は何もしない。
+					if len(txts)>1:  # "｡"がある時。
 						if txts[-1]:  # 日付の直前が｡でない時。
 							articletxt = "".join((txts[0], "｡", datetxt, " ", txts[1]))  # ｡の後ろに日付を移動させる。
 						else:  # 日付の直前が｡の時。txts[-1]は空文字になる。
 							txts2 = txts[0].rsplit("｡", 1)  # 右から｡で再分割。	
 							if len(txts2)>1:  # ｡の後ろに日付を移動させる。
 								articletxt = "".join((txts2[0], "｡", datetxt, " ", txts2[1], "｡"))
-						articlecell.setString(articletxt)
+							else:
+								articletxt = "".join((datetxt, " ", txts2[0], "｡"))  # 先頭に日付を移動させる。
+					else:  # "｡"がない時。
+						articletxt = "".join((datetxt, " ", txts[0]))  # 先頭に日付を移動させる。
+					articlecell.setString(articletxt)	
+				controller = xscriptcontext.getDocument().getCurrentController()		
+				controller.select(articlecell)
+				commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。	
 	elif c==VARS.historycolumn:  # 履歴列の時。
 		problemtxt = VARS.sheet[r, VARS.problemcolumn].getString()
 		if not problemtxt:
@@ -292,9 +299,13 @@ def callback_phrasecolumn(gridcelltxt, xscriptcontext):  # プロブレム列に
 	datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
 	VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
 def callback_insertdatecolumn(datetxt, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
+	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
 	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
 	articlecell.setString("".join([articlecell.getString(), datetxt]))  # 新規日付を代入。
+	controller = doc.getCurrentController()
+	controller.select(articlecell)
+	commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。
 def createHandleDS(functionaccess):
 	rgpat = r"^((([HS][0-3]?|20\d)\d[\.\-\/][01]?\d[\.\-\/][0-3]?\d)|(([HS][0-3]?|20\d)\d[\.\-\/][01]?\d)|(([HS][0-3]?|20\d)\d))[^\.\d]"  # 日付を取得する正規表現パターン。数字とピリオド以外が続く時のみ取得。
 	rgx = re.compile(rgpat)	

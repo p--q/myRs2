@@ -67,11 +67,7 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				dispatcher.executeDispatch(docframe, ".uno:Cut", "", 0, ())  # 選択範囲をカット。	
 				controller.select(sheet[monthrow, datacolumn])  # ペーストする左上セルを選択。
 				dispatcher.executeDispatch(docframe, ".uno:Paste", "", 0, ())  # ペースト。	
-				componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
-				keyevent = KeyEvent(KeyCode=Key.ESCAPE, KeyChar=chr(0x1b), Modifiers=0, KeyFunc=0, Source=componentwindow)  # EscキーのKeyEventを取得。
-				toolkit = componentwindow.getToolkit()  # ツールキットを取得。
-				toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
-				toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。
+				commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 				controller.select(sheet[emptyrow, datacolumn])			
 		elif diff<0:  # 先頭日付が未来の時はここで終わる。
 			return
