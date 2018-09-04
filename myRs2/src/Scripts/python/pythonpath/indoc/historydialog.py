@@ -42,12 +42,13 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
 	args = xscriptcontext, outputcolumn, callback
 	mouselistener = MouseListener(args)
+	mousemotionlistener = dialogcommons.MouseMotionListener()
 	menulistener = MenuListener(controlcontainer)  # コンテクストメニューにつけるリスナー。
 	actionlistener = ActionListener(xscriptcontext)  # ボタンコントロールにつけるリスナー。
 	items = ("選択行を削除", 0, {"setCommand": "delete"}),\
 			("全行を削除", 0, {"setCommand": "deleteall"})  # グリッドコントロールにつける右クリックメニュー。
 	mouselistener.gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items, {"addMenuListener": menulistener})  # 右クリックでまず呼び出すポップアップメニュー。 
-	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。gridは他のコントロールの設定に使うのでコピーを渡す。
+	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener, "addMouseMotionListener": mousemotionlistener})  # グリッドコントロールの取得。gridは他のコントロールの設定に使うのでコピーを渡す。
 	gridmodel = gridcontrol1.getModel()  # グリッドコントロールモデルの取得。
 	gridcolumn = gridmodel.getPropertyValue("ColumnModel")  # DefaultGridColumnModel
 	gridcolumn.addColumn(gridcolumn.createColumn())  # 列を追加。
@@ -76,7 +77,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	dialogframe.addFrameActionListener(dialogcommons.FrameActionListener())  # FrameActionListenerをダイアログフレームに追加。リスナーはフレームを閉じる時に削除するようにしている。
 	windowlistener = WindowListener(controlcontainer)
 	dialogwindow.addWindowListener(windowlistener) # setVisible(True)でも呼び出される。
-	args = doc, controlcontainer, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, textlistener, itemlistener
+	args = doc, controlcontainer, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, textlistener, itemlistener, mousemotionlistener
 	dialogframe.addCloseListener(CloseListener(args))  # CloseListener。ノンモダルダイアログのリスナー削除用。		
 	controlcontainer.setVisible(True)  # コントロールの表示。
 	dialogwindow.setVisible(True) # ウィンドウの表示。ここでウィンドウリスナーが発火する。
@@ -150,7 +151,7 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 		self.args = args
 	def queryClosing(self, eventobject, getsownership):  # ノンモダルダイアログを閉じる時に発火。
 		dialogframe = eventobject.Source
-		doc, controlcontainer, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, textlistener, itemlistener = self.args
+		doc, controlcontainer, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, textlistener, itemlistener, mousemotionlistener = self.args
 		size = controlcontainer.getSize()
 		checkboxcontrol2 = controlcontainer.getControl("CheckBox2")
 		checkboxcontrol2.removeItemListener(itemlistener)			
@@ -164,6 +165,7 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 		dialogcommons.saveData(doc, "GridDatarows_{}".format(dialogtitle), DATAROWS)
 		mouselistener.gridpopupmenu.removeMenuListener(menulistener)
 		gridcontrol1.removeMouseListener(mouselistener)
+		gridcontrol1.removeMouseMotionListener(mousemotionlistener)
 		controlcontainer.getControl("Button1").removeActionListener(actionlistener)
 		controlcontainer.getControl("Edit1").removeTextListener(textlistener)
 		dialogwindow.removeWindowListener(windowlistener)
