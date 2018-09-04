@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import unohelper, json
+from com.sun.star.awt import XMouseMotionListener
 from com.sun.star.awt import PosSize  # 定数
 from com.sun.star.awt import Point  # Struct
 from com.sun.star.frame import XFrameActionListener
@@ -171,3 +172,14 @@ def createConverters(window):  # ma単位をピクセルに変換する関数を
 		point = window.convertPointToPixel(Point(X=x, Y=y), MeasureUnit.APPFONT)
 		return point.X, point.Y
 	return maTopx
+class MouseMotionListener(unohelper.Base, XMouseMotionListener):
+	def mouseDragged(self, mouseevent):
+		pass
+	def mouseMoved(self, mouseevent):
+		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
+		gridcontrol.deselectAllRows()  # すべての行の選択を外す。
+		rowidx = gridcontrol.getRowAtPoint(mouseevent.X, mouseevent.Y)  # マウスポイントがある行インデックスを取得。行がそこにない時は-1が返る。
+		if rowidx>-1:  # 行インデックスを取得出来た時。
+			gridcontrol.selectRow(rowidx)  # その行を選択。
+	def disposing(self, eventobject):  
+		pass

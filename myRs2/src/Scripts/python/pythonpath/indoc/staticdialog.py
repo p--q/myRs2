@@ -266,7 +266,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向							
 	def mouseReleased(self, mouseevent):
 		pass
-	def mouseEntered(self, mouseevent):
+	def mouseEntered(self, mouseevent): 
 		pass
 	def mouseExited(self, mouseevent):
 		pass
