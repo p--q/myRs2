@@ -41,7 +41,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	column1 = gridcolumn.createColumn() # 列の作成。
 	column1.ColumnWidth = gridcontrolwidth - column0.ColumnWidth #  列幅。列の合計がグリッドコントロールの幅に一致するようにする。
 	gridcolumn.addColumn(column1)  # 2列目を追加。
-	numericfieldprops1 = {"PositionY": m, "Width": 24, "Height": h+2, "Spin": True, "StrictFormat": True, "Value": 0, "ValueStep": 1, "ShowThousandsSeparator": False, "DecimalAccuracy": 0}
+	numericfieldprops1 = {"PositionY": m, "Width": 24, "Height": h+2, "Spin": True, "StrictFormat": True, "Value": 0, "ValueStep": -1, "ShowThousandsSeparator": False, "DecimalAccuracy": 0}
 	fixedtextprops1 = {"PositionY": m, "Width": 14, "Height": h, "Label": "週後", "VerticalAlign": MIDDLE}
 	fixedtextprops1.update({"PositionX": gridcontrolwidth-fixedtextprops1["Width"]})
 	numericfieldprops1.update({"PositionX": fixedtextprops1["PositionX"]-numericfieldprops1["Width"]})
@@ -157,7 +157,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		xscriptcontext, formatstring, outputcolumn, callback = self.args
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		if mouseevent.Buttons==MouseButton.LEFT:
-			if mouseevent.ClickCount==2:  # ダブルクリックの時。
+			if mouseevent.ClickCount==1:  # シングルクリックで入力する。
 				doc = xscriptcontext.getDocument()
 				selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 				if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
