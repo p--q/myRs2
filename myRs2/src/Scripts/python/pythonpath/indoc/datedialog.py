@@ -31,8 +31,9 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items)  # 右クリックでまず呼び出すポップアップメニュー。 
 	args = xscriptcontext, formatstring, outputcolumn, callback
 	mouselistener = MouseListener(gridpopupmenu, args)
+	mousemotionlistener = dialogcommons.MouseMotionListener()
 	gridcontrolwidth = gridprops["Width"]  # gridpropsは消費されるので、グリッドコントロールの幅を取得しておく。
-	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。
+	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener, "addMouseMotionListener": mousemotionlistener})  # グリッドコントロールの取得。
 	gridcolumn = gridcontrol1.getModel().getPropertyValue("ColumnModel")  # DefaultGridColumnModel
 	column0 = gridcolumn.createColumn() # 列の作成。
 	column0.ColumnWidth = 25 # 列幅。
@@ -40,7 +41,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 	column1 = gridcolumn.createColumn() # 列の作成。
 	column1.ColumnWidth = gridcontrolwidth - column0.ColumnWidth #  列幅。列の合計がグリッドコントロールの幅に一致するようにする。
 	gridcolumn.addColumn(column1)  # 2列目を追加。
-	numericfieldprops1 = {"PositionY": m, "Width": 24, "Height": h+2, "Spin": True, "StrictFormat": True, "Value": 0, "ValueStep": 1, "ShowThousandsSeparator": False, "DecimalAccuracy": 0}
+	numericfieldprops1 = {"PositionY": m, "Width": 24, "Height": h+2, "Spin": True, "StrictFormat": True, "Value": 0, "ValueStep": -1, "ShowThousandsSeparator": False, "DecimalAccuracy": 0}
 	fixedtextprops1 = {"PositionY": m, "Width": 14, "Height": h, "Label": "週後", "VerticalAlign": MIDDLE}
 	fixedtextprops1.update({"PositionX": gridcontrolwidth-fixedtextprops1["Width"]})
 	numericfieldprops1.update({"PositionX": fixedtextprops1["PositionX"]-numericfieldprops1["Width"]})
@@ -89,7 +90,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, formatstring=N
 				closecheck = dialogstate.get("CloseCheck")  # セル入力で閉じる、のチェックがある時。
 				if closecheck is not None:
 					gridpopupmenu.checkItem(menuid, closecheck)	
-	args = doc, mouselistener, controlcontainer
+	args = doc, mouselistener, controlcontainer, mousemotionlistener
 	dialogframe.addCloseListener(CloseListener(args))  # CloseListener。ノンモダルダイアログのリスナー削除用。		
 def addDays(gridcontrol, centerday, col0, daycount=7):
 	todayindex = 7//2  # 今日の日付の位置を決定。切り下げ。
@@ -105,7 +106,7 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 		self.args = args
 	def queryClosing(self, eventobject, getsownership):  # ノンモダルダイアログを閉じる時に発火。
 		dialogframe = eventobject.Source
-		doc, mouselistener, controlcontainer = self.args
+		doc, mouselistener, controlcontainer, mousemotionlistener = self.args
 		gridpopupmenu = mouselistener.gridpopupmenu
 		for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 			itemtext = gridpopupmenu.getItemText(menuid)
@@ -113,7 +114,9 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 				dialogstate = {"CloseCheck": gridpopupmenu.isItemChecked(menuid)}
 		dialogtitle = dialogframe.getTitle()  # コンテナウィンドウタイトルを取得。データ保存のIDに使う。
 		dialogcommons.saveData(doc, "dialogstate_{}".format(dialogtitle), dialogstate)  # ダイアログの状態を保存。
-		controlcontainer.getControl("Grid1").removeMouseListener(mouselistener)
+		gridcontrol1 = controlcontainer.getControl("Grid1")
+		gridcontrol1.removeMouseListener(mouselistener)
+		gridcontrol1.removeMouseMotionListener(mousemotionlistener)
 		eventobject.Source.removeCloseListener(self)
 	def notifyClosing(self, eventobject):
 		pass
@@ -154,7 +157,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		xscriptcontext, formatstring, outputcolumn, callback = self.args
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		if mouseevent.Buttons==MouseButton.LEFT:
-			if mouseevent.ClickCount==2:  # ダブルクリックの時。
+			if mouseevent.ClickCount==1:  # シングルクリックで入力する。
 				doc = xscriptcontext.getDocument()
 				selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 				if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
@@ -171,8 +174,8 @@ class MouseListener(unohelper.Base, XMouseListener):
 							if formatkey == -1:  # デフォルトのフォーマットにformatstringがないとき。
 								formatkey = numberformats.addNew(formatstring, localestruct)  # フォーマット一覧に追加する。保存はドキュメントごと。
 							selection.setPropertyValue("NumberFormat", formatkey)  # セルの書式を設定。 
-						datetxt = datetxt.split("(")[0]  # 2018-8-7の形式で日付を取得。
-						selection.setFormula(datetxt)  # 日付の書式で式としてセルに代入。
+						datetxt = datetxt.split("(")[0]  # 2018-8-7という書式にする。
+						selection.setFormula(datetxt)  # 2018-8-7の書式で式としてセルに代入。
 						if callback is not None:  # コールバック関数が与えられている時。
 							callback(datetxt, xscriptcontext)
 				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。

@@ -1,6 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+import platform
 from itertools import chain
 from indoc import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
@@ -122,11 +123,14 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		if not clipboardtxt:  # クリップボードの文字列が取得出来なかった時。メッセージボックスを出して終わる。
 			msg = "クリップボードから文字列を取得できませんでした。"
 			commons.showErrorMessageBox(controller, msg)
-			return False  # セル編集モードにしない。	
+			return False  # セル編集モードにしない。		
+		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))			
+		clipboardtxt = transliteration.transliterate(clipboardtxt, 0, len(clipboardtxt), [])[0]  # 半角に変換。数字すら全角のときがあるので。
 		newdatarows = []
 		yoho = ""
-		for rowtxt in clipboardtxt.split("\n")[::-1]:  # 改行文字で分割して下の行からイテレート。
-# 			rowtxt = rowtxt.strip()  # Windowsでは\r\nがついてくるのもあって前後のスペースを削除。不要?
+		sep = "\r\n" if platform.system()=="Windows" else "\n"  # Windowsでは\r\nで分割しないとうまく処理できない。
+		for rowtxt in clipboardtxt.split(sep)[::-1]:  # 改行文字で分割して下の行からイテレート。
 			if not rowtxt:
 				continue
 			elif rowtxt.startswith("点滴"):

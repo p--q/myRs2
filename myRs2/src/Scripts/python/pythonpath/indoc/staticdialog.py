@@ -25,13 +25,14 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	gridprops = {"PositionX": 0, "PositionY": 0, "Width": 50, "Height": 50, "ShowRowHeader": False, "ShowColumnHeader": False, "SelectionModel": MULTI}  # グリッドコントロールのプロパティ。
 	controlcontainerprops = {"PositionX": 0, "PositionY": 0, "Width": XWidth(gridprops), "Height": YHeight(gridprops), "BackgroundColor": 0xF0F0F0}  # コントロールコンテナの基本プロパティ。幅は右端のコントロールから取得。高さはコントロール追加後に最後に設定し直す。		
 	controlcontainer, addControl = dialogcommons.controlcontainerMaCreator(ctx, smgr, maTopx, controlcontainerprops)  # コントロールコンテナの作成。		
-	menulistener = MenuListener()  # コンテクストメニューにつけるリスナー。
+	mousemotionlistener = dialogcommons.MouseMotionListener()  # グリッドコントロールにつけるマウスが動くと発火するリスナー。
+	menulistener = MenuListener(mousemotionlistener)  # コンテクストメニューにつけるリスナー。mousemotionlistenerはグリッドコントロールにつけるもの。
 	items = ("セル入力で閉じる", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": False}),\
 			("オプション表示", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": False})  # グリッドコントロールのコンテクストメニュー。XMenuListenerのmenuevent.MenuIdでコードを実行する。
 	gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items, {"addMenuListener": menulistener})  # 右クリックでまず呼び出すポップアップメニュー。 
 	args = gridpopupmenu, xscriptcontext, outputcolumn, callback  # gridpopupmenuは先頭でないといけない。
 	mouselistener = MouseListener(args)
-	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener})  # グリッドコントロールの取得。
+	gridcontrol1 = addControl("Grid", gridprops, {"addMouseListener": mouselistener, "addMouseMotionListener": mousemotionlistener})  # グリッドコントロールの取得。
 	gridmodel = gridcontrol1.getModel()  # グリッドコントロールモデルの取得。
 	gridcolumn = gridmodel.getPropertyValue("ColumnModel")  # DefaultGridColumnModel
 	gridcolumn.addColumn(gridcolumn.createColumn())  # 列を追加。
@@ -107,14 +108,14 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 			checkboxcontrol2.setState(checkbox2sate)  # 状態を復元。	
 			if checkbox2sate:  # サイズ復元がチェックされている時。
 				dialogwindow.setPosSize(0, 0, dialogstate["Width"], dialogstate["Height"], PosSize.SIZE)  # ウィンドウサイズを復元。WindowListenerが発火する。
-	args = doc, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, controlcontainerwindowlistener, optioncontrolcontainerwindowlistener
+	args = doc, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, controlcontainerwindowlistener, optioncontrolcontainerwindowlistener, mousemotionlistener
 	dialogframe.addCloseListener(CloseListener(args))  # CloseListener。ノンモダルダイアログのリスナー削除用。	
 class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイアログのリスナー削除用。
 	def __init__(self, args):
 		self.args = args
 	def queryClosing(self, eventobject, getsownership):  # ノンモダルダイアログを閉じる時に発火。
 		dialogframe = eventobject.Source
-		doc, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, controlcontainerwindowlistener, optioncontrolcontainerwindowlistener = self.args
+		doc, actionlistener, dialogwindow, windowlistener, mouselistener, menulistener, controlcontainerwindowlistener, optioncontrolcontainerwindowlistener, mousemotionlistener = self.args
 		controlcontainer, optioncontrolcontainer = windowlistener.args
 		dialogwindowsize = dialogwindow.getSize()	
 		dialogstate = {"CheckBox1sate": optioncontrolcontainer.getControl("CheckBox1").getState(),\
@@ -132,8 +133,10 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 		dialogcommons.saveData(doc, "dialogstate_{}".format(dialogtitle), dialogstate)  # ダイアログの状態を保存。
 		dialogcommons.saveData(doc, "GridDatarows_{}".format(dialogtitle), actionlistener.datarows)  # ダイアログのグリッドコントロールの行を保存。
 		gridpopupmenu.removeMenuListener(menulistener)
-		controlcontainer.getControl("Grid1").removeMouseListener(mouselistener)
-		[controlcontainer.getControl(i).removeActionListener(actionlistener) for i in ("Button1", "Button2", "Button3", "Button4")]
+		gridcontrol1 = controlcontainer.getControl("Grid1")
+		gridcontrol1.removeMouseListener(mouselistener)
+		gridcontrol1.removeMouseMotionListener(mousemotionlistener)		
+		[optioncontrolcontainer.getControl(i).removeActionListener(actionlistener) for i in ("Button1", "Button2", "Button3", "Button4")]
 		controlcontainer.removeWindowListener(controlcontainerwindowlistener)
 		optioncontrolcontainer.removeWindowListener(optioncontrolcontainerwindowlistener)
 		dialogwindow.removeWindowListener(windowlistener)
@@ -263,7 +266,38 @@ class MouseListener(unohelper.Base, XMouseListener):
 							break
 		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。
 			pos = Rectangle(mouseevent.X, mouseevent.Y, 0, 0)  # ポップアップメニューを表示させる起点。
-			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向							
+			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向		
+# 	def _toCell(self, gridcontrol):
+# 		xscriptcontext, outputcolumn, callback = self.args
+# 		doc = xscriptcontext.getDocument()
+# 		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+# 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
+# 			griddata = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModelを取得。
+# 			j = gridcontrol.getCurrentRow()  # 選択行がない時は-1が返る。
+# 			if j<0:
+# 				return
+# 			rowdata = griddata.getRowData(j)  # グリッドコントロールで選択している行のすべての列をタプルで取得。
+# 			controller = doc.getCurrentController()  # 現在のコントローラを取得。			
+# 			sheet = controller.getActiveSheet()
+# 			celladdress = selection.getCellAddress()
+# 			r, c = celladdress.Row, celladdress.Column
+# 			if outputcolumn is not None:  # 出力する列が指定されている時。
+# 				c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
+# 			flg = self.optioncontrolcontainer.getControl("CheckBox1").getState()  # セルに追記、のチェックの状態を取得。
+# 			if flg:  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
+# 				sheet[r, c].setString("".join([selection.getString(), rowdata[0]]))  # セルに追記する。
+# 			else:
+# 				sheet[r, c].setString(rowdata[0])  # セルに代入。
+# 			if callback is not None:  # コールバック関数が与えられている時。
+# 				callback(rowdata[0], xscriptcontext)						
+# 			if not flg:	
+# 				controller.select(sheet[r+1, c])  # 下のセルを選択。	
+# 		for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
+# 			itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+# 			if itemtext.startswith("セル入力で閉じる"):
+# 				if self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
+# 					self.dialogframe.close(True)
+# 					break			
 	def mouseReleased(self, mouseevent):
 		pass
 	def mouseEntered(self, mouseevent): 
@@ -273,7 +307,8 @@ class MouseListener(unohelper.Base, XMouseListener):
 	def disposing(self, eventobject):
 		pass
 class MenuListener(unohelper.Base, XMenuListener):
-	def __init__(self):
+	def __init__(self, mousemotionlistener):
+		self.mousemotionlistener = mousemotionlistener
 		self.args = None
 	def itemHighlighted(self, menuevent):
 		pass
@@ -283,16 +318,18 @@ class MenuListener(unohelper.Base, XMenuListener):
 		itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 		if itemtext.startswith("オプション表示"):		
 			dialogwindow, windowlistener = self.args
-			dummy, optioncontrolcontainer = windowlistener.args
+			controlcontainer, optioncontrolcontainer = windowlistener.args
 			dialogwindowsize = dialogwindow.getSize()
 			optioncontrolcontainersize = optioncontrolcontainer.getSize()		
 			if gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入った時。
+				controlcontainer.getControl("Grid1").removeMouseMotionListener(self.mousemotionlistener)		
 				windowlistener.option = True  # オプションコントロールダイアログを表示させるフラグを立てる。
 				diff_width = optioncontrolcontainersize.Width - dialogwindowsize.Width  # オプションコントロールコンテナ幅とコンテナウィンドウ幅の差。
 				diff_width = 0 if diff_width<0 else diff_width  # オプションコントロールコンテナ幅よりコンテナウィンドウ幅が大きい時は幅の調整をしない。
 				diff_height = optioncontrolcontainersize.Height  # オプションコントロールコンテナの高さを追加する。
 				dialogcommons.createApplyDiff(diff_width, diff_height)(dialogwindow, PosSize.SIZE)  # コンテナウィンドウの大きさを変更。
-			else:
+			else:  # 選択項目にチェックが外れた時。
+				controlcontainer.getControl("Grid1").addMouseMotionListener(self.mousemotionlistener)
 				windowlistener.option = False  # オプションコントロールダイアログを表示させるフラグを倒す。
 				diff_height = -optioncontrolcontainersize.Height  # オプションコントロールコンテナの高さを減らす。
 				dialogcommons.createApplyDiff(0, diff_height)(dialogwindow, PosSize.HEIGHT)  # コンテナウィンドウの大きさを変更。	
