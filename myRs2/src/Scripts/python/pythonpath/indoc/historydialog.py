@@ -367,7 +367,7 @@ class WindowListener(unohelper.Base, XWindowListener):
 		pass
 def scrollDown(gridcontrol):  # グリッドコントロールを下までスクロールする。		
 	accessiblecontext = gridcontrol.getAccessibleContext()  # グリッドコントロールのAccessibleContextを取得。
-	for i in range(accessiblecontext.getAccessibleChildCount()):  # 子要素をのインデックスを走査する。
+	for i in range(accessiblecontext.getAccessibleChildCount()):  # 子要素のインデックスを走査する。
 		child = accessiblecontext.getAccessibleChild(i)  # 子要素を取得。
 		if child.getAccessibleContext().getAccessibleRole()==AccessibleRole.SCROLL_BAR:  # スクロールバーの時。
 			if child.getOrientation()==ScrollBarOrientation.VERTICAL:  # 縦スクロールバーの時。
