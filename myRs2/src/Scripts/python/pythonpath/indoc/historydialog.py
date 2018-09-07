@@ -44,7 +44,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	mouselistener = MouseListener(args)
 	mousemotionlistener = dialogcommons.MouseMotionListener()
 	menulistener = MenuListener(controlcontainer)  # コンテクストメニューにつけるリスナー。
-	actionlistener = ActionListener(xscriptcontext)  # ボタンコントロールにつけるリスナー。
+	actionlistener = ActionListener(args)  # ボタンコントロールにつけるリスナー。
 	items = ("選択行を削除", 0, {"setCommand": "delete"}),\
 			("全行を削除", 0, {"setCommand": "deleteall"})  # グリッドコントロールにつける右クリックメニュー。
 	mouselistener.gridpopupmenu = dialogcommons.menuCreator(ctx, smgr)("PopupMenu", items, {"addMenuListener": menulistener})  # 右クリックでまず呼び出すポップアップメニュー。 
@@ -175,17 +175,21 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 	def disposing(self, eventobject):  
 		pass
 class ActionListener(unohelper.Base, XActionListener):
-	def __init__(self, xscriptcontext):
-		self.xscriptcontext = xscriptcontext
-		self.transliteration = fullwidth_halfwidth(xscriptcontext)
+	def __init__(self, args):
+		self.args = args
+		self.transliteration = fullwidth_halfwidth(args[0])  # xscriptcontextを渡す。
+		self.callback = None
 	def actionPerformed(self, actionevent):  
+		xscriptcontext, outputcolumn, callback = self.args
 		cmd = actionevent.ActionCommand
 		if cmd=="enter":
-			doc = self.xscriptcontext.getDocument()  
-			controller = doc.getCurrentController()  # 現在のコントローラを取得。			
+			controller = xscriptcontext.getDocument().getCurrentController()  # 現在のコントローラを取得。			
 			selection = controller.getSelection()
+			sheet = controller.getActiveSheet()
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
 				controlcontainer = actionevent.Source.getContext()
+				celladdress = selection.getCellAddress()
+				r, c = celladdress.Row, celladdress.Column					
 				edit1 = controlcontainer.getControl("Edit1")  # テキストボックスコントロールを取得。
 				txt = edit1.getText()  # テキストボックスコントロールの文字列を取得。
 				if txt:  # テキストボックスコントロールに文字列がある時。
@@ -199,11 +203,13 @@ class ActionListener(unohelper.Base, XActionListener):
 					gridcontrol1 = controlcontainer.getControl("Grid1")
 					refreshRows(gridcontrol1, datarows)
 					scrollDown(gridcontrol1)  # グリッドコントロールを下までスクロール。
-					selection.setString(txt)  # 選択セルに代入。
-					DATAROWS = datarows				
-				sheet = controller.getActiveSheet()
-				celladdress = selection.getCellAddress()
-				nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
+					if outputcolumn is not None:  # 出力する列が指定されている時。
+						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
+					sheet[r, c].setString(txt)  # セルに代入。
+					DATAROWS = datarows			
+					if callback is not None:  # コールバック関数が与えられている時。
+						callback(txt, xscriptcontext)		
+				nextcell = sheet[r+1, c]  # 下のセルを取得。
 				controller.select(nextcell)  # 下のセルを選択。
 				nexttxt = nextcell.getString()  # 下のセルの文字列を取得。
 				edit1.setText(nexttxt)  # テキストボックスコントロールにセルの内容を取得。
