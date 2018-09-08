@@ -206,6 +206,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		self.gridpopupmenu, *self.args = args  # gridpopupmenuはCloseListenerで使うので、別にする。
 		self.optioncontrolcontainer = None
 		self.dialogframe = None
+		self.flg = True  # 付け直した時にmousePressed()が発火しないようにするフラグ。
 	def mousePressed(self, mouseevent):  # グリッドコントロールをクリックした時。コントロールモデルにはNameプロパティはない。
 		gridcontrol = mouseevent.Source  # グリッドコントロールを取得。
 		optioncontrolcontainer = self.optioncontrolcontainer
@@ -214,38 +215,40 @@ class MouseListener(unohelper.Base, XMouseListener):
 			if not selectedrowindexes:  # 選択行がない時(選択行を削除した時)。
 				return  # 何もしない					
 			if mouseevent.ClickCount==1:  # シングルクリックの時。
-				for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
-					itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
-					if itemtext.startswith("オプション表示"):
-						if not self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っていない時。
-							self._toCell(gridcontrol, selectedrowindexes)  # オプション表示していない時はシングルクリックでセルに入力する。
-							break		
-				else:  # オプション表示部分の設定。
-					upbuttoncontrol = optioncontrolcontainer.getControl("Button1")
-					downbuttoncontrol = optioncontrolcontainer.getControl("Button2")
-					insertbuttoncontrol = optioncontrolcontainer.getControl("Button3")
-					upbuttoncontrol.setEnable(True)  # まず全てのボタンを有効にする。
-					downbuttoncontrol.setEnable(True)
-					insertbuttoncontrol.setEnable(True)
-					if selectedrowindexes[0]==0:  # 先頭行が選択されている時。
-						upbuttoncontrol.setEnable(False)  # 上へボタンを無効にする。
-					griddatamodel = gridcontrol.getModel().getPropertyValue("GridDataModel")	
-					if selectedrowindexes[-1]==griddatamodel.RowCount-1:  # 最終行が選択されている時。
-						downbuttoncontrol.setEnable(False)  # 下へボタンを無効にする。
-					indexcount = len(selectedrowindexes)  # 選択行数を取得。
-					if indexcount>1:  # 複数行を選択している時。
-						insertbuttoncontrol.setEnable(False)  # 行挿入ボタンを無効にする。
-						if indexcount!=selectedrowindexes[-1]-selectedrowindexes[0]+1:  # 連続した行でない時。
+				if self.flg:
+					for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
+						itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+						if itemtext.startswith("オプション表示"):
+							if not self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っていない時。
+								self._toCell(gridcontrol, selectedrowindexes)  # オプション表示していない時はシングルクリックでセルに入力する。
+								break		
+					else:  # 選択項目にチェックが入っている時、オプション表示部分の設定。
+						upbuttoncontrol = optioncontrolcontainer.getControl("Button1")
+						downbuttoncontrol = optioncontrolcontainer.getControl("Button2")
+						insertbuttoncontrol = optioncontrolcontainer.getControl("Button3")
+						upbuttoncontrol.setEnable(True)  # まず全てのボタンを有効にする。
+						downbuttoncontrol.setEnable(True)
+						insertbuttoncontrol.setEnable(True)
+						if selectedrowindexes[0]==0:  # 先頭行が選択されている時。
 							upbuttoncontrol.setEnable(False)  # 上へボタンを無効にする。
+						griddatamodel = gridcontrol.getModel().getPropertyValue("GridDataModel")	
+						if selectedrowindexes[-1]==griddatamodel.RowCount-1:  # 最終行が選択されている時。
 							downbuttoncontrol.setEnable(False)  # 下へボタンを無効にする。
-					rowdata = griddatamodel.getRowData(selectedrowindexes[0])  # 選択行の最初の行のデータを取得。
-					optioncontrolcontainer.getControl("Edit1").setText(rowdata[0])  # テキストボックスに選択行の初行の文字列を代入。
-					if griddatamodel.RowCount==1:  # 1行しかない時はまた発火できるように選択を外す。
-						gridcontrol.deselectRow(0)  # 選択行の選択を外す。選択していない行を指定すると永遠ループになる。	
+						indexcount = len(selectedrowindexes)  # 選択行数を取得。
+						if indexcount>1:  # 複数行を選択している時。
+							insertbuttoncontrol.setEnable(False)  # 行挿入ボタンを無効にする。
+							if indexcount!=selectedrowindexes[-1]-selectedrowindexes[0]+1:  # 連続した行でない時。
+								upbuttoncontrol.setEnable(False)  # 上へボタンを無効にする。
+								downbuttoncontrol.setEnable(False)  # 下へボタンを無効にする。
+						rowdata = griddatamodel.getRowData(selectedrowindexes[0])  # 選択行の最初の行のデータを取得。
+						optioncontrolcontainer.getControl("Edit1").setText(rowdata[0])  # テキストボックスに選択行の初行の文字列を代入。
+						if griddatamodel.RowCount==1:  # 1行しかない時はまた発火できるように選択を外す。
+							gridcontrol.deselectRow(0)  # 選択行の選択を外す。選択していない行を指定すると永遠ループになる。	
+				else:
+					self.flg = True
 			elif mouseevent.ClickCount==2:  # ダブルクリックの時。
 				self._toCell(gridcontrol, selectedrowindexes)
-		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。	
-			mouseevent.Source.removeMouseListener(self)  # ポップアップメニュー上でもMouseListenerが発火するの外しておく。MouseListnerをつけたままダイアログを閉じるとLibreOfficeがクラッシュする。
+		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。
 			pos = Rectangle(mouseevent.X, mouseevent.Y, 0, 0)  # ポップアップメニューを表示させる起点。
 			self.gridpopupmenu.execute(gridcontrol.getPeer(), pos, PopupMenuDirection.EXECUTE_DEFAULT)  # ポップアップメニューを表示させる。引数は親ピア、位置、方向		
 	def _toCell(self, gridcontrol, selectedrowindexes):  # callback関数で指定した行をマウスで選択し直さないとgetCurrentRow()では0が返ってしまうのでselectedrowindexesも受け取る。
@@ -269,13 +272,14 @@ class MouseListener(unohelper.Base, XMouseListener):
 				else:
 					sheet[r, c].setString(rowdata[0])  # セルに代入。
 				if callback is not None:  # コールバック関数が与えられている時。
-					callback(rowdata[0], xscriptcontext)						
+					callback(rowdata[0])						
 				if not flg:	
 					controller.select(sheet[r, c+1])  # 右のセルを選択。	
-		for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
-			itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+		gridpopupmenu = self.gridpopupmenu	
+		for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
+			itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
 			if itemtext.startswith("セル入力で閉じる"):
-				if self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
+				if gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
 					self.dialogframe.close(True)  # gridcontrolのMouseListenerを外しておかないとクラッシュする。
 					break						
 	def mouseReleased(self, mouseevent):
@@ -296,30 +300,44 @@ class MenuListener(unohelper.Base, XMenuListener):
 		menuid = menuevent.MenuId  # メニューIDを取得。1から始まる。
 		dialogwindow, windowlistener, mouselistener = self.args
 		controlcontainer, optioncontrolcontainer = windowlistener.args
+		mousemotionlistener = self.mousemotionlistener
 		gridpopupmenu = menuevent.Source
 		itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+		gridcontrol1 = controlcontainer.getControl("Grid1")
 		if itemtext.startswith("オプション表示"):	
 			dialogwindowsize = dialogwindow.getSize()
 			optioncontrolcontainersize = optioncontrolcontainer.getSize()		
 			if gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入った時。
-				controlcontainer.getControl("Grid1").removeMouseMotionListener(self.mousemotionlistener)
 				windowlistener.option = True  # オプションコントロールダイアログを表示させるフラグを立てる。
 				diff_width = optioncontrolcontainersize.Width - dialogwindowsize.Width  # オプションコントロールコンテナ幅とコンテナウィンドウ幅の差。
 				diff_width = 0 if diff_width<0 else diff_width  # オプションコントロールコンテナ幅よりコンテナウィンドウ幅が大きい時は幅の調整をしない。
 				diff_height = optioncontrolcontainersize.Height  # オプションコントロールコンテナの高さを追加する。
 				dialogcommons.createApplyDiff(diff_width, diff_height)(dialogwindow, PosSize.SIZE)  # コンテナウィンドウの大きさを変更。
 			else:  # 選択項目にチェックが外れた時。
-				controlcontainer.getControl("Grid1").removeMouseMotionListener(self.mousemotionlistener)
 				windowlistener.option = False  # オプションコントロールダイアログを表示させるフラグを倒す。
 				diff_height = -optioncontrolcontainersize.Height  # オプションコントロールコンテナの高さを減らす。
 				dialogcommons.createApplyDiff(0, diff_height)(dialogwindow, PosSize.HEIGHT)  # コンテナウィンドウの大きさを変更。	
-		controlcontainer.getControl("Grid1").addMouseListener(mouselistener)  # ポップアップメニューを表示する時に外したMouseListenerを付け直す。つけた時点でmousePressed()が発火するので。
-	def itemActivated(self, menuevent):  # メニュー項目を有効にした時。チェックボックスをオンにした時ではない。ポップアップメニューをexecute()した時も発火する。
-		pass
+				gridcontrol1.addMouseMotionListener(mousemotionlistener)
+		mouselistener.flg = False		
+		gridcontrol1.addMouseListener(mouselistener)  # ポップアップメニューを表示する時に外したMouseListenerを付け直す。つけた時点でmousePressed()が発火する。
+	def itemActivated(self, menuevent):  # メニュー項目を有効にした時。チェックボックスをオンにした時ではない。ポップアップメニューをexecute()した時に発火する。
+		dummy, windowlistener, mouselistener = self.args
+		controlcontainer, dummy = windowlistener.args
+		gridcontrol1 = controlcontainer.getControl("Grid1")
+		gridcontrol1.removeMouseMotionListener(self.mousemotionlistener)  # ポップアップメニュー上で動くとMouseMotionLitenerも発火するので外しておく。
+		gridcontrol1.removeMouseListener(mouselistener)
 	def itemDeactivated(self, menuevent):  # メニュー項目が無効になった時。ポップアップメニュー項目を選択せずに閉じた時も発火する。
 		dummy, windowlistener, mouselistener = self.args
 		controlcontainer, dummy = windowlistener.args
-		controlcontainer.getControl("Grid1").addMouseListener(mouselistener)  # ポップアップメニューを表示する時に外したMouseListenerを付け直す。つけた時点でmousePressed()が発火するので。
+		gridcontrol1 = controlcontainer.getControl("Grid1")
+		mouselistener.flg = False
+		gridcontrol1.addMouseListener(mouselistener)  # ポップアップメニューを表示する時に外したMouseListenerを付け直す。つけた時点でmousePressed()が発火する。
+		for menuid in range(1, self.gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
+			itemtext = self.gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。
+			if itemtext.startswith("オプション表示"):
+				if not self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っていない時。
+					gridcontrol1.addMouseMotionListener(self.mousemotionlistener)
+					break				
 	def disposing(self, eventobject):
 		pass
 class WindowListener(unohelper.Base, XWindowListener):

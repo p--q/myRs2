@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # ノンモダルダイアログ。UnoControlDialogとかメッセージボックスだとマウスをクリックした状態のままになってしまうことがある。
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+# 引数の不足やサブモジュールのエラーには対応できない。
 import os, platform, subprocess, traceback, unohelper
 from indoc import dialogcommons
 from com.sun.star.awt import XMouseListener

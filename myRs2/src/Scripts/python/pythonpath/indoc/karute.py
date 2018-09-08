@@ -239,11 +239,11 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	elif c in (VARS.articlecolumn,):  # 記事列の時。
 		return True  # セル編集モードにする。
 	elif c==VARS.phrasecolumn:  # 定型句列インデックスの時。
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumn)
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "ﾌﾟﾛﾌﾞﾚﾑ", outputcolumn=VARS.problemcolumn, callback=callback_phrasecolumnCreator(xscriptcontext))
 		selection.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
 		selection.setString("")  # 日付挿入列の文字列をクリア。
-		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumn)  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
+		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumnCreator(xscriptcontext))  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
 		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
 		datetxt = VARS.sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
@@ -279,33 +279,37 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 		if not problemtxt:
 			problemtxt = "履歴"
 		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
-	return False  # セルを編集モードにしない。	
-def callback_phrasecolumn(gridcelltxt, xscriptcontext):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
-	if gridcelltxt.startswith("#"):  # #から始まっている時。
-		sharptxt = "#"
-		gridcelltxt = gridcelltxt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
-	if gridcelltxt.startswith("today"):  # todayで始まっている時。
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
-		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
-		todayvalue = int(functionaccess.callFunction("TODAY", ()))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
-		gridcelltxt = gridcelltxt[len("today"):]  # todayを削る。
-	if ":" in gridcelltxt:
-		problemtxt, articletxt = gridcelltxt.split(":", 1)
-	else:
-		articletxt = gridcelltxt
-	datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
-	VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
-def callback_insertdatecolumn(datetxt, xscriptcontext):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
-	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
-	articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
-	articlecell.setString("".join([articlecell.getString(), datetxt]))  # 新規日付を代入。
-	controller = doc.getCurrentController()
-	controller.select(articlecell)
-	commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。
+	return False  # セルを編集モードにしない。
+def callback_phrasecolumnCreator(xscriptcontext):	
+	def callback_phrasecolumn(gridcelltxt):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
+		if gridcelltxt.startswith("#"):  # #から始まっている時。
+			sharptxt = "#"
+			gridcelltxt = gridcelltxt[1:].lstrip()  # 先頭文字を削って、先頭スペースも削る。
+		if gridcelltxt.startswith("today"):  # todayで始まっている時。
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
+			functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。	
+			todayvalue = int(functionaccess.callFunction("TODAY", ()))  # シリアル値を整数で取得。floatで返る。シリアル値で入れないとsetDataArray()で日付にできない。
+			gridcelltxt = gridcelltxt[len("today"):]  # todayを削る。
+		if ":" in gridcelltxt:
+			problemtxt, articletxt = gridcelltxt.split(":", 1)
+		else:
+			articletxt = gridcelltxt
+		datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
+		VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
+	return callback_phrasecolumn
+def callback_insertdatecolumnCreator(xscriptcontext):
+	def callback_insertdatecolumn(datetxt):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+		articlecell = VARS.sheet[selection.getCellAddress().Row, VARS.articlecolumn]  # 記事セルを取得。		
+		articlecell.setString("".join([articlecell.getString(), datetxt]))  # 新規日付を代入。
+		controller = doc.getCurrentController()
+		controller.select(articlecell)
+		commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。
+	return callback_insertdatecolumn
 def createHandleDS(functionaccess):
 	rgpat = r"^((([HS][0-3]?|20\d)\d[\.\-\/][01]?\d[\.\-\/][0-3]?\d)|(([HS][0-3]?|20\d)\d[\.\-\/][01]?\d)|(([HS][0-3]?|20\d)\d))[^\.\d]"  # 日付を取得する正規表現パターン。数字とピリオド以外が続く時のみ取得。
 	rgx = re.compile(rgpat)	

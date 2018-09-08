@@ -42,8 +42,9 @@ class Ichiran():  # シート固有の値。
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
 VARS = Ichiran()
-def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない(リスナー追加前なので)。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない(リスナー追加後でも)。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	initSheet(activationevent.ActiveSheet, xscriptcontext)
+def initSheet(sheet, xscriptcontext):  # documentevent.pyから呼び出す。 
 	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	annotations = sheet.getAnnotations()
 	doc = xscriptcontext.getDocument()
@@ -54,6 +55,9 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			if not sheet[i.getPosition().Row, VARS.idcolumn].getString() in yoteiids:  # 予定シートにないIDの時。
 				i.getParent().clearContents(CellFlags.ANNOTATION)
 	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # チェック列固定行より下、全て左寄せ、上下中央揃えにする。
+	refreshCounts()  # 一覧シートのカウントを更新する。
+	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])  # カウントの文字色を設定。
+	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])  # カウントの文字色を設定。	
 	accessiblecontext = doc.getCurrentController().ComponentWindow.getAccessibleContext()  # コントローラーのアトリビュートからコンポーネントウィンドウを取得。
 	for i in range(accessiblecontext.getAccessibleChildCount()): 
 		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()

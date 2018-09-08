@@ -21,6 +21,7 @@ def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジ�
 	except:  # UNO APIのメソッド以外のエラーはダイアログがでないのでここで捉える。
 		exceptiondialog2.createDialog(args[-1])  # XSCRIPTCONTEXTを渡す。
 def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文書のイベント駆動用。
+	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。他のリスナー追加前。リスナー追加後でもリスナーは発火しない模様。
 	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	controller = doc.getCurrentController()  # コントローラの取得。
 	changeslistener = ChangesListener(xscriptcontext)  # ChangesListener。セルの変化の感知に利用。列の挿入も感知。
@@ -33,7 +34,6 @@ def addLinsteners(tdocimport, modulefolderpath, xscriptcontext):  # 引数は文
 	controller.addActivationEventListener(activationeventlistener)
 	controller.addEnhancedMouseClickHandler(enhancedmouseclickhandler)
 	controller.registerContextMenuInterceptor(contextmenuinterceptor)
-	invokeModuleMethod(None, "documentOnLoad", xscriptcontext)  # ドキュメントを開いた時に実行するメソッド。他のリスナー追加後。
 	listeners = changeslistener, selectionchangelistener, activationeventlistener, enhancedmouseclickhandler, contextmenuinterceptor
 	doc.addDocumentEventListener(DocumentEventListener(xscriptcontext, tdocimport, modulefolderpath, controller, *listeners))  # DocumentEventListener。ドキュメントとコントローラに追加したリスナーの除去に利用。
 class DocumentEventListener(unohelper.Base, XDocumentEventListener):

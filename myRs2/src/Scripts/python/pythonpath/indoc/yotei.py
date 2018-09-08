@@ -470,37 +470,40 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		ichirandatarows = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1].getDataArray()
 		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
 		defaultrows = [" ".join(i) for i in ichirandatarows]
-		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, fixedtxt="面", callback=callback_wClickGrid)
-def callback_wClickGrid(gridcelltxt, xscriptcontext):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
-	idtxt = gridcelltxt.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	sheet = doc.getCurrentController().getActiveSheet()
-	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	annotations = sheet.getAnnotations()
-	for i in annotations:  # すべてのコメントについて。
-		if i.getString().startswith(idtxt):  # すでに同じIDのコメントが存在する時。
-			msg = "{}にすでに面談予定がありますがそれを取り消しますか?".format(getCelldatetime(xscriptcontext, i.getPosition()))
-			componentwindow = doc.getCurrentController().ComponentWindow
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)
-			if msgbox.execute()==MessageBoxResults.YES:	
-				cell = i.getParent()
-				cell.clearContents(511)
-				setCellProp(cell)		
-			elif msgbox.execute()==MessageBoxResults.CANCEL:
-				selection.setString("")  # 選択セルの文字列をクリア。
-				setCellProp(selection)
-				return
-	setCellProp(selection)	
-	celladdress = selection.getCellAddress()
-	annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
-	ichiransheet = doc.getSheets()["一覧"]
-	cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
-	if cell:	
-		ichiransheet.getAnnotations().insertNew(cell.getCellAddress(), "{} 面談".format(getCelldatetime(xscriptcontext, celladdress))) 
-		cell.setString("")  # 面談列の文字列をクリア。
-	else:
-		msg = "IDが一覧に見つかりません。"	
-		commons.showErrorMessageBox(doc.getCurrentController(), msg)
+		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, callback=callback_wClickGrid(xscriptcontext, "面"))
+def callback_wClickGrid(xscriptcontext, txt):  
+	def callback_wClickGrid(gridcelltxt):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
+		idtxt = gridcelltxt.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		sheet = doc.getCurrentController().getActiveSheet()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		selection.setString(txt)
+		annotations = sheet.getAnnotations()
+		for i in annotations:  # すべてのコメントについて。
+			if i.getString().startswith(idtxt):  # すでに同じIDのコメントが存在する時。
+				msg = "{}にすでに面談予定がありますがそれを取り消しますか?".format(getCelldatetime(xscriptcontext, i.getPosition()))
+				componentwindow = doc.getCurrentController().ComponentWindow
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)
+				if msgbox.execute()==MessageBoxResults.YES:	
+					cell = i.getParent()
+					cell.clearContents(511)
+					setCellProp(cell)		
+				elif msgbox.execute()==MessageBoxResults.CANCEL:
+					selection.setString("")  # 選択セルの文字列をクリア。
+					setCellProp(selection)
+					return
+		setCellProp(selection)	
+		celladdress = selection.getCellAddress()
+		annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
+		ichiransheet = doc.getSheets()["一覧"]
+		cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
+		if cell:	
+			ichiransheet.getAnnotations().insertNew(cell.getCellAddress(), "{} 面談".format(getCelldatetime(xscriptcontext, celladdress))) 
+			cell.setString("")  # 面談列の文字列をクリア。
+		else:
+			msg = "IDが一覧に見つかりません。"	
+			commons.showErrorMessageBox(doc.getCurrentController(), msg)
+	return callback_wClickGrid	
 def getCelldatetime(xscriptcontext, celladdress):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			

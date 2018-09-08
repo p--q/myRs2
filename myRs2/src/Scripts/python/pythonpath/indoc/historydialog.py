@@ -43,7 +43,7 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	args = xscriptcontext, outputcolumn, callback
 	mouselistener = MouseListener(args)
 	mousemotionlistener = dialogcommons.MouseMotionListener()
-	menulistener = MenuListener(controlcontainer)  # コンテクストメニューにつけるリスナー。
+	menulistener = MenuListener(controlcontainer, mouselistener, mousemotionlistener)  # コンテクストメニューにつけるリスナー。
 	actionlistener = ActionListener(args)  # ボタンコントロールにつけるリスナー。
 	items = ("選択行を削除", 0, {"setCommand": "delete"}),\
 			("全行を削除", 0, {"setCommand": "deleteall"})  # グリッドコントロールにつける右クリックメニュー。
@@ -252,7 +252,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
 					sheet[r, c].setString(rowdata[0])  # グリッドコントロールは1列と決めつけて、その最初の要素をセルに代入。
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(rowdata[0], xscriptcontext)							
+						callback(rowdata[0])							
 					nextcell = sheet[r+1, c]  # 下のセルを取得。
 					controller.select(nextcell)  # 下のセルを選択。
 					nexttxt = nextcell.getString()  # 下のセルの文字列を取得。
@@ -275,13 +275,13 @@ class MouseListener(unohelper.Base, XMouseListener):
 	def disposing(self, eventobject):
 		pass
 class MenuListener(unohelper.Base, XMenuListener):
-	def __init__(self, controlcontainer):
-		self.controlcontainer = controlcontainer
+	def __init__(self, *args):
+		self.args = args
 	def itemHighlighted(self, menuevent):
 		pass
 	def itemSelected(self, menuevent):  # PopupMenuの項目がクリックされた時。どこのコントロールのメニューかを知る方法はない。
+		controlcontainer, dummy, dummy = self.args
 		cmd = menuevent.Source.getCommand(menuevent.MenuId)
-		controlcontainer = self.controlcontainer
 		global DATAROWS
 		datarows = list(DATAROWS)
 		peer = controlcontainer.getPeer()  # ピアを取得。	
@@ -318,11 +318,18 @@ class MenuListener(unohelper.Base, XMenuListener):
 							d = griddatamodel.getRowData(i)[0]  # タプルが返るのでその先頭の要素を取得。
 							datarows = [j for j in datarows if not d in j]  # dが要素にある行を除いて取得。
 						griddatamodel.removeAllRows()  # グリッドコントロールの行を全削除。							
-		DATAROWS = datarows			
-	def itemActivated(self, menuevent):
-		pass
+		DATAROWS = datarows		
+		self.itemDeactivated(menuevent)
+	def itemActivated(self, menuevent):  # ポップアップメニューとグリッドコントロールが交錯しているのでグリッドコントロールのマウスリスナーを外す。
+		controlcontainer, mouselistener, mousemotionlistener = self.args
+		gridcontrol1 = controlcontainer.getControl("Grid1")  # グリッドコントロールを取得。
+		gridcontrol1.removeMouseListener(mouselistener)
+		gridcontrol1.removeMouseMotionListener(mousemotionlistener)		
 	def itemDeactivated(self, menuevent):
-		pass   
+		controlcontainer, mouselistener, mousemotionlistener = self.args
+		gridcontrol1 = controlcontainer.getControl("Grid1")  # グリッドコントロールを取得。
+		gridcontrol1.addMouseListener(mouselistener)
+		gridcontrol1.addMouseMotionListener(mousemotionlistener)			 
 	def disposing(self, eventobject):
 		pass
 class WindowListener(unohelper.Base, XWindowListener):

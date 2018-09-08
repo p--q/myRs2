@@ -17,9 +17,7 @@ def documentOnLoad(xscriptcontext):  # ドキュメントを開いた時。リ�
 	sheet = sheets["一覧"]  # 一覧シートを取得。
 	ichiranvars = ichiran.VARS
 	ichiranvars.setSheet(sheet)
-	ichiran.refreshCounts()  # 一覧シートのカウントを更新する。
-	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])  # カウントの文字色を設定。
-	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])  # カウントの文字色を設定。	
-	controller.setActiveSheet(sheet)  # 一覧シートをアクティブにする。				
+	controller.setActiveSheet(sheet)  # 一覧シートをアクティブにする。		
+	ichiran.initSheet(sheet, xscriptcontext)
 def documentUnLoad(xscriptcontext):  # ドキュメントを閉じた時。リスナー削除後。
 	pass
