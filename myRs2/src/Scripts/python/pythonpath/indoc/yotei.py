@@ -164,10 +164,20 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 			for j in range(rangeaddress.StartColumn-datacolumn, rangeaddress.EndColumn+1-datacolumn):
 				for k in range(rangeaddress.StartRow-monthrow, rangeaddress.EndRow+1-monthrow):
 					if datarows[k][j] in ("", "/", "x"):  # テンプレートを優先する文字列の時。
-						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。		
+						datarows[k][j] = templates[k][ti]  # テンプレートの値を使う。					
 	annotations = sheet.getAnnotations()  # コメントコレクションを取得。					
 	comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。											
 	sheet[monthrow:emptyrow, datacolumn:endedgecolumn].setDataArray(datarows)  # コメントが消されてしまう。
+	starttimevalue = sheet[VARS.datarow, 0].getValue()
+	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
+	starttime = datetime.combine(todaydate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。	
+	times = [starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow)]  # 30分毎に枠を取得。開始時間のdatetimeのリストを取得。
+	cellranges = sheet[datarow:emptyrow, datacolumn].queryEmptyCells()  # 本日列の空セルのセル範囲コレクションを取得。
+	for cell in cellranges.getCells():  # 本日の日付列の空セルをイテレート。
+		if times[cell.getCellAddress().Row-datarow]<datetime.now():  # 枠の時刻が過去の時。
+			cell.setString("x")  # 空セルを埋める。
+		else:  # 枠の時刻が未来になったら終わる。
+			break
 	[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
 	sheet[VARS.dayrow:VARS.datarow, datacolumn:templatestartcolumn-1].clearContents(CellFlags.HARDATTR)  # 日付行と曜日行の書式をクリア。
 	colors = commons.COLORS
@@ -460,37 +470,40 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		ichirandatarows = ichiransheet[ichiranvars.splittedrow:ichiranvars.emptyrow, ichiranvars.idcolumn:ichiranvars.kanacolumn+1].getDataArray()
 		ichirandatarows = sorted(ichirandatarows, key=lambda x: x[2])[3:]  # カナ列でソート。タイトル行は空欄なので先頭に来るのでインデックス3以降のみ取得。
 		defaultrows = [" ".join(i) for i in ichirandatarows]
-		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, fixedtxt="面", callback=callback_wClickGrid)
-def callback_wClickGrid(gridcelltxt, xscriptcontext):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
-	idtxt = gridcelltxt.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-	sheet = doc.getCurrentController().getActiveSheet()
-	selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	annotations = sheet.getAnnotations()
-	for i in annotations:  # すべてのコメントについて。
-		if i.getString().startswith(idtxt):  # すでに同じIDのコメントが存在する時。
-			msg = "{}にすでに面談予定がありますがそれを取り消しますか?".format(getCelldatetime(xscriptcontext, i.getPosition()))
-			componentwindow = doc.getCurrentController().ComponentWindow
-			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)
-			if msgbox.execute()==MessageBoxResults.YES:	
-				cell = i.getParent()
-				cell.clearContents(511)
-				setCellProp(cell)		
-			elif msgbox.execute()==MessageBoxResults.CANCEL:
-				selection.setString("")  # 選択セルの文字列をクリア。
-				setCellProp(selection)
-				return
-	setCellProp(selection)	
-	celladdress = selection.getCellAddress()
-	annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
-	ichiransheet = doc.getSheets()["一覧"]
-	cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
-	if cell:	
-		ichiransheet.getAnnotations().insertNew(cell.getCellAddress(), "{} 面談".format(getCelldatetime(xscriptcontext, celladdress))) 
-		cell.setString("")  # 面談列の文字列をクリア。
-	else:
-		msg = "IDが一覧に見つかりません。"	
-		commons.showErrorMessageBox(doc.getCurrentController(), msg)
+		transientdialog.createDialog(xscriptcontext, "患者一覧", defaultrows, callback=callback_wClickGrid(xscriptcontext, "面"))
+def callback_wClickGrid(xscriptcontext, txt):  
+	def callback_wClickGrid(gridcelltxt):  # gridcelldata: グリッドコントロールのダブルクリックしたセルのデータ。
+		idtxt = gridcelltxt.split(" ")[0]  # グリッドコントロールのセルからIDを取得。
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+		sheet = doc.getCurrentController().getActiveSheet()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		selection.setString(txt)
+		annotations = sheet.getAnnotations()
+		for i in annotations:  # すべてのコメントについて。
+			if i.getString().startswith(idtxt):  # すでに同じIDのコメントが存在する時。
+				msg = "{}にすでに面談予定がありますがそれを取り消しますか?".format(getCelldatetime(xscriptcontext, i.getPosition()))
+				componentwindow = doc.getCurrentController().ComponentWindow
+				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)
+				if msgbox.execute()==MessageBoxResults.YES:	
+					cell = i.getParent()
+					cell.clearContents(511)
+					setCellProp(cell)		
+				elif msgbox.execute()==MessageBoxResults.CANCEL:
+					selection.setString("")  # 選択セルの文字列をクリア。
+					setCellProp(selection)
+					return
+		setCellProp(selection)	
+		celladdress = selection.getCellAddress()
+		annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
+		ichiransheet = doc.getSheets()["一覧"]
+		cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
+		if cell:	
+			ichiransheet.getAnnotations().insertNew(cell.getCellAddress(), "{} 面談".format(getCelldatetime(xscriptcontext, celladdress))) 
+			cell.setString("")  # 面談列の文字列をクリア。
+		else:
+			msg = "IDが一覧に見つかりません。"	
+			commons.showErrorMessageBox(doc.getCurrentController(), msg)
+	return callback_wClickGrid	
 def getCelldatetime(xscriptcontext, celladdress):
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。			

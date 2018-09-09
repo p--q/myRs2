@@ -3,8 +3,9 @@
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import glob, os, unohelper 
 from itertools import chain
-from indoc import commons, datedialog, ent, keika
-from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults # 定数
+from indoc import commons, datedialog, ent, keika, karute
+from com.sun.star.accessibility import AccessibleRole  # 定数
+from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, ScrollBarOrientation # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH, HIRAGANA_KATAKANA  # enum
@@ -41,17 +42,34 @@ class Ichiran():  # シート固有の値。
 		cellranges = sheet[:, self.idcolumn].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # ID列の文字列が入っているセルに限定して抽出。数値の時もありうる。
 		self.emptyrow = cellranges.getRangeAddresses()[-1].EndRow + 1  # ID列の最終行インデックス+1を取得。
 VARS = Ichiran()
-def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない(リスナー追加後でも)。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	initSheet(activationevent.ActiveSheet, xscriptcontext)
+def initSheet(sheet, xscriptcontext):  # documentevent.pyから呼び出す。 
 	sheet["C1:G1"].setDataArray((("済をﾘｾｯﾄ", "検予を反映", "予をﾘｾｯﾄ", "入力支援", "退院ﾘｽﾄ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	annotations = sheet.getAnnotations()
-	yoteisheet = xscriptcontext.getDocument().getSheets()["予定"]
+	doc = xscriptcontext.getDocument()
+	yoteisheet = doc.getSheets()["予定"]
 	yoteiids = [i.getString().split(" ")[0] for i in yoteisheet.getAnnotations()]  # 予定シートのコメントにあるIDをすべて取得。
 	for i in annotations:  # すべてのコメントについて。予定シートにない予定を削除する。
 		if i.getString().endswith("面談"):
 			if not sheet[i.getPosition().Row, VARS.idcolumn].getString() in yoteiids:  # 予定シートにないIDの時。
 				i.getParent().clearContents(CellFlags.ANNOTATION)
 	sheet[VARS.splittedrow:, VARS.checkstartcolumn:VARS.memostartcolumn].setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # チェック列固定行より下、全て左寄せ、上下中央揃えにする。
+	refreshCounts()  # 一覧シートのカウントを更新する。
+	sheet["Y1:Z1"].setPropertyValue("CharColor", commons.COLORS["silver"])  # カウントの文字色を設定。
+	sheet["Y2:Z2"].setPropertyValue("CharColor", commons.COLORS["skyblue"])  # カウントの文字色を設定。	
+	accessiblecontext = doc.getCurrentController().ComponentWindow.getAccessibleContext()  # コントローラーのアトリビュートからコンポーネントウィンドウを取得。
+	for i in range(accessiblecontext.getAccessibleChildCount()): 
+		childaccessiblecontext = accessiblecontext.getAccessibleChild(i).getAccessibleContext()
+		if childaccessiblecontext.getAccessibleRole()==AccessibleRole.SCROLL_PANE:
+			for j in range(childaccessiblecontext.getAccessibleChildCount()): 
+				child2 = childaccessiblecontext.getAccessibleChild(j)
+				childaccessiblecontext2 = child2.getAccessibleContext()
+				if childaccessiblecontext2.getAccessibleRole()==AccessibleRole.SCROLL_BAR:  # スクロールバーの時。
+					if child2.getOrientation()==ScrollBarOrientation.VERTICAL:  # 縦スクロールバーの時。
+						if childaccessiblecontext2.getBounds().Height>0:  # 右上枠の縦スクロールバーのHeghtが0になっている。
+							child2.setValue(0)  # 縦スクロールバーを一番上にする。
+							return  # breakだと二重ループは抜けれない。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -89,7 +107,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。
-			datarows = list(map(list, checkrange.getDataArray()))  # 各行をリストにして取得。
+			datarows = [["" for dummy in range(VARS.memostartcolumn-VARS.checkstartcolumn)] for dummy in range(len(iddatarows))]  # チェック列範囲の空データ行のリストを取得。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
@@ -121,8 +139,11 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 								datarows[r][shochicol] += i			
 					if "ECG" in s:  # ECG。
 						if not "E" in datarows[r][ecgcol]:  # すでにない時のみ。
-							datarows[r][ecgcol] = "E"							
+							datarows[r][ecgcol] = "E"			
+			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
+			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
+			[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
 	elif txt=="済をﾘｾｯﾄ":
 		msg = "済列をリセットします。"
 		componentwindow = controller.ComponentWindow
@@ -134,6 +155,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			searchdescriptor.setSearchString("済")
 			cellranges = sheet[VARS.splittedrow:VARS.emptyrow, VARS.checkstartcolumn:VARS.memostartcolumn].findAll(searchdescriptor)  # チェック列の「済」が入っているセル範囲コレクションを取得。
 			cellranges.setPropertyValue("CharColor", commons.COLORS["silver"])
+			refreshCounts()  # 一覧シートのカウントを更新する。
 	elif txt=="予をﾘｾｯﾄ":
 		sheet[VARS.splittedrow:VARS.emptyrow, VARS.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
 	elif txt=="入力支援":
@@ -477,7 +499,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			if msgbox.execute()==MessageBoxResults.OK:
 				flgs = []
 				newsheetname = "{}{}_{}入院".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-				flgs.append(detachSheet(idtxt, newsheetname))
+				flgs.append(detachSheet(idtxt, newsheetname))  # 切り出したシートのfileurlを取得。
 				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
 				flgs.append(detachSheet("".join([idtxt, "経"]), newsheetname))
 				if not all(flgs):
@@ -506,7 +528,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_CANCEL, "myRs", msg)					
 			if msgbox.execute()==MessageBoxResults.OK:
 				newsheetname = "{}{}経_{}開始".format(kanatxt, idtxt, datetxt)  # 新しいシート名を取得。
-				detachSheet("".join([idtxt, "経"]), newsheetname)  # 切り出したシートのfileurlを取得。
+				detachSheet("".join([idtxt, "経"]), newsheetname)
 	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。
@@ -570,12 +592,13 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
-	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
+# 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。
 			existingsheet = sheets[sheetname]  # カルテシートを取得。
 			existingsheet.setName(newsheetname)  # カルテシート名を変更。
-			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+# 			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
+			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())  # 新規ドキュメントの取得。シートの行と列の固定のためにhiddenでは開かない。
 			newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
 			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
 			del newsheets["Sheet1"]  # 新規ドキュメントのデフォルトシートを削除する。 
@@ -587,6 +610,16 @@ def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 				msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_YES_NO+MessageBoxButtons.DEFAULT_BUTTON_YES, "myRs", msg)
 				if msgbox.execute()!=MessageBoxResults.YES:			
 					return True  # 上書きしない時は、切り出したものとして返す。
+			frozenrow, frozencol = 0, 0
+			if sheetname.isdigit():  # シート名が数字のみの時カルテシート。
+				karutevars = karute.VARS
+				frozenrow, frozencol = karutevars.splittedrow, karutevars.splittedcolumn
+			elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
+				keikavars = keika.VARS
+				frozenrow, frozencol = keikavars.splittedrow, keikavars.splittedcolumn				
+			newdoccontroller = newdoc.getCurrentController()  # コピー先のドキュメントのコントローラを取得。	
+			newdoccontroller.setActiveSheet(newsheets[newsheetname])  # コピーしたシートをアクティブにする。
+			newdoccontroller.freezeAtPosition(frozencol, frozenrow)  # 行と列の固定をする。切り出したシートは固定がなくなっているので。			
 			fileurl = unohelper.systemPathToFileUrl(systempath)
 			newdoc.storeToURL(fileurl, ())  
 			newdoc.close(True)		

@@ -156,7 +156,7 @@ def getClipboardtxt(systemclipboard):  # クリップボードの文字列を取
 	return None
 def simulateKey(controller, keycode, keychar):	
 	componentwindow	= controller.ComponentWindow  # コンポーネントウィンドウを取得。
-	keyevent = KeyEvent(KeyCode=keycode, KeyChar=keychar, Modifiers=0, KeyFunc=0, Source=componentwindow)  # F2キーのKeyEventを取得。
+	keyevent = KeyEvent(KeyCode=keycode, KeyChar=keychar, Modifiers=0, KeyFunc=0, Source=componentwindow)  # キーのKeyEventを取得。
 	toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 	toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
 	toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。	

@@ -217,18 +217,20 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		selection.setString("{}月".format(m))
 	elif r==VARS.dayrow+1:
 		defaultrows = "", "○", "尿"
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	elif r==VARS.dayrow+2:
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
-	return False  # セル編集モードにしない。		
-def callback_wClickUpperRight(gridcelltxt, xscriptcontext):	
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	if gridcelltxt:  # セルに文字列がある時。
-		horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
-		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
-	else:
-		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+	return False  # セル編集モードにしない。	
+def callback_wClickUpperRightCreator(xscriptcontext):	
+	def callback_wClickUpperRight(gridcelltxt):	
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		if gridcelltxt:  # セルに文字列がある時。
+			horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+			selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS["skyblue"], horijustify))  # 背景をスカイブルーにする。		
+		else:
+			selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+	return callback_wClickUpperRight
 def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
@@ -251,13 +253,13 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				"ﾌｪﾉﾊﾞﾙﾋﾞﾀｰﾙ(ﾌｪﾉﾊﾞｰﾙ内服)10-25ug/ml2-3wで定常:検査値"
 		elif headertxt=="その他":
 			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0)
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))
 	else:
 		r = celladdress.Row
 		defaultrows = []
 		if c==VARS.yakucolumn+1:  # 用法列。
 			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注"
-			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)	
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
 		elif c==VARS.yakucolumn+2:  # 回数列。
 			yoho = sheet[r, VARS.yakucolumn+1].getString()
 			if yoho:
@@ -267,10 +269,10 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 					defaultrows = "1日1回", "1日2回", "1日3回", "1日4回"
 				elif yoho=="皮下注":
 					defaultrows = "毎食前", "朝前", "夕前", "眠前"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomLeft)
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, yoho))
 			else:
 				defaultrows = "持続", "1回", "2回", "3回"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeft)	
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
 		elif c==VARS.yakucolumn+3:  # 限定列。
 			dialogtitle = sheet[1, c].getString()
 			weekdays = "月火水木金土日"
@@ -285,27 +287,32 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 			defaultrows.extend(weekdays)
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomLeft0(gridcelltxt, xscriptcontext):
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	r = selection.getCellAddress().Row
-	sheet = VARS.sheet
-	if ":" in gridcelltxt:
-		txts = gridcelltxt.split(":"),
-		columnlength = len(txts[0])
-		if columnlength<VARS.splittedcolumn-VARS.yakucolumn+1:
-			sheet[r, VARS.yakucolumn:VARS.yakucolumn+columnlength].setDataArray(txts)
-	if gridcelltxt.endswith(":検査値"):
-		sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
-def callback_wClickBottomLeft(gridcelltxt, xscriptcontext, fixedtxt=None):
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	if gridcelltxt:  # セルに文字列がある時。
-		horijustify	= LEFT if len(gridcelltxt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
-		selection.setPropertyValue("HoriJustify", horijustify)  
-		if gridcelltxt=="皮下注":
-			VARS.sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
+def callback_wClickBottomLeft0Creator(xscriptcontext):
+	def callback_wClickBottomLeft0(gridcelltxt):
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		r = selection.getCellAddress().Row
+		sheet = VARS.sheet
+		if ":" in gridcelltxt:
+			txts = gridcelltxt.split(":"),
+			columnlength = len(txts[0])
+			if columnlength<VARS.splittedcolumn-VARS.yakucolumn+1:
+				sheet[r, VARS.yakucolumn:VARS.yakucolumn+columnlength].setDataArray(txts)
+		if gridcelltxt.endswith(":検査値"):
+			sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
+	return callback_wClickBottomLeft0
+def callback_wClickBottomLeftCreator(xscriptcontext, fixedtxt):
+	def callback_wClickBottomLeft(gridcelltxt):
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		if gridcelltxt:  # セルに文字列がある時。
+			horijustify	= LEFT if len(gridcelltxt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
+			selection.setPropertyValue("HoriJustify", horijustify)  
+			if gridcelltxt=="皮下注":
+				VARS.sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
+	return callback_wClickBottomLeft
 def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 	r = enhancedmouseevent.Target.getCellAddress().Row
 	yoho = VARS.sheet[r, VARS.yakucolumn+1].getString()
+	callback_wClickBottomRight = callback_wClickBottomRightCreator(xscriptcontext)
 	if yoho:
 		if yoho in ("吸入"):
 			defaultrows = "止", "変", "朝", "昼", "夕", "寝", "処方"
@@ -320,23 +327,25 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 		defaultrows = "止", "変", "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "点滴", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
-def callback_wClickBottomRight(gridcelltxt, xscriptcontext):	
-	sheet = VARS.sheet
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	if gridcelltxt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
-		endPrescription(selection, gridcelltxt)
-	elif gridcelltxt=="処方":
-		selection.setString("")
-		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
-	elif gridcelltxt:  # 上記以外の文字列の時。
-		horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
-		if selection.getPropertyValue("CellBackColor")==-1:  # 背景色がまだない時。
-			color = "lime" if sheet[selection.getCellAddress().Row, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
-			selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], horijustify))  
-		else:	
-			selection.setPropertyValue("HoriJustify", horijustify)
-	else:  # 文字列がない時。
-		selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+def callback_wClickBottomRightCreator(xscriptcontext):
+	def callback_wClickBottomRight(gridcelltxt):	
+		sheet = VARS.sheet
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		if gridcelltxt in ("止", "変"):  # 代入したセルの背景色を消し、それより右を全て消し黒行より下なら、黒行の上に移動する。
+			endPrescription(selection, gridcelltxt)
+		elif gridcelltxt=="処方":
+			selection.setString("")
+			selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+		elif gridcelltxt:  # 上記以外の文字列の時。
+			horijustify	= LEFT if len(gridcelltxt)>1 else CENTER  # 文字数が1個の時は中央揃えにする。
+			if selection.getPropertyValue("CellBackColor")==-1:  # 背景色がまだない時。
+				color = "lime" if sheet[selection.getCellAddress().Row, VARS.yakucolumn+1].getString() else "magenta3"  # 用法列に文字列がなければ点滴とする。
+				selection.setPropertyValues(("CellBackColor", "HoriJustify"), (commons.COLORS[color], horijustify))  
+			else:	
+				selection.setPropertyValue("HoriJustify", horijustify)
+		else:  # 文字列がない時。
+			selection.setPropertyValue("CellBackColor", -1)  # 背景色を消す。	
+	return callback_wClickBottomRight	
 def endPrescription(cell, txt):
 	cell.setString(txt)
 	celladdress = cell.getCellAddress()
