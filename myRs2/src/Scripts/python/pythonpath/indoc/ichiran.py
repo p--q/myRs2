@@ -107,7 +107,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。
-			datarows = list(map(list, checkrange.getDataArray()))  # 各行をリストにして取得。
+			datarows = [["" for dummy in range(VARS.memostartcolumn-VARS.checkstartcolumn)] for dummy in range(len(iddatarows))]  # チェック列範囲の空データ行のリストを取得。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
@@ -139,8 +139,11 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 								datarows[r][shochicol] += i			
 					if "ECG" in s:  # ECG。
 						if not "E" in datarows[r][ecgcol]:  # すでにない時のみ。
-							datarows[r][ecgcol] = "E"							
+							datarows[r][ecgcol] = "E"			
+			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
+			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
+			[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
 	elif txt=="済をﾘｾｯﾄ":
 		msg = "済列をリセットします。"
 		componentwindow = controller.ComponentWindow
@@ -152,6 +155,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			searchdescriptor.setSearchString("済")
 			cellranges = sheet[VARS.splittedrow:VARS.emptyrow, VARS.checkstartcolumn:VARS.memostartcolumn].findAll(searchdescriptor)  # チェック列の「済」が入っているセル範囲コレクションを取得。
 			cellranges.setPropertyValue("CharColor", commons.COLORS["silver"])
+			refreshCounts()  # 一覧シートのカウントを更新する。
 	elif txt=="予をﾘｾｯﾄ":
 		sheet[VARS.splittedrow:VARS.emptyrow, VARS.sumicolumn+1].clearContents(CellFlags.STRING)  # 予列をリセット。
 	elif txt=="入力支援":
