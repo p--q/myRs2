@@ -32,10 +32,12 @@ class Keika():  # シート固有の定数設定。
 		self.blackrow, = headers  # 黒行インデックスを取得。	
 VARS = Keika()		
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+	sheet = activationevent.ActiveSheet
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3:F4"].setDataArray((("薬品順",), ("クリップボードから薬品名抽出",)))
 	sheet["I3"].setString("透析")
+	highlightToday(sheet, xscriptcontext)
+def highlightToday(sheet, xscriptcontext):	# 今日の日付の上のセルをハイライトする。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
@@ -45,9 +47,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 	sheet[dayrow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
 	c = splittedcolumn + (todayvalue - startdatevalue)  # 今日の日付の列インデックスを取得。
-	if c<1024:
+	if splittedcolumn<=c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
-	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -508,13 +509,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
-				addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
-				addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry16")})  # 黒行上から使用中最下行へ
+				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
+				addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry16")})  # 黒行上から使用中最下行へ
 			elif r>VARS.blackrow:  # 黒行以外の時。
 				addMenuentry("ActionTrigger", {"Text": "黒行上へ", "CommandURL": baseurl.format("entry17")})  
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-				addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry18")})  # 使用中から使用中最上行へ  
-				addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry19")})  # 使用中から使用中最下行へ		
+				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry18")})  # 使用中から使用中最上行へ  
+				addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry19")})  # 使用中から使用中最下行へ		
 			if r!=VARS.blackrow:
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 				commons.cutcopypasteMenuEntries(addMenuentry)
@@ -582,6 +583,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==20:  # 退院翌日
 		selection[VARS.splittedrow:VARS.emptyrow+100, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける(時間がかるので最終行下100行までにする)。
 	elif entrynum==21:  # 退院取消
+		
+# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
+		
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
@@ -597,7 +601,11 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("AsLink", False),\
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
-		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+		
+		# フリーズする
+# 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+
+		
 		commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 	elif entrynum==22:  # インスリン残計算。選択セルは単一。
 		u = 300  # 1本単位。
@@ -775,6 +783,7 @@ def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # s
 			sheet[r-1, c+startmonthindex].setString("{}月".format(month))
 		else:
 			break
+	highlightToday(sheet, xscriptcontext)
 def getHolidaycolumns(functionaccess, datevalues, c): # 祝日になる列インデックスを返す。datevalues: 日付シリアル値のタプル。c: 開始列インデックス。
 	holidaycolumns = set()  # 祝日インデックスの集合。
 	holidays = commons.HOLIDAYS	
