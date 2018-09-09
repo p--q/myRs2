@@ -150,7 +150,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-		addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry2")}) 
 		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 
 	elif contextmenuname=="rowheader":  # 行ヘッダーのとき。				
 		commons.cutcopypasteMenuEntries(addMenuentry)
@@ -166,9 +165,19 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	controller = doc.getCurrentController()  # コントローラの取得。
 	selection = controller.getSelection()  # 選択範囲を取得。
 	if entrynum==1:  # クリア。
-		selection.clearContents(511)  # 範囲をすべてクリアする。
-	elif entrynum==2:  # 値のみクリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		sheet = VARS.sheet
+		splittedrow = VARS.splittedrow
+		keikacolumn = VARS.keikacolumn
+		cellflags = CellFlags.VALUE + CellFlags.DATETIME + CellFlags.STRING + CellFlags.ANNOTATION + CellFlags.FORMULA
+		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+				if i<splittedrow:  # 固定行より上の時。
+					continue
+				elif j<=keikacolumn:
+					sheet[i, j].clearContents(cellflags)
+				else:  # それ以外の時。
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。		
 	elif entrynum>20:  # startentrynum以上の数値の時はアーカイブファイルを開く。
 		startentrynum = 21
 		c = entrynum - startentrynum  # コンテクストメニューからファイルリストのインデックスを取得。

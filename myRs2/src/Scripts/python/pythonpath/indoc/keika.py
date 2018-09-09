@@ -227,7 +227,7 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	elif r==VARS.dayrow+2:
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	return False  # セル編集モードにしない。	
 def callback_wClickUpperRightCreator(xscriptcontext):	
 	def callback_wClickUpperRight(gridcelltxt):	
@@ -260,13 +260,13 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				"ﾌｪﾉﾊﾞﾙﾋﾞﾀｰﾙ(ﾌｪﾉﾊﾞｰﾙ内服)10-25ug/ml2-3wで定常:検査値"
 		elif headertxt=="その他":
 			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))		
 	else:
 		r = celladdress.Row
 		defaultrows = []
 		if c==VARS.yakucolumn+1:  # 用法列。
-			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注"
-			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
+			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注", "頓"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))	
 		elif c==VARS.yakucolumn+2:  # 回数列。
 			yoho = sheet[r, VARS.yakucolumn+1].getString()
 			if yoho:
@@ -276,10 +276,10 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 					defaultrows = "1日1回", "1日2回", "1日3回", "1日4回"
 				elif yoho=="皮下注":
 					defaultrows = "毎食前", "朝前", "夕前", "眠前"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, yoho))
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))
 			else:
 				defaultrows = "持続", "1回", "2回", "3回"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))	
 		elif c==VARS.yakucolumn+3:  # 限定列。
 			dialogtitle = sheet[1, c].getString()
 			weekdays = "月火水木金土日"
@@ -292,7 +292,7 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				defaultrows.extend(["{}(透析日のみ)".format(tosekibi), "{}(透析日以外)".format(nontosekibi), "{}(透析日前日以外)".format(nontosekibizenjitu)])
 				dialogtitle = "{}透析日".format(tosekibi)
 			defaultrows.extend(weekdays)
-			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))
 	return False  # セル編集モードにしない。
 def callback_wClickBottomLeft0Creator(xscriptcontext):
 	def callback_wClickBottomLeft0(gridcelltxt):
@@ -307,7 +307,7 @@ def callback_wClickBottomLeft0Creator(xscriptcontext):
 		if gridcelltxt.endswith(":検査値"):
 			sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
 	return callback_wClickBottomLeft0
-def callback_wClickBottomLeftCreator(xscriptcontext, fixedtxt):
+def callback_wClickBottomLeftCreator(xscriptcontext):
 	def callback_wClickBottomLeft(gridcelltxt):
 		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 		if gridcelltxt:  # セルに文字列がある時。
@@ -322,16 +322,16 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 	callback_wClickBottomRight = callback_wClickBottomRightCreator(xscriptcontext)
 	if yoho:
 		if yoho in ("吸入"):
-			defaultrows = "止", "変", "朝", "昼", "夕", "寝", "処方"
+			defaultrows = "朝", "昼", "夕", "寝", "処方"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
 		elif yoho in ("皮下注"):	
-			defaultrows = "止", "処方", "4-4-4", "4"
+			defaultrows = "処方", "4-4-4", "4"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
 		else:
-			defaultrows = "止", "変", "朝", "昼", "夕", "寝"
+			defaultrows = "朝", "昼", "夕", "寝"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "処方", defaultrows, callback=callback_wClickBottomRight)
 	else:  # 用法列が空セルの時は点滴とする。
-		defaultrows = "止", "変", "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
+		defaultrows = "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "点滴", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
 def callback_wClickBottomRightCreator(xscriptcontext):
@@ -476,10 +476,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 					if r==VARS.dayrow:  # 日付行の時。
 						if selection.getValue():  # セルに値があるとき。
 							addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry3")}) 
-					elif r>VARS.dayrow:  # 日付行より下の時。
-						commons.cutcopypasteMenuEntries(addMenuentry)					
-						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-						addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
+			if r>VARS.dayrow:  # 日付行より下の時
+				commons.cutcopypasteMenuEntries(addMenuentry)					
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
 				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")
@@ -555,7 +555,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			if c!=VARS.splittedcolumn:  # 固定列でないとき。
 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
 	elif entrynum==4:  # クリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(511)  # 範囲をすべてクリアする。
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		titlerows = VARS.blackrow,
+		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+				if i in titlerows or i<=VARS.dayrow:  # 黒行、または、日付行以上、の時。
+					continue
+				elif j<VARS.splittedcolumn and i<VARS.splittedrow:  # 左上枠の時
+					continue
+				else:
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。		
 	elif entrynum in (5, 6):  # 止 変
 		txt = "止" if entrynum==5 else "変"
 		rangeaddress = selection.getRangeAddress()
@@ -718,12 +727,20 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
 					cols = range(startc, endc+1)[::k]
-				if yoho:
+					
+				# 薬名によって開始列のみ点滴と同じ色にする。	
+					
+				if yoho:	
 					naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)	
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)
 			else:
-				if yoho:
+				
+				# 薬名によって開始列のみ点滴と同じ色にする。	
+				
+				if yoho in ("頓", "屯"):  # 頓服は1列しか使わないはずで、点滴と同じ色にする。
+					tentekirangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())		
+				elif yoho:
 					naifukurangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())	
@@ -731,10 +748,12 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 	if naifukurangeaddress:
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(naifukurangeaddress, False)
+		sheetcellranges.setPropertyValue("CellBackColor", -1)  # すでにある背景色をクリアする。
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["lime"])
 	if tentekirangeaddress:
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(tentekirangeaddress, False)
+		sheetcellranges.setPropertyValue("CellBackColor", -1)  # すでにある背景色をクリアする。
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])	
 def getNewEndC(startc, weekdayval, n, t, w):		
 	if weekdayval==1:

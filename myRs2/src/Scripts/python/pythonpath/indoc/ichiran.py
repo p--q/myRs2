@@ -567,13 +567,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		cellflags = CellFlags.VALUE + CellFlags.DATETIME + CellFlags.STRING + CellFlags.ANNOTATION + CellFlags.FORMULA
 		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
 			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
-				if i>=splittedrow or i not in edgerows:  # 分割行を含む下行以外、または、色行以外の時。
-					if idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。
-						sheet[i, j].clearContents(cellflags)
-					elif j>=memostartcolumn:  # メモ列開始列含む右列の時。
-						sheet.removeRange(sheet[i, j].getRangeAddress(), delete_left)  # セルを削除して左にずらす。
-					else:  # それ以外の時。
-						sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
+				if i<splittedrow or i in edgerows:  # 固定行より上、または、タイトル行の時。
+					continue
+				elif idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。
+					sheet[i, j].clearContents(cellflags)
+				elif j>=memostartcolumn:  # メモ列開始列含む右列の時。
+					sheet.removeRange(sheet[i, j].getRangeAddress(), delete_left)  # セルを削除して左にずらす。
+				else:  # それ以外の時。
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
 		
 		pass
@@ -594,12 +595,10 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
-# 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。
 			existingsheet = sheets[sheetname]  # カルテシートを取得。
 			existingsheet.setName(newsheetname)  # カルテシート名を変更。
-# 			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
 			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())  # 新規ドキュメントの取得。シートの行と列の固定のためにhiddenでは開かない。
 			newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
 			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。

@@ -504,7 +504,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-			addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry7")}) 			
 			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry6")}) 
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
@@ -565,10 +564,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			for i in problemranges:  # 各セル範囲について。移動や挿入したセル範囲は逐次インデックスで取得する。
 				sourcerangeaddress = moveProblems(sheet, i, dest_start_ridx)  # 問題リストを移動させる。
 				sheet.copyRange(sheet[dest_start_ridx, 0].getCellAddress(), sourcerangeaddress)  # 行の内容を移動。
-	elif entrynum==6:  # クリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(511)  # 範囲をすべてクリアする。
-	elif entrynum==7:  # 値のみクリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)
+	elif entrynum==6:  # クリア。
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		splittedrow = VARS.splittedrow
+		edgerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
+		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+				if i<splittedrow or i in edgerows:  
+					continue
+				else:  # それ以外の時。
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum in (8, 9, 10):
 		formatkey = ""
 		if entrynum==8:  # 年-月、書式にする。
