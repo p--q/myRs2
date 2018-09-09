@@ -198,13 +198,19 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			selection.setPropertyValue("CharColor", commons.COLORS["silver"])
 			sheet[celladdress.Row+1, celladdress.Column].setPropertyValue("CharColor", commons.COLORS["white"])
 	elif txt=="月水金":
-		selection.setString("火木土")
+		changeDialysDate(selection, "火木土")
 	elif txt=="火木土":
-		selection.setString("月水金")
+		changeDialysDate(selection, "月水金")
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 	return False  # セル編集モードにしない。	
+def changeDialysDate(cell, daystxt):
+	if cell.getPropertyValue("CharColor")==-1:
+		cell.setPropertyValue("CharColor", commons.COLORS["red3"])
+	else:
+		cell.setPropertyValue("CharColor", -1)
+		cell.setString(daystxt)	
 def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
@@ -414,37 +420,39 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
-	if selection:		
-		skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
-		colorlesscells = []  # 背景色を無色にするセルのリスト。
-		leftcells = []  # 左寄せにするセルのリスト。
-		centercells = []  # 中央寄せにするセルのリスト。	
-		sheet = selection.getSpreadsheet()
-		rangeaddress = selection.getRangeAddress()	
-		dayrow = VARS.dayrow
-		splittedrow = VARS.splittedrow
-		splittedcolumn = VARS.splittedcolumn
-		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
-			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
-				if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
-					continue
-				cell = sheet[r, c]  # セルを取得。
-				txt = cell.getString()
-				if txt:  # セルに文字列がある時のみ。	
-					stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
-					if len(txt)>stringlength:
-						leftcells.append(cell)  # 左揃えにする。				
-					else:
-						centercells.append(cell)  # 中央揃えにする。				
-					if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
-						skybluecells.append(cell)  # 背景色を設定。
-				elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
-					colorlesscells.append(cell)  # 背景色を消す。			
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-		setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
-		setRangeProp(doc, colorlesscells, "CellBackColor", -1)
-		setRangeProp(doc, leftcells, "HoriJustify", LEFT)
-		setRangeProp(doc, centercells, "HoriJustify", CENTER)
+	if selection:  # 背景色をペーストしても発火するのでセル範囲が膨大になるときがある。		
+		cellranges = selection.queryContentCells(CellFlags.STRING+CellFlags.DATETIME+CellFlags.VALUE+CellFlags.FORMULA)  # 内容のあるセルのみのセル範囲コレクションを取得。
+		if cellranges:
+			skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
+			colorlesscells = []  # 背景色を無色にするセルのリスト。
+			leftcells = []  # 左寄せにするセルのリスト。
+			centercells = []  # 中央寄せにするセルのリスト。	
+			sheet = selection.getSpreadsheet()
+			dayrow = VARS.dayrow
+			splittedrow = VARS.splittedrow
+			splittedcolumn = VARS.splittedcolumn					
+			for rangeaddress in cellranges.getRangeAddresses():
+				for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 行インデックスについてイテレート。				
+					for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 列インデックスについてイテレート。			
+						if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
+							continue
+						cell = sheet[r, c]  # セルを取得。
+						txt = cell.getString()
+						if txt:  # セルに文字列がある時のみ。	
+							stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
+							if len(txt)>stringlength:
+								leftcells.append(cell)  # 左揃えにする。				
+							else:
+								centercells.append(cell)  # 中央揃えにする。				
+							if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
+								skybluecells.append(cell)  # 背景色を設定。
+						elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
+							colorlesscells.append(cell)  # 背景色を消す。			
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
+			setRangeProp(doc, colorlesscells, "CellBackColor", -1)
+			setRangeProp(doc, leftcells, "HoriJustify", LEFT)
+			setRangeProp(doc, centercells, "HoriJustify", CENTER)
 def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リストの#を検索するセル範囲。
 	if ranges:
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
@@ -523,8 +531,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.rowMenuEntries(addMenuentry)
 	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		if c>VARS.splittedcolumn and len(selection[0, :].getColumns())==1:  # 分割列を含まない右列、かつ、選択列数が1つの時。
-			addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
-			addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
+			if sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
+				addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
+			else:
+				addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Remove"})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:RenameTable"})
@@ -581,19 +591,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		elif entrynum==19:  # 使用中から使用中最下行へ		
 			commons.toNewEntry(sheet, rangeaddress, VARS.emptyrow, VARS.emptyrow) 
 	elif entrynum==20:  # 退院翌日
-		selection[VARS.splittedrow:VARS.emptyrow+100, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける(時間がかるので最終行下100行までにする)。
+		selection[VARS.dayrow+1:VARS.emptyrow+100, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける(時間がかるので最終行下100行までにする)。
 	elif entrynum==21:  # 退院取消
-		
-# 		import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-		
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
 		docframe = controller.getFrame()
 		c = selection[0, 0].getCellAddress().Column  # 選択セル範囲の一番上のセルの列インデックスを取得。
-		controller.select(sheet[VARS.splittedrow:, c-1])  # 選択列の左の列を選択。
+		controller.select(sheet[VARS.dayrow+1:, c-1])  # 選択列の左の列を選択。
 		dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # コピー。
-		controller.select(sheet[VARS.splittedrow:, c])  # 元の列を選択し直す。
+		controller.select(sheet[VARS.dayrow+1:, c])  # 元の列を選択し直す。
 		nvs = ("Flags", "T"),\
 			("FormulaCommand", 0),\
 			("SkipEmptyCells", False),\
@@ -601,11 +608,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("AsLink", False),\
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
-		
-		# フリーズする
-# 		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
-
-		
+		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。changesOccurred()が発火する。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
 		commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 	elif entrynum==22:  # インスリン残計算。選択セルは単一。
 		u = 300  # 1本単位。

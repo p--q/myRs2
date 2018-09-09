@@ -386,36 +386,39 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。マクロで変更したときはセル範囲が入ってくる時がある。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。
 			break
-	if selection and selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
-		celladdress = selection.getCellAddress()
-		r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-		offdayc = VARS.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
-		if VARS.datarow<=r<VARS.emptyrow:  # 予定セルまたはテンプレートセルのある行の時。
-			if VARS.datacolumn-1<c<VARS.firstemptycolumn or offdayc<c<VARS.templateendcolumnedge:  # 予定セルまたはテンプレートセルのある列の時。
-				setCellProp(selection)
-		elif celladdress.Column==offdayc and selection.getValue()>0:  # 選択セルが休日設定のある列、かつ、選択セルに0より大きい数値が入っている。の時。 
-			sheet = selection.getSpreadsheet()
+	if selection:  # 背景色をペーストしても発火するのでセル範囲が膨大になるときがある。			
+		cellranges = selection.queryContentCells(CellFlags.STRING+CellFlags.DATETIME+CellFlags.VALUE+CellFlags.FORMULA)  # 内容のあるセルのみのセル範囲コレクションを取得。
+		if cellranges:		
+			sheet = VARS.sheet	
+			offdayc = VARS.templatestartcolumn - 1  # 休日設定のある列インデックスを取得。
 			searchdescriptor = sheet.createSearchDescriptor()
 			searchdescriptor.setSearchString("休日設定")  # 戻り値はない。
-			searchedcell = sheet[VARS.emptyrow:, offdayc].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。
-			if searchedcell:  # 休日設定の開始セルがある時。
-				if celladdress.Row>searchedcell.getCellAddress().Row+1:  # 休日設定の開始行より下の時。
-					selection.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(xscriptcontext.getDocument())('YYYY-M-D'), LEFT))
-def setCellProp(selection):		
-	txt = selection.getString()	
+			searchedcell = sheet[VARS.emptyrow:, offdayc].findFirst(searchdescriptor)  # 休日設定の開始セルを取得。見つからなかった時はNoneが返る。			
+			for rangeaddress in cellranges.getRangeAddresses():
+				for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 行インデックスについてイテレート。				
+					for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 列インデックスについてイテレート。				
+						if VARS.datarow<=r<VARS.emptyrow:  # 予定セルまたはテンプレートセルのある行の時。
+							if VARS.datacolumn-1<c<VARS.firstemptycolumn or offdayc<c<VARS.templateendcolumnedge:  # 予定セルまたはテンプレートセルのある列の時。
+								setCellProp(sheet[r, c])
+						elif c==offdayc and sheet[r, c].getValue()>0:  # 選択セルが休日設定のある列、かつ、選択セルに0より大きい数値が入っている。の時。 
+							if searchedcell:  # 休日設定の開始セルがある時。
+								if r>searchedcell.getCellAddress().Row+1:  # 休日設定の開始行より下の時。
+									sheet[r, c].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(xscriptcontext.getDocument())('YYYY-M-D'), LEFT))
+def setCellProp(cell):		
+	txt = cell.getString()	
 	if txt:  # セルに文字列がある時。
 		horijustify	= LEFT if len(txt)>2 else CENTER  # 文字数が2個までの時は中央揃えにする。
-		selection.setPropertyValue("HoriJustify", horijustify)  
+		cell.setPropertyValue("HoriJustify", horijustify)  
 		color = "magenta3"
 		if txt=="x":
 			color = "gray7"
 		elif txt=="/":
 			color = "silver"
-		selection.setPropertyValue("CellBackColor", commons.COLORS[color])
+		cell.setPropertyValue("CellBackColor", commons.COLORS[color])
 		if txt=="ｸﾘｱ":
-			selection.clearContents(511)
+			cell.clearContents(511)
 	else:
-		selection.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
+		cell.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
 	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
 	sheet = controller.getActiveSheet()  # アクティブシートを取得。
