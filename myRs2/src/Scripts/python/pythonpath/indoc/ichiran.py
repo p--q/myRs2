@@ -139,8 +139,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
-			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。
-			datarows = [["" for dummy in range(VARS.memostartcolumn-VARS.checkstartcolumn)] for dummy in range(len(iddatarows))]  # チェック列範囲の空データ行のリストを取得。
+			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
+			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
