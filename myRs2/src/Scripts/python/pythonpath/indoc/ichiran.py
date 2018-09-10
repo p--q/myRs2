@@ -77,7 +77,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			celladdress = selection.getCellAddress()
 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
 			if enhancedmouseevent.ClickCount==1:  # 左シングルクリックの時。
-				if r>=VARS.splittedrow:
+				if r>=VARS.splittedrow and r not in (VARS.bluerow, VARS.skybluerow, VARS.redrow):
 					if c<VARS.memostartcolumn or c not in (VARS.kanjicolumn, VARS.datecolumn, VARS.hospdayscolumn):
 						txt = selection.getString()
 						if txt:
@@ -108,7 +108,6 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 									selection.setString("予")
 							elif c>=VARS.checkstartcolumn:
 								sClickCheckCol(enhancedmouseevent, xscriptcontext)
-								
 			elif enhancedmouseevent.ClickCount==2:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
 				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
 					return wClickMenu(enhancedmouseevent, xscriptcontext)
@@ -140,7 +139,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
 			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
-			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。
+			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。既に済がある時は書き換えない。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
@@ -149,30 +148,35 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
 					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
-					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
+					if not "済" in datarows[r][ketuekicol]:
+						datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
-					for i in commons.GAZOs:  # 読影のない画像。
-						if i in s:
-							if not i in datarows[r][gazocol]:  # すでにない時のみ。
-								datarows[r][gazocol] += i
-					for i in commons.GAZOd:  # 読影のある画像。
-						if i in s:
-							if not i in datarows[r][gazocol]:  # すでにない時のみ。
-								datarows[r][gazocol] += i			
-							if datarows[r][wardcol] not in ("療", "包"):					
-								datarows[r][dokueicol] = "読"
-					for i in commons.ECHOs:  # エコー。
-						if i in s:
-							if not i in datarows[r][echocol]:  # すでにない時のみ。
-								datarows[r][echocol] += i		
-							datarows[r][eketsucol] = "ｴ"	
-					for i in commons.SHOCHIs:  # 処置。
-						if i in s:
-							if not i in datarows[r][shochicol]:  # すでにない時のみ。
-								datarows[r][shochicol] += i			
-					if "ECG" in s:  # ECG。
-						if not "E" in datarows[r][ecgcol]:  # すでにない時のみ。
-							datarows[r][ecgcol] = "E"			
+					if not "済" in datarows[r][gazocol]:
+						for i in commons.GAZOs:  # 読影のない画像。
+							if i in s:  # 経過列に文字列がある時。
+								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][gazocol] += i
+						for i in commons.GAZOd:  # 読影のある画像。
+							if i in s:
+								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][gazocol] += i			
+								if datarows[r][wardcol] not in ("療", "包"):					
+									datarows[r][dokueicol] = "読"
+					if not "済" in datarows[r][echocol]:				
+						for i in commons.ECHOs:  # エコー。
+							if i in s:
+								if not i in datarows[r][echocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][echocol] += i		
+								datarows[r][eketsucol] = "ｴ"	
+					if not "済" in datarows[r][shochicol]:						
+						for i in commons.SHOCHIs:  # 処置。
+							if i in s:
+								if not i in datarows[r][shochicol]:  # まだ文字列iが追加されていない時。
+									datarows[r][shochicol] += i		
+					if not "済" in datarows[r][ecgcol]:							
+						if "ECG" in s:  # ECG。
+							if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
+								datarows[r][ecgcol] = "E"			
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。

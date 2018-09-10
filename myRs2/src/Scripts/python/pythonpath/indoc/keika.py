@@ -223,7 +223,7 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 		selection.setString("{}月".format(m))
 	elif r==VARS.dayrow+1:
-		defaultrows = "", "○", "尿"
+		defaultrows = "○", "尿"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	elif r==VARS.dayrow+2:
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
@@ -482,7 +482,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
-				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")
+				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")  # 単一セルの時True。
 				yoho = sheet[r, VARS.yakucolumn+1].getString()
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
@@ -491,19 +491,23 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
 						addMenuentry("ActionTrigger", {"Text": "変", "CommandURL": baseurl.format("entry6")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-					addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
+					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry7")})
 					if sheetcell and yoho=="皮下注":  # 単一セルかつ用法列が皮下注の時。
-						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+						addMenuentry("ActionTrigger", {"Text": "4-4-4", "CommandURL": baseurl.format("entry11")})		
 						addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
-					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が皮下注の時。
+					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が吸入の時。
 						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-					addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
-					addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
-					addMenuentry("ActionTrigger", {"Text": "翌々週まで", "CommandURL": baseurl.format("entry2")})
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-					addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+						addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
+						addMenuentry("ActionTrigger", {"Text": "30日間", "CommandURL": baseurl.format("entry12")})
+					else:
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+						addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
+						addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
+						addMenuentry("ActionTrigger", {"Text": "翌々週まで", "CommandURL": baseurl.format("entry2")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+						addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry25")}) 			
 				addMenuentry("ActionTrigger", {"Text": "以後消去", "CommandURL": baseurl.format("entry14")})
@@ -580,6 +584,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection, "w")
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
+	elif entrynum==11:  # 4-4-4。	
+		selection.setString("4-4-4")
+		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+	elif entrynum==12:  # 30日観。
+		rangeaddress = selection.getRangeAddress()
+		colorizeSelectionRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+30])	
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
 		componentwindow = controller.ComponentWindow
@@ -654,8 +664,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			dayu = newdayu  # 1日消費量を更新。
 		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
 		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
-	elif entrynum==23:  # 処方。
-		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+# 	elif entrynum==23:  # 処方。
+# 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif entrynum==24:  # 開始。	
 		celladdress = selection[0, 0].getCellAddress()
 		r, c = celladdress.Row, celladdress.Column
@@ -713,11 +723,13 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 			if tdiff<0:  # 負数なら1週間繰り越す・
 				tdiff += 7			
 			tendc = newendc + tdiff  # 点滴用。
+	yohos = "頓", "屯", "吸入", "外用", "皮下注"  # 開始セルだけ点滴と同じ色にする用法。			
 	for i, yakurow in enumerate(yakurows, start=r):  # 各行について
 		yaku, yoho, dummy, gentei = yakurow
 		if yaku and i!=VARS.blackrow:
 			if end is not None:
 				endc = nendc if yoho else tendc
+			sheet[i, startc:endc+1].clearContents(511)  # 描く予定のセル範囲をクリア。
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。
@@ -727,19 +739,19 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
 					cols = range(startc, endc+1)[::k]
-					
-				# 薬名によって開始列のみ点滴と同じ色にする。	
-					
-				if yoho:	
+				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。	
+					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
+					if len(cols)>1:
+						naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols[1:])	
+				elif yoho:	
 					naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)	
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)
 			else:
-				
-				# 薬名によって開始列のみ点滴と同じ色にする。	
-				
-				if yoho in ("頓", "屯"):  # 頓服は1列しか使わないはずで、点滴と同じ色にする。
-					tentekirangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())		
+				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。
+					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
+					if startc<endc:
+						naifukurangeaddress.append(sheet[i, startc+1:endc+1].getRangeAddress())	
 				elif yoho:
 					naifukurangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())
 				else:  # 用法列がない時は点滴と考える。
@@ -748,12 +760,10 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 	if naifukurangeaddress:
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(naifukurangeaddress, False)
-		sheetcellranges.setPropertyValue("CellBackColor", -1)  # すでにある背景色をクリアする。
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["lime"])
 	if tentekirangeaddress:
 		sheetcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。			
 		sheetcellranges.addRangeAddresses(tentekirangeaddress, False)
-		sheetcellranges.setPropertyValue("CellBackColor", -1)  # すでにある背景色をクリアする。
 		sheetcellranges.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])	
 def getNewEndC(startc, weekdayval, n, t, w):		
 	if weekdayval==1:

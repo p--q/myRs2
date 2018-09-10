@@ -158,26 +158,30 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 		newdatarows = formatProblemList(VARS.splittedrow, VARS.bluerow, "****ｻﾏﾘ****")  # プロブレム欄を整形。
 		startendedgerowpairs = (VARS.splittedrow, VARS.bluerow), (VARS.bluerow+1, VARS.skybluerow), (VARS.skybluerow+1, VARS.redrow)  # 赤行より上の色行以外の開始行と終了行下の行インデックスのペアのタプル。
 		pcellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges") 
-		pcellranges.addRangeAddresses([sheet[i[0]:i[1], VARS.sharpcolumn:VARS.problemcolumn+1].getRangeAddress() for i in startendedgerowpairs], False)  # #列からプロブレム列までのセル範囲コレクションを取得。
-		pcellranges.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せ、縦位置を中央にする。
-		searchdescriptor = sheet.createSearchDescriptor()
-		searchdescriptor.setSearchString("#")  # 戻り値はない。	
-		cellranges = pcellranges.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
-		if cellranges:  # 日付列とプロブレム列の#が入っているセル範囲コレクションがある時。
-			cellranges.setPropertyValue("HoriJustify", RIGHT)  # #のセルのみ右寄せにする。
-		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges") 
-		cellranges.addRangeAddresses([sheet[i[0]:i[1], VARS.articlecolumn].getRangeAddress() for i in startendedgerowpairs], False)  # 記事列のみ取得。
-		cellranges.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.TOP))  # 左寄せ、縦位置を上寄せにする。
-		pcellranges.addRangeAddresses(cellranges.getRangeAddresses(), False)  # 記事列のセル範囲コレクションと合体する。
-		pcellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。
-		sheet[VARS.splittedrow:VARS.redrow, 0].getRows().setPropertyValue("OptimalHeight", True)  # 内容を折り返した後の行の高さを調整。
-		newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
-		copyCells(newdatarows)  # クリップボードにコピーする。
-		now = datetime.now()
-		datetxt = "{}-{}-{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
-		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
-		copieddatecell.setString(datetxt)
-		copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
+		rangeaddresses = [sheet[i[0]:i[1], VARS.sharpcolumn:VARS.problemcolumn+1].getRangeAddress() for i in startendedgerowpairs if i[0]<i[1]]
+		if rangeaddresses:
+			pcellranges.addRangeAddresses(rangeaddresses, False)  # #列からプロブレム列までのセル範囲コレクションを取得。
+			pcellranges.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.CENTER))  # 左寄せ、縦位置を中央にする。
+			searchdescriptor = sheet.createSearchDescriptor()
+			searchdescriptor.setSearchString("#")  # 戻り値はない。	
+			cellranges = pcellranges.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
+			if cellranges:  # 日付列とプロブレム列の#が入っているセル範囲コレクションがある時。
+				cellranges.setPropertyValue("HoriJustify", RIGHT)  # #のセルのみ右寄せにする。
+			rangeaddresses = [sheet[i[0]:i[1], VARS.articlecolumn].getRangeAddress() for i in startendedgerowpairs if i[0]<i[1]]
+			if rangeaddresses:
+				cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges") 
+				cellranges.addRangeAddresses(rangeaddresses, False)  # 記事列のみ取得。
+				cellranges.setPropertyValues(("HoriJustify", "VertJustify"), (LEFT, CellVertJustify2.TOP))  # 左寄せ、縦位置を上寄せにする。
+				pcellranges.addRangeAddresses(cellranges.getRangeAddresses(), False)  # 記事列のセル範囲コレクションと合体する。
+			pcellranges.setPropertyValue("IsTextWrapped", True)  # セルの内容を折り返す。
+			sheet[VARS.splittedrow:VARS.redrow, 0].getRows().setPropertyValue("OptimalHeight", True)  # 内容を折り返した後の行の高さを調整。
+			newdatarows.extend(copydatarows)  # 本日の記事欄をプロブレム欄の下に追加。
+			copyCells(newdatarows)  # クリップボードにコピーする。
+			now = datetime.now()
+			datetxt = "{}-{}-{} {}:{}:{} Copied".format(now.year, now.month, now.day, now.hour, now.minute, now.second)  # コピーボタンを押した日付を入力。
+			copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	
+			copieddatecell.setString(datetxt)
+			copieddatecell.setPropertyValues(("CellBackColor", "CharColor"), (commons.COLORS["lime"], -1))  # コピー日時セルの背景色を変更。文字色をリセット。
 	elif txt=="退院ｻﾏﾘ":
 		newdatarows = formatProblemList(VARS.splittedrow, VARS.bluerow, "****退院ｻﾏﾘ****")  # プロブレム欄を整形。
 		copieddatecell = sheet[0, VARS.articlecolumn]  # コピー日時セルを取得。	

@@ -190,12 +190,12 @@ class MouseListener(unohelper.Base, XMouseListener):
 						if itemtext.startswith("セル入力で閉じる"):
 							if self.gridpopupmenu.isItemChecked(menuid):  # 選択項目にチェックが入っている時。
 								self.dialogframe.close(True)
-							else:
-								controller = doc.getCurrentController()  # 現在のコントローラを取得。	
-								sheet = controller.getActiveSheet()
-								celladdress = selection.getCellAddress()
-								nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
-								controller.select(nextcell)  # 下のセルを選択。							
+# 							else:
+# 								controller = doc.getCurrentController()  # 現在のコントローラを取得。	
+# 								sheet = controller.getActiveSheet()
+# 								celladdress = selection.getCellAddress()
+# 								nextcell = sheet[celladdress.Row+1, celladdress.Column]  # 下のセルを取得。
+# 								controller.select(nextcell)  # 下のセルを選択。							
 							break
 				else:
 					self.flg = True		
