@@ -735,10 +735,10 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。
 				cols = []
 				if genteidigit.isdigit():  # 全て数字に変換できたときは、日月火水木金土しかない時。			
-					cols = (j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit)  # 日曜日=1から始まる。
+					cols = [j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit]  # 日曜日=1から始まる。
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
-					cols = range(startc, endc+1)[::k]
+					cols = range(startc, endc+1, k)  # range()はジェネレーターではなくシークエンス型を返す。
 				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。	
 					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
 					if len(cols)>1:

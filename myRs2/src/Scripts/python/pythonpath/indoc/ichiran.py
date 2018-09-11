@@ -148,35 +148,45 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
 					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
-					if not "済" in datarows[r][ketuekicol]:
+					if not "済" in datarows[r][ketuekicol]:  # 済があるときは書き換えない。
 						datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
-					if not "済" in datarows[r][gazocol]:
+					if not "済" in datarows[r][gazocol]:  # 済があるときは書き換えない。
 						for i in commons.GAZOs:  # 読影のない画像。
 							if i in s:  # 経過列に文字列がある時。
 								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
 									datarows[r][gazocol] += i
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
 						for i in commons.GAZOd:  # 読影のある画像。
 							if i in s:
 								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
 									datarows[r][gazocol] += i			
 								if datarows[r][wardcol] not in ("療", "包"):					
 									datarows[r][dokueicol] = "読"
-					if not "済" in datarows[r][echocol]:				
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
+					if not "済" in datarows[r][echocol]:  # 済があるときは書き換えない。				
 						for i in commons.ECHOs:  # エコー。
 							if i in s:
 								if not i in datarows[r][echocol]:  # まだ文字列iが追加されていない時。
 									datarows[r][echocol] += i		
 								datarows[r][eketsucol] = "ｴ"	
-					if not "済" in datarows[r][shochicol]:						
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][eketsucol] = datarows[r][eketsucol].replace(i, "")
+					if not "済" in datarows[r][shochicol]:  # 済があるときは書き換えない。						
 						for i in commons.SHOCHIs:  # 処置。
 							if i in s:
 								if not i in datarows[r][shochicol]:  # まだ文字列iが追加されていない時。
 									datarows[r][shochicol] += i		
-					if not "済" in datarows[r][ecgcol]:							
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][shochicol] = datarows[r][shochicol].replace(i, "")	
+					if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
 						if "ECG" in s:  # ECG。
 							if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
 								datarows[r][ecgcol] = "E"			
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][ecgcol] = datarows[r][ecgcol].replace("E", "")
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
