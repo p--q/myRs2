@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import unohelper  # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import dialogcommons
+from . import dialogcommons
 from com.sun.star.accessibility import AccessibleRole  # 定数
 from com.sun.star.awt import XActionListener, XMenuListener, XMouseListener, XWindowListener, XTextListener, XItemListener
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, PopupMenuDirection, PosSize, ScrollBarOrientation  # 定数

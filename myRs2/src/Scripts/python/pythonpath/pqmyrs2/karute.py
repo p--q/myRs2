@@ -3,7 +3,7 @@
 # カルテシートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import re
 from datetime import date, datetime
-from indoc import commons, datedialog, historydialog, staticdialog
+from . import commons, datedialog, historydialog, staticdialog
 from com.sun.star.awt import Key, MouseButton  # 定数
 from com.sun.star.i18n.TransliterationModulesNew import FULLWIDTH_HALFWIDTH  # enum
 from com.sun.star.lang import Locale  # Struct

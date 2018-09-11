@@ -3,7 +3,7 @@
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 from calendar import monthrange
 from datetime import date, datetime, time, timedelta  # シート関数ではアルゴリズムが難しい。
-from indoc import commons, ichiran, keika, staticdialog, transientdialog
+from . import commons, ichiran, keika, staticdialog, transientdialog
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, Key  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum

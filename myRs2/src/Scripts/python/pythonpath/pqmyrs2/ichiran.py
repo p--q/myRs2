@@ -3,7 +3,7 @@
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import glob, os, unohelper 
 from itertools import chain
-from indoc import commons, datedialog, ent, keika, karute
+from . import commons, datedialog, ent, keika, karute
 from com.sun.star.accessibility import AccessibleRole  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, ScrollBarOrientation # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum

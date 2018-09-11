@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, unohelper
-from indoc import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
+from . import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
 from com.sun.star.awt import MessageBoxButtons  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum

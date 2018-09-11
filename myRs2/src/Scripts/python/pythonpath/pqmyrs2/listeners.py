@@ -2,8 +2,7 @@
 # -*- coding: utf-8 -*-
 # embeddedmacro.pyから呼び出した関数ではXSCRIPTCONTEXTは使えない。デコレーターも使えない。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)でブレークする。
 import unohelper  # オートメーションには必須(必須なのはuno)。
-from indoc.commons import getModule # 相対インポートはできない。
-from indoc import exceptiondialog2
+from . import commons, exceptiondialog2
 from com.sun.star.awt import XEnhancedMouseClickHandler
 from com.sun.star.document import XDocumentEventListener
 from com.sun.star.sheet import XActivationEventListener
@@ -14,7 +13,7 @@ from com.sun.star.view import XSelectionChangeListener
 def invokeModuleMethod(name, methodname, *args):  # commons.getModle()でモジュールを振り分けてそのモジュールのmethodnameのメソッドを引数argsで呼び出す。
 # 	import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)  # ここでブレークするとすべてのイベントでブレークすることになる。
 	try:
-		m = getModule(name)  # モジュールを取得。
+		m = commons.getModule(name)  # モジュールを取得。
 		if hasattr(m, methodname):  # モジュールにmethodnameの関数が存在する時。	
 			return getattr(m, methodname)(*args)  # その関数を実行。
 		return None  # メソッドが見つからなかった時はNoneを返す。ハンドラやインターセプターは戻り値の処理が必ず必要。
