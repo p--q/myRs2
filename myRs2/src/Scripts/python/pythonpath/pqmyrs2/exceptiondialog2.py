@@ -4,7 +4,7 @@
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 # 引数の不足やサブモジュールのエラーには対応できない。
 import os, platform, subprocess, traceback, unohelper
-from indoc import dialogcommons
+from . import dialogcommons
 from com.sun.star.awt import XMouseListener
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, PosSize, SystemPointer  # 定数
 from com.sun.star.awt.MessageBoxType import ERRORBOX, QUERYBOX  # enum

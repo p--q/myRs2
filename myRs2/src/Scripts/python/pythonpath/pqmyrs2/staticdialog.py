@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import unohelper  # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import dialogcommons
+from . import dialogcommons
 from com.sun.star.awt import XActionListener, XMenuListener, XMouseListener, XWindowListener
 from com.sun.star.awt import MenuItemStyle, MessageBoxButtons, MessageBoxResults, MouseButton, PopupMenuDirection, PosSize  # 定数
 from com.sun.star.awt import MenuEvent, Rectangle  # Struct
@@ -10,7 +10,6 @@ from com.sun.star.beans import NamedValue  # Struct
 from com.sun.star.util import XCloseListener
 from com.sun.star.view.SelectionType import MULTI  # enum 
 def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=None, outputcolumn=None, *, callback=None):  # dialogtitleはダイアログのデータ保存名に使うのでユニークでないといけない。defaultrowsはグリッドコントロールのデフォルトデータ。
-	# 一番最初のダイアログのオプション設定。
 	items = ("セル入力で閉じる", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": True}),\
 			("オプション表示", MenuItemStyle.CHECKABLE+MenuItemStyle.AUTOCHECK, {"checkItem": False})  # グリッドコントロールのコンテクストメニュー。XMenuListenerのmenuevent.MenuIdでコードを実行する。"セル入力で閉じる"はデフォルトで有効にして変更不可にする。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -258,7 +257,7 @@ class MouseListener(unohelper.Base, XMouseListener):
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
 			if len(selectedrowindexes)==1 and selectedrowindexes[0]>-1:  # グリッドコントロールの選択行インデックスが1つ、かつ、0以上の時のみ。
 				j = selectedrowindexes[0]  # グリッドコントロールの選択行インデックスを取得。
-				griddata = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModelを取得。
+				griddata = gridcontrol.getModel().getPropertyValue("GridDataModel")  # GridDataModelを取得。グリッドコントロールは1列と決めつけて処理する。
 				rowdata = griddata.getRowData(j)  # グリッドコントロールで選択している行のすべての列をタプルで取得。
 				controller = doc.getCurrentController()  # 現在のコントローラを取得。			
 				sheet = controller.getActiveSheet()
@@ -266,15 +265,12 @@ class MouseListener(unohelper.Base, XMouseListener):
 				r, c = celladdress.Row, celladdress.Column
 				if outputcolumn is not None:  # 出力する列が指定されている時。
 					c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
-				flg = self.optioncontrolcontainer.getControl("CheckBox1").getState()  # セルに追記、のチェックの状態を取得。
-				if flg:  # セルに追記、にチェックがある時。グリッドコントロールは1列と決めつけて処理する。
+				if self.optioncontrolcontainer.getControl("CheckBox1").getState():  # セルに追記、にチェックがある時。
 					sheet[r, c].setString("".join([selection.getString(), rowdata[0]]))  # セルに追記する。
 				else:
 					sheet[r, c].setString(rowdata[0])  # セルに代入。
 				if callback is not None:  # コールバック関数が与えられている時。
 					callback(rowdata[0])						
-				if not flg:	
-					controller.select(sheet[r, c+1])  # 右のセルを選択。	
 		gridpopupmenu = self.gridpopupmenu	
 		for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 			itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。

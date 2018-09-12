@@ -3,7 +3,7 @@
 # 経過シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import platform
 from itertools import chain
-from indoc import commons, historydialog, staticdialog, yotei
+from . import commons, historydialog, staticdialog, yotei
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, Key  # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX, WARNINGBOX  # enum
 from com.sun.star.beans import PropertyValue  # Struct
@@ -32,10 +32,12 @@ class Keika():  # シート固有の定数設定。
 		self.blackrow, = headers  # 黒行インデックスを取得。	
 VARS = Keika()		
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
-	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
+	sheet = activationevent.ActiveSheet
 	sheet["F1:G1"].setDataArray((("一覧へ", "ｶﾙﾃへ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet["F3:F4"].setDataArray((("薬品順",), ("クリップボードから薬品名抽出",)))
 	sheet["I3"].setString("透析")
+	highlightToday(sheet, xscriptcontext)
+def highlightToday(sheet, xscriptcontext):	# 今日の日付の上のセルをハイライトする。
 	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 	functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。			
@@ -45,9 +47,8 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	todayvalue = int(functionaccess.callFunction("TODAY", ()))  # 今日のシリアル値を整数で取得。floatで返る。
 	sheet[dayrow-1, splittedcolumn:].setPropertyValue("CellBackColor", -1)  # r-1行目の背景色をクリア。
 	c = splittedcolumn + (todayvalue - startdatevalue)  # 今日の日付の列インデックスを取得。
-	if c<1024:
+	if splittedcolumn<=c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
-	sheet[dayrow+2:, splittedcolumn:].setPropertyValue("HoriJustify", LEFT)  # 分割列以降、日付行2行下以降すべて左詰めにする。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -197,13 +198,19 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			selection.setPropertyValue("CharColor", commons.COLORS["silver"])
 			sheet[celladdress.Row+1, celladdress.Column].setPropertyValue("CharColor", commons.COLORS["white"])
 	elif txt=="月水金":
-		selection.setString("火木土")
+		changeDialysDate(selection, "火木土")
 	elif txt=="火木土":
-		selection.setString("月水金")
+		changeDialysDate(selection, "月水金")
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。						
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
 		systemclipboard.setContents(commons.TextTransferable(txt[:8]), None)  # クリップボードにIDをコピーする。							
 	return False  # セル編集モードにしない。	
+def changeDialysDate(cell, daystxt):
+	if cell.getPropertyValue("CharColor")==-1:
+		cell.setPropertyValue("CharColor", commons.COLORS["red3"])
+	else:
+		cell.setPropertyValue("CharColor", -1)
+		cell.setString(daystxt)	
 def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	celladdress = selection.getCellAddress()
@@ -216,11 +223,11 @@ def wClickUpperRight(enhancedmouseevent, xscriptcontext):
 		m = int(functionaccess.callFunction("MONTH", (datevalue,)))  # 月、を取得。
 		selection.setString("{}月".format(m))
 	elif r==VARS.dayrow+1:
-		defaultrows = "", "○", "尿"
+		defaultrows = "○", "尿"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	elif r==VARS.dayrow+2:
 		defaultrows = chain(commons.GAZOs, commons.GAZOd, commons.SHOCHIs, commons.ECHOs)
-		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRight)  # 行タイトル毎に定型句ダイアログを作成。
+		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, VARS.sheet[r, VARS.yakucolumn+1].getString(), defaultrows, callback=callback_wClickUpperRightCreator(xscriptcontext))  # 行タイトル毎に定型句ダイアログを作成。
 	return False  # セル編集モードにしない。	
 def callback_wClickUpperRightCreator(xscriptcontext):	
 	def callback_wClickUpperRight(gridcelltxt):	
@@ -253,13 +260,13 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				"ﾌｪﾉﾊﾞﾙﾋﾞﾀｰﾙ(ﾌｪﾉﾊﾞｰﾙ内服)10-25ug/ml2-3wで定常:検査値"
 		elif headertxt=="その他":
 			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))		
 	else:
 		r = celladdress.Row
 		defaultrows = []
 		if c==VARS.yakucolumn+1:  # 用法列。
-			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注"
-			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
+			defaultrows = "分3", "分2", "朝", "昼", "夕", "寝", "朝寝", "分2朝寝", "分2朝昼", "吸入", "外用", "皮下注", "頓"
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))	
 		elif c==VARS.yakucolumn+2:  # 回数列。
 			yoho = sheet[r, VARS.yakucolumn+1].getString()
 			if yoho:
@@ -269,10 +276,10 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 					defaultrows = "1日1回", "1日2回", "1日3回", "1日4回"
 				elif yoho=="皮下注":
 					defaultrows = "毎食前", "朝前", "夕前", "眠前"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, yoho))
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))
 			else:
 				defaultrows = "持続", "1回", "2回", "3回"
-				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext, sheet[1, c].getString()))	
+				staticdialog.createDialog(enhancedmouseevent, xscriptcontext, sheet[1, c].getString(), defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))	
 		elif c==VARS.yakucolumn+3:  # 限定列。
 			dialogtitle = sheet[1, c].getString()
 			weekdays = "月火水木金土日"
@@ -285,7 +292,7 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				defaultrows.extend(["{}(透析日のみ)".format(tosekibi), "{}(透析日以外)".format(nontosekibi), "{}(透析日前日以外)".format(nontosekibizenjitu)])
 				dialogtitle = "{}透析日".format(tosekibi)
 			defaultrows.extend(weekdays)
-			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeft)
+			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows, callback=callback_wClickBottomLeftCreator(xscriptcontext))
 	return False  # セル編集モードにしない。
 def callback_wClickBottomLeft0Creator(xscriptcontext):
 	def callback_wClickBottomLeft0(gridcelltxt):
@@ -300,7 +307,7 @@ def callback_wClickBottomLeft0Creator(xscriptcontext):
 		if gridcelltxt.endswith(":検査値"):
 			sheet[selection.getCellAddress().Row, VARS.splittedcolumn:].setPropertyValue("NumberFormat", commons.formatkeyCreator(xscriptcontext.getDocument())('@'))  # 書式を設定。 
 	return callback_wClickBottomLeft0
-def callback_wClickBottomLeftCreator(xscriptcontext, fixedtxt):
+def callback_wClickBottomLeftCreator(xscriptcontext):
 	def callback_wClickBottomLeft(gridcelltxt):
 		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
 		if gridcelltxt:  # セルに文字列がある時。
@@ -315,16 +322,16 @@ def wClickBottomRight(enhancedmouseevent, xscriptcontext):
 	callback_wClickBottomRight = callback_wClickBottomRightCreator(xscriptcontext)
 	if yoho:
 		if yoho in ("吸入"):
-			defaultrows = "止", "変", "朝", "昼", "夕", "寝", "処方"
+			defaultrows = "朝", "昼", "夕", "寝", "処方"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
 		elif yoho in ("皮下注"):	
-			defaultrows = "止", "処方", "4-4-4", "4"
+			defaultrows = "処方", "4-4-4", "4"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, yoho, defaultrows, callback=callback_wClickBottomRight)
 		else:
-			defaultrows = "止", "変", "朝", "昼", "夕", "寝"
+			defaultrows = "朝", "昼", "夕", "寝"
 			staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "処方", defaultrows, callback=callback_wClickBottomRight)
 	else:  # 用法列が空セルの時は点滴とする。
-		defaultrows = "止", "変", "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
+		defaultrows = "朝", "昼", "夕", "1A", "2A", "3A", "4A", "5ml/hr"
 		staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "点滴", defaultrows, callback=callback_wClickBottomRight)
 	return False  # セル編集モードにしない。
 def callback_wClickBottomRightCreator(xscriptcontext):
@@ -413,37 +420,39 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
-	if selection:		
-		skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
-		colorlesscells = []  # 背景色を無色にするセルのリスト。
-		leftcells = []  # 左寄せにするセルのリスト。
-		centercells = []  # 中央寄せにするセルのリスト。	
-		sheet = selection.getSpreadsheet()
-		rangeaddress = selection.getRangeAddress()	
-		dayrow = VARS.dayrow
-		splittedrow = VARS.splittedrow
-		splittedcolumn = VARS.splittedcolumn
-		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
-			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
-				if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
-					continue
-				cell = sheet[r, c]  # セルを取得。
-				txt = cell.getString()
-				if txt:  # セルに文字列がある時のみ。	
-					stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
-					if len(txt)>stringlength:
-						leftcells.append(cell)  # 左揃えにする。				
-					else:
-						centercells.append(cell)  # 中央揃えにする。				
-					if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
-						skybluecells.append(cell)  # 背景色を設定。
-				elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
-					colorlesscells.append(cell)  # 背景色を消す。			
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-		setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
-		setRangeProp(doc, colorlesscells, "CellBackColor", -1)
-		setRangeProp(doc, leftcells, "HoriJustify", LEFT)
-		setRangeProp(doc, centercells, "HoriJustify", CENTER)
+	if selection:  # 背景色をペーストしても発火するのでセル範囲が膨大になるときがある。		
+		cellranges = selection.queryContentCells(CellFlags.STRING+CellFlags.DATETIME+CellFlags.VALUE+CellFlags.FORMULA)  # 内容のあるセルのみのセル範囲コレクションを取得。
+		if cellranges:
+			skybluecells = []  # 背景色をスカイブルーにするセルのリスト。
+			colorlesscells = []  # 背景色を無色にするセルのリスト。
+			leftcells = []  # 左寄せにするセルのリスト。
+			centercells = []  # 中央寄せにするセルのリスト。	
+			sheet = selection.getSpreadsheet()
+			dayrow = VARS.dayrow
+			splittedrow = VARS.splittedrow
+			splittedcolumn = VARS.splittedcolumn					
+			for rangeaddress in cellranges.getRangeAddresses():
+				for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 行インデックスについてイテレート。				
+					for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 列インデックスについてイテレート。			
+						if r<=dayrow or (c<splittedcolumn and r<splittedrow):  # 日付行を含む上行、または、左上枠、の時は何もしない。
+							continue
+						cell = sheet[r, c]  # セルを取得。
+						txt = cell.getString()
+						if txt:  # セルに文字列がある時のみ。	
+							stringlength = 2 if c<splittedcolumn else 1  # 分割列より左の時は文字数を2個、それ以外は1個に設定。
+							if len(txt)>stringlength:
+								leftcells.append(cell)  # 左揃えにする。				
+							else:
+								centercells.append(cell)  # 中央揃えにする。				
+							if r<splittedrow:  # 右上枠で日付行より下、かつ、文字がある、時。
+								skybluecells.append(cell)  # 背景色を設定。
+						elif r<splittedrow:  # 右上枠で日付行より下、かつ、文字がない、時。
+							colorlesscells.append(cell)  # 背景色を消す。			
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			setRangeProp(doc, skybluecells, "CellBackColor", commons.COLORS["skyblue"])
+			setRangeProp(doc, colorlesscells, "CellBackColor", -1)
+			setRangeProp(doc, leftcells, "HoriJustify", LEFT)
+			setRangeProp(doc, centercells, "HoriJustify", CENTER)
 def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リストの#を検索するセル範囲。
 	if ranges:
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
@@ -467,13 +476,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 					if r==VARS.dayrow:  # 日付行の時。
 						if selection.getValue():  # セルに値があるとき。
 							addMenuentry("ActionTrigger", {"Text": "日付追加", "CommandURL": baseurl.format("entry3")}) 
-					elif r>VARS.dayrow:  # 日付行より下の時。
-						commons.cutcopypasteMenuEntries(addMenuentry)					
-						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-						addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
+			if r>VARS.dayrow:  # 日付行より下の時
+				commons.cutcopypasteMenuEntries(addMenuentry)					
+				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
-				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")
+				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")  # 単一セルの時True。
 				yoho = sheet[r, VARS.yakucolumn+1].getString()
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
@@ -482,19 +491,23 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
 						addMenuentry("ActionTrigger", {"Text": "変", "CommandURL": baseurl.format("entry6")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-					addMenuentry("ActionTrigger", {"Text": "継続", "CommandURL": baseurl.format("entry7")})
+					addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry7")})
 					if sheetcell and yoho=="皮下注":  # 単一セルかつ用法列が皮下注の時。
-						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+						addMenuentry("ActionTrigger", {"Text": "4-4-4", "CommandURL": baseurl.format("entry11")})		
 						addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
-					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が皮下注の時。
+					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が吸入の時。
 						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
-					addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
-					addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
-					addMenuentry("ActionTrigger", {"Text": "翌々週まで", "CommandURL": baseurl.format("entry2")})
-					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
-					addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+						addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
+						addMenuentry("ActionTrigger", {"Text": "30日間", "CommandURL": baseurl.format("entry12")})
+					else:
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
+						addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
+						addMenuentry("ActionTrigger", {"Text": "翌週まで", "CommandURL": baseurl.format("entry9")})
+						addMenuentry("ActionTrigger", {"Text": "翌々週まで", "CommandURL": baseurl.format("entry2")})
+						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
+						addMenuentry("ActionTrigger", {"Text": "翌月まで", "CommandURL": baseurl.format("entry10")})
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "値のみクリア", "CommandURL": baseurl.format("entry25")}) 			
 				addMenuentry("ActionTrigger", {"Text": "以後消去", "CommandURL": baseurl.format("entry14")})
@@ -508,13 +521,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
-				addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
-				addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry16")})  # 黒行上から使用中最下行へ
+				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
+				addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry16")})  # 黒行上から使用中最下行へ
 			elif r>VARS.blackrow:  # 黒行以外の時。
 				addMenuentry("ActionTrigger", {"Text": "黒行上へ", "CommandURL": baseurl.format("entry17")})  
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
-				addMenuentry("ActionTrigger", {"Text": "使用中最上行へ", "CommandURL": baseurl.format("entry18")})  # 使用中から使用中最上行へ  
-				addMenuentry("ActionTrigger", {"Text": "使用中最下行へ", "CommandURL": baseurl.format("entry19")})  # 使用中から使用中最下行へ		
+				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry18")})  # 使用中から使用中最上行へ  
+				addMenuentry("ActionTrigger", {"Text": "最下行へ", "CommandURL": baseurl.format("entry19")})  # 使用中から使用中最下行へ		
 			if r!=VARS.blackrow:
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 				commons.cutcopypasteMenuEntries(addMenuentry)
@@ -522,8 +535,10 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.rowMenuEntries(addMenuentry)
 	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		if c>VARS.splittedcolumn and len(selection[0, :].getColumns())==1:  # 分割列を含まない右列、かつ、選択列数が1つの時。
-			addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
-			addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
+			if sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
+				addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
+			else:
+				addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
 	elif contextmenuname=="sheettab":  # シートタブの時。
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:Remove"})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:RenameTable"})
@@ -544,7 +559,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			if c!=VARS.splittedcolumn:  # 固定列でないとき。
 				sheet[r-1, c].setString("")  # 選択セルの上のセルの文字列を消す。
 	elif entrynum==4:  # クリア。書式設定とオブジェクト以外を消去。
-		selection.clearContents(511)  # 範囲をすべてクリアする。
+		rangeaddress = selection.getRangeAddress()  # 選択範囲のアドレスを取得。
+		titlerows = VARS.blackrow,
+		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+				if i in titlerows or i<=VARS.dayrow:  # 黒行、または、日付行以上、の時。
+					continue
+				elif j<VARS.splittedcolumn and i<VARS.splittedrow:  # 左上枠の時
+					continue
+				else:
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。		
 	elif entrynum in (5, 6):  # 止 変
 		txt = "止" if entrynum==5 else "変"
 		rangeaddress = selection.getRangeAddress()
@@ -560,6 +584,12 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		colorizeSelectionRange(xscriptcontext, selection, "w")
 	elif entrynum==10:  # 翌月まで。selectionは単一セルか複数セル。
 		colorizeSelectionRange(xscriptcontext, selection, "m")
+	elif entrynum==11:  # 4-4-4。	
+		selection.setString("4-4-4")
+		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+	elif entrynum==12:  # 30日観。
+		rangeaddress = selection.getRangeAddress()
+		colorizeSelectionRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+30])	
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
 		componentwindow = controller.ComponentWindow
@@ -580,16 +610,16 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		elif entrynum==19:  # 使用中から使用中最下行へ		
 			commons.toNewEntry(sheet, rangeaddress, VARS.emptyrow, VARS.emptyrow) 
 	elif entrynum==20:  # 退院翌日
-		selection[VARS.splittedrow:VARS.emptyrow+100, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける(時間がかるので最終行下100行までにする)。
+		selection[VARS.dayrow+1:VARS.emptyrow+100, :].setPropertyValue("CellBackColor", commons.COLORS["skyblue"])  # 固定行より下すべてに色を付ける(時間がかるので最終行下100行までにする)。
 	elif entrynum==21:  # 退院取消
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 		dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)
 		docframe = controller.getFrame()
 		c = selection[0, 0].getCellAddress().Column  # 選択セル範囲の一番上のセルの列インデックスを取得。
-		controller.select(sheet[VARS.splittedrow:, c-1])  # 選択列の左の列を選択。
+		controller.select(sheet[VARS.dayrow+1:, c-1])  # 選択列の左の列を選択。
 		dispatcher.executeDispatch(docframe, ".uno:Copy", "", 0, ())  # コピー。
-		controller.select(sheet[VARS.splittedrow:, c])  # 元の列を選択し直す。
+		controller.select(sheet[VARS.dayrow+1:, c])  # 元の列を選択し直す。
 		nvs = ("Flags", "T"),\
 			("FormulaCommand", 0),\
 			("SkipEmptyCells", False),\
@@ -597,7 +627,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			("AsLink", False),\
 			("MoveMode", 4)
 		props = [PropertyValue(Name=n, Value=v) for n, v in nvs]
-		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
+		dispatcher.executeDispatch(docframe, ".uno:InsertContents", "", 0, props)  # 書式のみをペースト。changesOccurred()が発火する。ソースのセル範囲の枠が動く破線のままになるのでEscキーをシミュレートする必要がある。
 		commons.simulateKey(controller, Key.ESCAPE, chr(0x1b))  # Escキーをシミュレート。
 	elif entrynum==22:  # インスリン残計算。選択セルは単一。
 		u = 300  # 1本単位。
@@ -634,8 +664,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			dayu = newdayu  # 1日消費量を更新。
 		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
 		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
-	elif entrynum==23:  # 処方。
-		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
+# 	elif entrynum==23:  # 処方。
+# 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif entrynum==24:  # 開始。	
 		celladdress = selection[0, 0].getCellAddress()
 		r, c = celladdress.Row, celladdress.Column
@@ -693,26 +723,36 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 			if tdiff<0:  # 負数なら1週間繰り越す・
 				tdiff += 7			
 			tendc = newendc + tdiff  # 点滴用。
+	yohos = "頓", "屯", "吸入", "外用", "皮下注"  # 開始セルだけ点滴と同じ色にする用法。			
 	for i, yakurow in enumerate(yakurows, start=r):  # 各行について
 		yaku, yoho, dummy, gentei = yakurow
 		if yaku and i!=VARS.blackrow:
 			if end is not None:
 				endc = nendc if yoho else tendc
+			sheet[i, startc:endc+1].clearContents(511)  # 描く予定のセル範囲をクリア。
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。
 				cols = []
 				if genteidigit.isdigit():  # 全て数字に変換できたときは、日月火水木金土しかない時。			
-					cols = (j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit)  # 日曜日=1から始まる。
+					cols = [j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit]  # 日曜日=1から始まる。
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
-					cols = range(startc, endc+1)[::k]
-				if yoho:
+					cols = range(startc, endc+1, k)  # range()はジェネレーターではなくシークエンス型を返す。
+				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。	
+					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
+					if len(cols)>1:
+						naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols[1:])	
+				elif yoho:	
 					naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)	
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)
 			else:
-				if yoho:
+				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。
+					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
+					if startc<endc:
+						naifukurangeaddress.append(sheet[i, startc+1:endc+1].getRangeAddress())	
+				elif yoho:
 					naifukurangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())
 				else:  # 用法列がない時は点滴と考える。
 					tentekirangeaddress.append(sheet[i, startc:endc+1].getRangeAddress())	
@@ -775,6 +815,7 @@ def setDates(xscriptcontext, doc, sheet, cell, datevalue, *, daycount=100):  # s
 			sheet[r-1, c+startmonthindex].setString("{}月".format(month))
 		else:
 			break
+	highlightToday(sheet, xscriptcontext)
 def getHolidaycolumns(functionaccess, datevalues, c): # 祝日になる列インデックスを返す。datevalues: 日付シリアル値のタプル。c: 開始列インデックス。
 	holidaycolumns = set()  # 祝日インデックスの集合。
 	holidays = commons.HOLIDAYS	

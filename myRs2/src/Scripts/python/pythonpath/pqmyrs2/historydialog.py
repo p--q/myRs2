@@ -1,7 +1,7 @@
 #!/opt/libreoffice5.4/program/python
 # -*- coding: utf-8 -*-
 import unohelper  # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
-from indoc import dialogcommons
+from . import dialogcommons
 from com.sun.star.accessibility import AccessibleRole  # 定数
 from com.sun.star.awt import XActionListener, XMenuListener, XMouseListener, XWindowListener, XTextListener, XItemListener
 from com.sun.star.awt import MessageBoxButtons, MessageBoxResults, MouseButton, PopupMenuDirection, PosSize, ScrollBarOrientation  # 定数
@@ -258,6 +258,9 @@ class MouseListener(unohelper.Base, XMouseListener):
 					nexttxt = nextcell.getString()  # 下のセルの文字列を取得。
 					edit1 = gridcontrol.getContext().getControl("Edit1")  # テキストボックスコントロールを取得。				
 					edit1.setText(nexttxt)  # テキストボックスコントロールにセルの内容を取得。		
+					
+					
+					
 		elif mouseevent.Buttons==MouseButton.RIGHT:  # 右ボタンクリックの時。mouseevent.PopupTriggerではサブジェクトによってはTrueにならないので使わない。
 			rowindex = gridcontrol.getRowAtPoint(mouseevent.X, mouseevent.Y)  # クリックした位置の行インデックスを取得。該当行がない時は-1が返ってくる。
 			if rowindex>-1:  # クリックした位置に行が存在する時。

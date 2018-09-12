@@ -3,7 +3,7 @@
 # 一覧シートについて。import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import glob, os, unohelper 
 from itertools import chain
-from indoc import commons, datedialog, ent, keika, karute
+from . import commons, datedialog, ent, keika, karute
 from com.sun.star.accessibility import AccessibleRole  # 定数
 from com.sun.star.awt import MouseButton, MessageBoxButtons, MessageBoxResults, ScrollBarOrientation # 定数
 from com.sun.star.awt.MessageBoxType import QUERYBOX  # enum
@@ -71,19 +71,51 @@ def initSheet(sheet, xscriptcontext):  # documentevent.pyから呼び出す。
 							child2.setValue(0)  # 縦スクロールバーを一番上にする。
 							return  # breakだと二重ループは抜けれない。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
-		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
+	if enhancedmouseevent.Buttons==MouseButton.LEFT:
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			celladdress = selection.getCellAddress()
-			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-			if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
-				return wClickMenu(enhancedmouseevent, xscriptcontext)
-			elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
-				return False # 何もしない。
-			elif c<VARS.checkstartcolumn:  # チェック列より左の時。
-				return wClickIDCol(enhancedmouseevent, xscriptcontext)
-			elif c<VARS.memostartcolumn:  # チェック列の時。
-				return wClickCheckCol(enhancedmouseevent, xscriptcontext)
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
+			if enhancedmouseevent.ClickCount==1:  # 左シングルクリックの時。
+				if r>=VARS.splittedrow and r not in (VARS.bluerow, VARS.skybluerow, VARS.redrow):
+					if c<VARS.memostartcolumn or c not in (VARS.kanjicolumn, VARS.datecolumn, VARS.hospdayscolumn):
+						txt = selection.getString()
+						if txt:
+							ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+							smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
+							systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。						
+							if c==VARS.idcolumn:  # ID列の時。
+								systemclipboard.setContents(commons.TextTransferable(txt), None)  # クリップボードにIDをコピーする。
+							elif c==VARS.kanacolumn:  # カナ名列の時。
+								idtxt = VARS.sheet[r, VARS.idcolumn].getString()
+								if idtxt:
+									transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
+									kanatxt = commons.convertKanaFULLWIDTH(transliteration, txt)  # カナ名を半角からスペースを削除して全角にする。
+									systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
+						if r<VARS.emptyrow:  # ID列が入力されている時のみ実行するもの。
+							if c==VARS.sumicolumn:  # 済列の時。
+								items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
+								items.append(items[0])  # 最初の要素を最後の要素に追加する。
+								dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。				
+								newtxt = dic[txt][0]							
+								selection.setString(newtxt)
+								VARS.sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[txt][1]])						
+								refreshCounts()  # カウントを更新する。	
+							elif c==VARS.yocolumn:  # 予列の時。
+								if txt:
+									selection.clearContents(CellFlags.STRING)  # 予をクリア。
+								else:  # セルの文字列が空の時。
+									selection.setString("予")
+							elif c>=VARS.checkstartcolumn:
+								sClickCheckCol(enhancedmouseevent, xscriptcontext)
+			elif enhancedmouseevent.ClickCount==2:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
+					return wClickMenu(enhancedmouseevent, xscriptcontext)
+				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
+					return False # 何もしない。
+				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
+					return wClickIDCol(enhancedmouseevent, xscriptcontext)
+				return False  # セル編集モードにしない。
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -106,8 +138,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
-			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。
-			datarows = [["" for dummy in range(VARS.memostartcolumn-VARS.checkstartcolumn)] for dummy in range(len(iddatarows))]  # チェック列範囲の空データ行のリストを取得。
+			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
+			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。既に済がある時は書き換えない。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
@@ -116,30 +148,45 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
 					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
 					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
-					datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
+					if not "済" in datarows[r][ketuekicol]:  # 済があるときは書き換えない。
+						datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
 					s = keikadatarows[1][0]  # 2行目を取得。
-					for i in commons.GAZOs:  # 読影のない画像。
-						if i in s:
-							if not i in datarows[r][gazocol]:  # すでにない時のみ。
-								datarows[r][gazocol] += i
-					for i in commons.GAZOd:  # 読影のある画像。
-						if i in s:
-							if not i in datarows[r][gazocol]:  # すでにない時のみ。
-								datarows[r][gazocol] += i			
-							if datarows[r][wardcol] not in ("療", "包"):					
-								datarows[r][dokueicol] = "読"
-					for i in commons.ECHOs:  # エコー。
-						if i in s:
-							if not i in datarows[r][echocol]:  # すでにない時のみ。
-								datarows[r][echocol] += i		
-							datarows[r][eketsucol] = "ｴ"	
-					for i in commons.SHOCHIs:  # 処置。
-						if i in s:
-							if not i in datarows[r][shochicol]:  # すでにない時のみ。
-								datarows[r][shochicol] += i			
-					if "ECG" in s:  # ECG。
-						if not "E" in datarows[r][ecgcol]:  # すでにない時のみ。
-							datarows[r][ecgcol] = "E"			
+					if not "済" in datarows[r][gazocol]:  # 済があるときは書き換えない。
+						for i in commons.GAZOs:  # 読影のない画像。
+							if i in s:  # 経過列に文字列がある時。
+								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][gazocol] += i
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
+						for i in commons.GAZOd:  # 読影のある画像。
+							if i in s:
+								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][gazocol] += i			
+								if datarows[r][wardcol] not in ("療", "包"):					
+									datarows[r][dokueicol] = "読"
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
+					if not "済" in datarows[r][echocol]:  # 済があるときは書き換えない。				
+						for i in commons.ECHOs:  # エコー。
+							if i in s:
+								if not i in datarows[r][echocol]:  # まだ文字列iが追加されていない時。
+									datarows[r][echocol] += i		
+								datarows[r][eketsucol] = "ｴ"	
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][eketsucol] = datarows[r][eketsucol].replace(i, "")
+					if not "済" in datarows[r][shochicol]:  # 済があるときは書き換えない。						
+						for i in commons.SHOCHIs:  # 処置。
+							if i in s:
+								if not i in datarows[r][shochicol]:  # まだ文字列iが追加されていない時。
+									datarows[r][shochicol] += i		
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][shochicol] = datarows[r][shochicol].replace(i, "")	
+					if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
+						if "ECG" in s:  # ECG。
+							if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
+								datarows[r][ecgcol] = "E"			
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][ecgcol] = datarows[r][ecgcol].replace("E", "")
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
@@ -170,32 +217,11 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 	sheet = VARS.sheet
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
-	sumitxt, yotxt, idtxt, kanjitxt, kanatxt, datevalue, hospdays = sheet[r, :VARS.checkstartcolumn].getDataArray()[0]  # 日付はfloatで返ってくる。	
+	idtxt, kanjitxt, kanatxt, datevalue, hospdays = sheet[r, VARS.idcolumn:VARS.checkstartcolumn].getDataArray()[0]  # 日付はfloatで返ってくる。	
 	if isinstance(datevalue , float):  # 入院日列がfloatの時。つまり日付シリアル値が取得出来た時。
 		datevalue = int(datevalue)  # 計算しにくいのでdatevalueがあるときはfloatを整数にしておく。	
-	if c==VARS.sumicolumn:  # 済列の時。
-		if hospdays:  # 在院日数列が空セルでない時。
-			items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
-			items.append(items[0])  # 最初の要素を最後の要素に追加する。
-			dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。	
-			newtxt = dic[sumitxt][0]							
-			selection.setString(newtxt)
-			sheet[r, :].setPropertyValue("CharColor", commons.COLORS[dic[sumitxt][1]])						
-			refreshCounts()  # カウントを更新する。
-	elif c==VARS.yocolumn:  # 予列の時。
-		if hospdays:  # 在院日数列が空セルでない時。
-			if yotxt:
-				selection.clearContents(CellFlags.STRING)  # 予をクリア。
-			else:  # セルの文字列が空の時。
-				selection.setString("予")
-	elif c==VARS.idcolumn:  # ID列の時。
-		if hospdays:  # 在院日数列が空セルでない時。
-			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-			systemclipboard.setContents(commons.TextTransferable(idtxt), None)  # クリップボードにIDをコピーする。
-		else:
-			return True  # セル編集モードにする。		
+	if c==VARS.idcolumn:  # ID列の時。
+		return True  # セル編集モードにする。		
 	elif c==VARS.kanjicolumn:  # 漢字列の時。カルテシートをアクティブにする、なければ作成する。カルトシート名はIDと一致。	
 		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 		sheets = doc.getSheets()  # シートコレクションを取得。			
@@ -209,21 +235,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 			else:
 				return True  # セル編集モードにする。		
 	elif c==VARS.kanacolumn:  # カナ名列の時。
-		if not kanatxt:  # カナ列が空文字の時。
-		
-			# フリガナ選択ダイアログを表示する。
-			pass
-		
-		
-		if hospdays:  # 経過列がすでにある時。
-			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
-			kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
-			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-			systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
-		else:
-			return True  # セル編集モードにする。		
+		return True  # セル編集モードにする。		
 	elif c==VARS.datecolumn:  # 入院日列の時。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "入院日", "YYYY-MM-DD")		
 	elif c==VARS.hospdayscolumn:  
@@ -238,7 +250,7 @@ def wClickIDCol(enhancedmouseevent, xscriptcontext):
 				keikasheet = commons.getKeikaSheet(xscriptcontext, doc, idtxt, kanjitxt, kanatxt, datevalue)  # 経過シートを取得。
 				doc.getCurrentController().setActiveSheet(keikasheet)  # 経過シートをアクティブにする。						
 	return False  # セル編集モードにしない。		
-def wClickCheckCol(enhancedmouseevent, xscriptcontext):
+def sClickCheckCol(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	c = selection.getCellAddress().Column  # selectionの行と列のインデックスを取得。		
@@ -319,62 +331,66 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 		if change.Accessor=="cell-change":  # セルの値が変化した時。
 			selection = change.ReplacedElement  # 値を変更したセルを取得。セル範囲が返るときもある。
 			break
-	if selection:	
-		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
-		transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-		transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
-		transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
-		transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。		
-		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-		datecolumncells = []	
-		nonkanacells = []
-		sheet = selection.getSpreadsheet()
-		rangeaddress = selection.getRangeAddress()	
-		flg = False
-		titlerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
-		splittedrow = VARS.splittedrow
-		idcolumn = VARS.idcolumn
-		kanacolumn = VARS.kanacolumn
-		datecolumn = VARS.datecolumn
-		hospdayscolumn = VARS.hospdayscolumn
-		for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # selectionの行インデックスについてイテレート。				
-			for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # selectionの列インデックスについてイテレート。			
-				if r>splittedrow-1 and r not in titlerows:  # 分割行を含めてその下、かつ、タイトル行でない、時。
-					cell = sheet[r, c]
-					txt = cell.getString()  # セルの文字列を取得。			
-					if c==idcolumn:  # ID列の時。
-						txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
-						if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
-							cell.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
-					elif c==kanacolumn:  # カナ列の時。
-						txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
-						txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-						if all(map(lambda x: chr(0xFF61)<=x<=chr(0xFF9F), txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
-							cell.setString(txt)
-						else:
-							nonkanacells.append(cell)
-					elif c==datecolumn:  # 日付列の時。
-						datecolumncells.append(cell)
-					if idcolumn-1<c<hospdayscolumn:
-						flg = True
-		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-		cellranges.addRangeAddresses([i.getRangeAddress() for i in datecolumncells], False)
-		cellranges.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
-		if flg:
-			ranges = [sheet[titlerows[2]+1:, idcolumn:hospdayscolumn]]
-			if splittedrow<titlerows[0]:
-				ranges.append(sheet[splittedrow:titlerows[0], idcolumn:hospdayscolumn])
-			if titlerows[0]+1<titlerows[1]:
-				ranges.append(sheet[titlerows[0]+1:titlerows[1], idcolumn:hospdayscolumn])
-			if titlerows[1]+1<titlerows[2]:
-				ranges.append(sheet[titlerows[1]+1:titlerows[2], idcolumn:hospdayscolumn])
+	if selection:  # 背景色をペーストしても発火するのでセル範囲が膨大になるときがある。		
+		cellranges = selection.queryContentCells(CellFlags.STRING+CellFlags.DATETIME+CellFlags.VALUE+CellFlags.FORMULA)  # 内容のあるセルのみのセル範囲コレクションを取得。
+		if cellranges:	
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。					
+			transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+			transliteration.loadModuleNew((FULLWIDTH_HALFWIDTH,), Locale(Language = "ja", Country = "JP"))		
+			transliteration2 = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+			transliteration2.loadModuleNew((HIRAGANA_KATAKANA,), Locale(Language = "ja", Country = "JP"))  # 変換モジュールをロード。		
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			datecolumncells = []	
+			nonkanacells = []
+			sheet = selection.getSpreadsheet()
+			rangeaddress = selection.getRangeAddress()	
+			flg = False
+			titlerows = VARS.bluerow, VARS.skybluerow, VARS.redrow
+			splittedrow = VARS.splittedrow
+			idcolumn = VARS.idcolumn
+			kanacolumn = VARS.kanacolumn
+			datecolumn = VARS.datecolumn
+			hospdayscolumn = VARS.hospdayscolumn
+			for rangeaddress in cellranges.getRangeAddresses():
+				for r in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 行インデックスについてイテレート。				
+					for c in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 列インデックスについてイテレート。			
+						if r>splittedrow-1 and r not in titlerows:  # 分割行を含めてその下、かつ、タイトル行でない、時。
+							cell = sheet[r, c]
+							txt = cell.getString()  # セルの文字列を取得。			
+							if c==idcolumn:  # ID列の時。
+								txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換。
+								if txt.isdigit():  # 数値の時のみ。空文字の時0で埋まってしまう。
+									cell.setString("{:0>8}".format(txt))  # 数値を8桁にして文字列として代入し直す。
+							elif c==kanacolumn:  # カナ列の時。
+								txt = transliteration2.transliterate(txt, 0, len(txt), [])[0]  # ひらがなをカタカナに変換。
+								txt = transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+								if all(map(lambda x: chr(0xFF61)<=x<=chr(0xFF9F), txt.replace(" ", ""))):  # すべて半角カタカナであることを確認。スペースは除去して評価する。
+									cell.setString(txt)
+								else:
+									nonkanacells.append(cell)
+							elif c==datecolumn:  # 日付列の時。
+								datecolumncells.append(cell)
+							if idcolumn<=c<hospdayscolumn:  # ID列から入院日列までのセルが含まれている時。
+								flg = True
 			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
-			cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
-			cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
-		if nonkanacells:
-			msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
-			commons.showErrorMessageBox(doc.getCurrentController(), msg)	
+			if datecolumncells:  # 日付列のセルがある時。
+				cellranges.addRangeAddresses([i.getRangeAddress() for i in datecolumncells], False)
+				cellranges.setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY-MM-DD'), LEFT))  # カルテシートの入院日の書式設定。左寄せにする。
+			if flg:  # ID列から入院日列までのセルが含まれている時背景色を再設定。
+				ranges = [sheet[titlerows[2]+1:, idcolumn:hospdayscolumn]]  # 赤行より下のセル範囲。
+				if splittedrow<titlerows[0]:  # 固定行から青行の上行までのセル範囲。
+					ranges.append(sheet[splittedrow:titlerows[0], idcolumn:hospdayscolumn])
+				if titlerows[0]+1<titlerows[1]:  # 青行からスカイブルー行の上行までのセル範囲。
+					ranges.append(sheet[titlerows[0]+1:titlerows[1], idcolumn:hospdayscolumn])
+				if titlerows[1]+1<titlerows[2]:  # スカイブルー行から赤行の上行までのセル範囲。
+					ranges.append(sheet[titlerows[1]+1:titlerows[2], idcolumn:hospdayscolumn])
+				cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
+				cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)
+				cellranges.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])
+			if nonkanacells:
+				msg = "ｶﾅ名列にはカタカナかひらながのみ入力してください。"
+				commons.showErrorMessageBox(doc.getCurrentController(), msg)	
 def refreshCounts():  # カウントを更新する。
 	sheet = VARS.sheet
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
@@ -565,13 +581,14 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		cellflags = CellFlags.VALUE + CellFlags.DATETIME + CellFlags.STRING + CellFlags.ANNOTATION + CellFlags.FORMULA
 		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
 			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
-				if i>=splittedrow or i not in edgerows:  # 分割行を含む下行以外、または、色行以外の時。
-					if idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。
-						sheet[i, j].clearContents(cellflags)
-					elif j>=memostartcolumn:  # メモ列開始列含む右列の時。
-						sheet.removeRange(sheet[i, j].getRangeAddress(), delete_left)  # セルを削除して左にずらす。
-					else:  # それ以外の時。
-						sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
+				if i<splittedrow or i in edgerows:  # 固定行より上、または、タイトル行の時。
+					continue
+				elif idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。
+					sheet[i, j].clearContents(cellflags)
+				elif j>=memostartcolumn:  # メモ列開始列含む右列の時。
+					sheet.removeRange(sheet[i, j].getRangeAddress(), delete_left)  # セルを削除して左にずらす。
+				else:  # それ以外の時。
+					sheet[i, j].clearContents(511)  # 範囲をすべてクリアする。
 	elif entrynum==12:  # ﾌﾘｶﾞﾅ辞書設定。
 		
 		pass
@@ -592,12 +609,10 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 				datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
-# 	propertyvalues = PropertyValue(Name="Hidden", Value=True),  # 新しいドキュメントのプロパティ。
 	def detachSheet(sheetname, newsheetname):
 		if sheetname in sheets:  # シートがある時。
 			existingsheet = sheets[sheetname]  # カルテシートを取得。
 			existingsheet.setName(newsheetname)  # カルテシート名を変更。
-# 			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, propertyvalues)  # 新規ドキュメントの取得。
 			newdoc = desktop.loadComponentFromURL("private:factory/scalc", "_blank", 0, ())  # 新規ドキュメントの取得。シートの行と列の固定のためにhiddenでは開かない。
 			newsheets = newdoc.getSheets()  # 新規ドキュメントのシートコレクションを取得。
 			newsheets.importSheet(doc, newsheetname, 0)  # 新規ドキュメントにシートをコピー。
