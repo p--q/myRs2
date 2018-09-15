@@ -200,10 +200,11 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 			datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。	
 			problemrange = sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1]
 			cellranges = problemrange.queryContentCells(CellFlags.STRING)
-			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow  # 青行おり上の範囲の最下行の下行を取得。
+			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow  # 青行より上の範囲の最下行の下行を取得。
 			endrowbelow = emptyrow + len(datarows)  # 挿入後の最下行の下行インデックス。	
-			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # 空行を挿入。	
+			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # 空行を挿入。
 			sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
+			VARS.setSheet(sheet)  # 行インデックスを再取得。
 			separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, emptyrow)
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。

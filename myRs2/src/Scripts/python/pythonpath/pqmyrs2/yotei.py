@@ -363,6 +363,10 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
 		dategene = (startdate+timedelta(days=i) for i in range(n))
+		
+		
+		
+		
 		weekdays = VARS.weekdays
 		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]
 		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
