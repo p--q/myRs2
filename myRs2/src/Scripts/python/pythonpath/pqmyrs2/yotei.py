@@ -287,11 +287,18 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	starttimevalue = sheet[VARS.datarow, 0].getValue()
 	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
-	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))  # 30分毎に枠を取得。
+	timegen = [starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow)]  # 30分毎に枠を取得。
+	nowdatetime = datetime.now()
+	for startrow, d in enumerate(timegen, start=VARS.datarow):  # 現在時刻のすぐ次の枠の行インデックスを取得。
+		if d>nowdatetime:
+			break
+	else:  # すべての時刻が過ぎている時は最終枠の行インデックスにする。
+		startrow = VARS.emptyrow - 1	
 	times = ["{}:{:0>2}".format(i.hour, i.minute) for i in timegen]
 	outputs = [sheet[VARS.menurow, VARS.templatestartcolumn].getString()]  # 最初の文をセルから取得。
+	scheduleToClip = createScheduleToClip(systemclipboard, times, startdate, outputs, startrow)
 	if txt=="COPY":
-		createScheduleToClip(systemclipboard, times, startdate, outputs)(14)					
+		scheduleToClip(14)					
 	elif txt=="強有効":
 		n = 14
 		searchdescriptor = sheet.createSearchDescriptor()
@@ -311,7 +318,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 				outputs.extend(fs)	
 		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
 	elif txt=="3wCOPY":
-		createScheduleToClip(systemclipboard, times, startdate, outputs)(21)
+		scheduleToClip(21)
 	elif txt=="休日更新":  # 祝日も更新する。
 		msg = "全経過シートの休日も更新します。\n祝日も含みます。"
 		componentwindow = controller.ComponentWindow
@@ -360,21 +367,24 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
 				cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])				
 	return False  # セル編集モードにしない。	
-def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
+def createScheduleToClip(systemclipboard, times, startdate, outputs, startrow):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
+		sheet = VARS.sheet
+		datarow = VARS.datarow
+		emptyrow = VARS.emptyrow
+		datacolumn = VARS.datacolumn
 		dategene = (startdate+timedelta(days=i) for i in range(n))
-		
-		
-		
-		
 		weekdays = VARS.weekdays
-		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]
-		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
-			cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
-			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
+		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]			
+		def _extendOutputs(r, c):  # r: 開始行インデックス、c: 列インデックス。
+			cellranges = sheet[r:emptyrow, c].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
+			fs = [" ".join([times[j], "○"]) for k in cellranges.getRangeAddresses() for j in range(k.StartRow-datarow, k.EndRow+1-datarow)]
 			if fs:
-				outputs.extend(["", dates[i-VARS.datacolumn]])
-				outputs.extend(fs)	
+				outputs.extend(["", dates[c-datacolumn]])
+				outputs.extend(fs)			
+		_extendOutputs(startrow, datacolumn)  # 開始日の列だけ開始行を指定する。
+		for i in range(datacolumn+1, datacolumn+n):  # 列インデックスをイテレート。
+			_extendOutputs(datarow, i)
 		systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。	\rはWindowsのメモ帳で開業するため。
 	return scheduleToClip
 def wClickCell(enhancedmouseevent, xscriptcontext):
