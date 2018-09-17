@@ -50,7 +50,12 @@ def highlightToday(sheet, xscriptcontext):	# 今日の日付の上のセルを�
 	if splittedcolumn<=c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
+	
+	
+	
+	
+	
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			celladdress = selection.getCellAddress()
@@ -469,7 +474,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの左上角セルの行と列のインデックスを取得。		
-	if contextmenuname=="cell":  # セルのとき		
+	if contextmenuname=="cell":  # セルのとき。複数セルも含まれる。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 単一セルの時。
 				if c>VARS.splittedcolumn-1:  # 分割列含む右の時。
@@ -515,6 +520,12 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				commons.cutcopypasteMenuEntries(addMenuentry)	
 			else:
+				if c==VARS.yakucolumn:  # 薬名列の時。
+					if selection.getPropertyValue("CellBackColor")==-1:
+						addMenuentry("ActionTrigger", {"Text": "他科処方", "CommandURL": baseurl.format("entry13")}) 
+					else:
+						addMenuentry("ActionTrigger", {"Text": "他科処方クリア", "CommandURL": baseurl.format("entry26")}) 
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 		
@@ -590,6 +601,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==12:  # 30日観。
 		rangeaddress = selection.getRangeAddress()
 		colorizeSelectionRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+30])	
+	elif entrynum==13:  # 他科処方。
+		selection.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])		
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
 		componentwindow = controller.ComponentWindow
@@ -664,8 +677,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			dayu = newdayu  # 1日消費量を更新。
 		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
 		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
-# 	elif entrynum==23:  # 処方。
-# 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif entrynum==24:  # 開始。	
 		celladdress = selection[0, 0].getCellAddress()
 		r, c = celladdress.Row, celladdress.Column
@@ -687,6 +698,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			commons.toOtherEntry(sheet, selection.getRangeAddress(), VARS.emptyrow, VARS.blackrow+1)  # 黒行下へ移動。
 	elif entrynum==25:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)		
+	elif entrynum==26:  # 他科処方クリア。
+		selection.setPropertyValue("CellBackColor", -1)	
 def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与えられている時はselectionは選択行だけが意味を持つ。
 	rangeaddress = selection.getRangeAddress()
 	startc = rangeaddress.StartColumn

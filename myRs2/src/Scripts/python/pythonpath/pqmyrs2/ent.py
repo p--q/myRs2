@@ -22,78 +22,81 @@ class Ent():  # シート固有の定数設定。
 VARS = Ent()
 def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートがアクティブになった時。ドキュメントを開いた時は発火しない。よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 	sheet = activationevent.ActiveSheet  # アクティブになったシートを取得。
-	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "ﾘｽﾄに戻る"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
+	sheet["A1:G1"].setDataArray((("ID", "漢字名", "ｶﾅ名", "入院日", "ﾘｽﾄ消去日", "経過", "一覧へ"),))  # よく誤入力されるセルを修正する。つまりボタンになっているセルの修正。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。
-	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。
+	if enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			celladdress = selection.getCellAddress()
-			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。
-			if r<VARS.splittedrow:
-				return mousePressedWSectionM(enhancedmouseevent, xscriptcontext)			
-			elif r<VARS.emptyrow:
-				return mousePressedWSectionB(enhancedmouseevent, xscriptcontext)
-			else:  # ID列が空欄の時。キーボードからの入力は想定しない。
-				sortRows(c)  # 昇順にソート。
-				return False  # セル編集モードにしない。	
+			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
+			if enhancedmouseevent.ClickCount==1:  # 左シングルクリックの時。
+				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
+				systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。	
+				if r<VARS.splittedrow and c>VARS.keikacolumn:  # 経過列より右の時。
+					txt = selection.getString()
+					if txt=="一覧へ":
+						doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+						controller = doc.getCurrentController()  # コントローラの取得。
+						sheets = doc.getSheets()
+						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+					elif txt=="改行削除":
+						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
+						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
+						clipboardtxt = commons.getClipboardtxt(systemclipboard)
+						if clipboardtxt:
+							outputs = []
+							buffer = []
+							for txt in clipboardtxt.split("\n"):
+								txt = txt.strip()
+								if txt.startswith("****"):
+									continue
+								elif txt.startswith("#"):
+									if buffer and outputs:
+										outputs[-1] = "".join([outputs[-1], *buffer])
+									outputs.append(txt)
+									buffer = []
+								else:
+									buffer.append(txt)	
+							if buffer and outputs:
+								outputs[-1] = "".join([outputs[-1], *buffer])
+							systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。\rはWindowsのメモ帳でも改行するため。		
+				elif r<VARS.emptyrow:		
+					if c==VARS.idcolumn:  # ID列の時。
+						systemclipboard.setContents(commons.TextTransferable(selection.getString()), None)  # クリップボードにIDをコピーする。
+					elif c==VARS.kanacolumn:  # カナ名列の時。
+						idtxt, dummy, kanatxt = VARS.sheet[r, :VARS.kanacolumn+1].getDataArray()[0]
+						transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。		
+						kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
+						systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
+			elif enhancedmouseevent.ClickCount==2:  # まずselectionChanged()が発火している。
+				if r<VARS.splittedrow:
+					return mousePressedWSectionM(enhancedmouseevent, xscriptcontext)			
+				elif r<VARS.emptyrow:
+					return mousePressedWSectionB(enhancedmouseevent, xscriptcontext)
+				else:  # ID列が空欄の時。キーボードからの入力は想定しない。
+					sortRows(c)  # 昇順にソート。
+					return False  # セル編集モードにしない。	
 	return True  # セル編集モードにする。	
 def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
 	c = selection.getCellAddress().Column
-	if c>VARS.keikacolumn:  # 経過列より右の時。
-		txt = selection.getString()
-		if txt=="ﾘｽﾄに戻る":
-			controller = doc.getCurrentController()  # コントローラの取得。
-			sheets = doc.getSheets()
-			controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
-		elif txt=="改行削除":
-			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
-			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
-			clipboardtxt = commons.getClipboardtxt(systemclipboard)
-			if clipboardtxt:
-				outputs = []
-				buffer = []
-				for txt in clipboardtxt.split("\n"):
-					txt = txt.strip()
-					if txt.startswith("****"):
-						continue
-					elif txt.startswith("#"):
-						if buffer and outputs:
-							outputs[-1] = "".join([outputs[-1], *buffer])
-						outputs.append(txt)
-						buffer = []
-					else:
-						buffer.append(txt)	
-				if buffer and outputs:
-					outputs[-1] = "".join([outputs[-1], *buffer])
-				systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。\rはWindowsのメモ帳でも改行するため。
-	elif c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
+	if c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
 		sortRows(c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		
-def sortRows(c, *, reverse=None):
+def sortRows(c, *, reverse=False):
 	if VARS.splittedrow<VARS.emptyrow:
 		datarange = VARS.sheet[VARS.splittedrow:VARS.emptyrow, :VARS.keikacolumn+1]
 		datarows = list(datarange.getDataArray())  # 行をリストで取得。要素はタプル。
-		datarows.sort(key=lambda x:x[c], reverse=reverse)  # 各行を列インデックスcでソート。
+		datarows.sort(key=lambda x: x[c], reverse=reverse)  # 各行を列インデックスcでソート。
 		datarange.setDataArray(datarows)  # シートに代入する。	
 def mousePressedWSectionB(enhancedmouseevent, xscriptcontext):
-	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
-	doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
-	systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
-	transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。	
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。		
 	celladdress = selection.getCellAddress()
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。	
-	if c==VARS.idcolumn:  # ID列の時。
-		systemclipboard.setContents(commons.TextTransferable(selection.getString()), None)  # クリップボードにIDをコピーする。
-	elif c==VARS.kanacolumn:  # カナ名列の時。
-		idtxt, dummy, kanatxt = VARS.sheet[r, :VARS.kanacolumn+1].getDataArray()[0]
-		kanatxt = commons.convertKanaFULLWIDTH(transliteration, kanatxt)  # カナ名を半角からスペースを削除して全角にする。
-		systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
-	elif c==VARS.keikacolumn+1:  # リスト消去日列の時。
+	if c==VARS.keikacolumn+1:  # リスト消去日列の時。
+		doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 	
 		datarows = VARS.sheet[r, VARS.idcolumn:VARS.datecolumn].getDataArray()  # ID、漢字名、カナ名を取得。
 		sheets = doc.getSheets()
 		ichiransheet = sheets["一覧"]

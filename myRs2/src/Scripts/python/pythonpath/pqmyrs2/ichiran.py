@@ -78,7 +78,7 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。				
 			if enhancedmouseevent.ClickCount==1:  # 左シングルクリックの時。
 				if r>=VARS.splittedrow and r not in (VARS.bluerow, VARS.skybluerow, VARS.redrow):
-					if c<VARS.memostartcolumn or c not in (VARS.kanjicolumn, VARS.datecolumn, VARS.hospdayscolumn):
+					if c<VARS.memostartcolumn and c not in (VARS.kanjicolumn, VARS.datecolumn, VARS.hospdayscolumn):  # メモ列より左、かつ、漢字列、入院日列、在院日数列、以外の時。
 						txt = selection.getString()
 						if txt:
 							ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
@@ -125,6 +125,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	sheets = doc.getSheets()  # シートコレクションを取得。
 	txt = selection.getString()  # クリックしたセルの文字列を取得。	
 	if txt=="検予を反映":  # 経過シートから本日の検予を取得。
+		datevaluecell = sheet["A1"]  # 更新日時のシリアル値を入れるセル。
 		ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 		smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
 		functionaccess = smgr.createInstanceWithContext("com.sun.star.sheet.FunctionAccess", ctx)  # シート関数利用のため。
@@ -137,9 +138,14 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		dayrow = keikavars.dayrow
 		splittedcolumn = keikavars.splittedcolumn
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
+			checkrange = sheet[VARS.splittedrow:VARS.emptyrow, VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
+			if datevaluecell.getValue()<todayvalue:  # 更新日が過去日の時。
+				checkrange.clearContents(CellFlags.STRING)  # チェック列の文字列をクリア。
+				checkrange.setPropertyValue("CharColor", -1)  # チェック列の文字色をクリア。
+				datevaluecell.setValue(todayvalue)  # 更新日時に今日のシリアル値を代入する。
+				datevaluecell.setPropertyValue("CellBackColor", commons.COLORS["black"])  # 更新日記録セルを黒塗りにする。
 			iddatarows = cellranges[0].getDataArray()  # ID列のデータ行のタプルを取得。空行がないとする。
-			checkrange = sheet[VARS.splittedrow:VARS.splittedrow+len(iddatarows), VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
-			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。既に済がある時は書き換えない。
+			datarows = list(map(list, checkrange.getDataArray())) # 各行をリストにして取得。
 			for r, idtxt in enumerate(chain.from_iterable(iddatarows)):  # 各ID列について。rは相対インデックス。
 				if idtxt.isdigit():  # IDがすべて数字の時。
 					sheetname = "{}経".format(idtxt)  # 経過シート名を作成。
@@ -147,46 +153,48 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
 					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
-					keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 今日の日付列のセル範囲の値を取得。
-					if not "済" in datarows[r][ketuekicol]:  # 済があるときは書き換えない。
-						datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
-					s = keikadatarows[1][0]  # 2行目を取得。
-					if not "済" in datarows[r][gazocol]:  # 済があるときは書き換えない。
+					if todayvalue>startdatevalue:  # 経過シートにある日付の時。
+						keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 経過シートの今日の日付列のセル範囲の値を取得。
+						if not "済" in datarows[r][ketuekicol]:  # 血液列は済があるときは何もしない。
+							datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
+						s = keikadatarows[1][0]  # 経過シートの当日の2行目を取得。
 						for i in commons.GAZOs:  # 読影のない画像。
 							if i in s:  # 経過列に文字列がある時。
 								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
-									datarows[r][gazocol] += i
-							else:  # 経過列に文字列ないときはiを削除する。
-								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
+									addTxt(datarows, r, gazocol, i)
+							else:  # 経過列に文字列がないときはiを削除する。
+								newtxt = datarows[r][gazocol].replace(i, "").strip()
+								datarows[r][gazocol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。
 						for i in commons.GAZOd:  # 読影のある画像。
 							if i in s:
 								if not i in datarows[r][gazocol]:  # まだ文字列iが追加されていない時。
-									datarows[r][gazocol] += i			
+									addTxt(datarows, r, gazocol, i)	
 								if datarows[r][wardcol] not in ("療", "包"):					
 									datarows[r][dokueicol] = "読"
 							else:  # 経過列に文字列ないときはiを削除する。
-								datarows[r][gazocol] = datarows[r][gazocol].replace(i, "")
-					if not "済" in datarows[r][echocol]:  # 済があるときは書き換えない。				
+								newtxt = datarows[r][gazocol].replace(i, "").strip()
+								datarows[r][gazocol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。			
 						for i in commons.ECHOs:  # エコー。
 							if i in s:
 								if not i in datarows[r][echocol]:  # まだ文字列iが追加されていない時。
-									datarows[r][echocol] += i		
+									addTxt(datarows, r, echocol, i)	
 								datarows[r][eketsucol] = "ｴ"	
 							else:  # 経過列に文字列ないときはiを削除する。
-								datarows[r][eketsucol] = datarows[r][eketsucol].replace(i, "")
-					if not "済" in datarows[r][shochicol]:  # 済があるときは書き換えない。						
+								newtxt = datarows[r][eketsucol].replace(i, "").strip()
+								datarows[r][eketsucol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。					
 						for i in commons.SHOCHIs:  # 処置。
 							if i in s:
 								if not i in datarows[r][shochicol]:  # まだ文字列iが追加されていない時。
-									datarows[r][shochicol] += i		
+									addTxt(datarows, r, shochicol, i)
 							else:  # 経過列に文字列ないときはiを削除する。
-								datarows[r][shochicol] = datarows[r][shochicol].replace(i, "")	
-					if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
-						if "ECG" in s:  # ECG。
-							if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
-								datarows[r][ecgcol] = "E"			
-							else:  # 経過列に文字列ないときはiを削除する。
-								datarows[r][ecgcol] = datarows[r][ecgcol].replace("E", "")
+								newtxt = datarows[r][shochicol].replace(i, "").strip()
+								datarows[r][shochicol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。								)	
+						if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
+							if "ECG" in s:  # ECG。
+								if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
+									datarows[r][ecgcol] = "E"			
+								else:  # 経過列に文字列ないときはiを削除する。
+									datarows[r][ecgcol] = ""
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
@@ -212,6 +220,9 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	elif txt=="退院ﾘｽﾄ":
 		controller.setActiveSheet(sheets["退院"])
 	return False  # セル編集モードにしない。	
+def addTxt(datarows, r, idx, txt):
+	datarows[r][idx] = "".join([datarows[r][idx].replace("済", ""), txt])  # 済を削除してiを追加する。
+	VARS.sheet[r, VARS.checkstartcolumn+idx].setPropertyValue("CharColor", -1)  # 文字色をクリア。
 def wClickIDCol(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	sheet = VARS.sheet
@@ -580,7 +591,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		memostartcolumn = VARS.memostartcolumn
 		cellflags = CellFlags.VALUE + CellFlags.DATETIME + CellFlags.STRING + CellFlags.ANNOTATION + CellFlags.FORMULA
 		for i in range(rangeaddress.StartRow, rangeaddress.EndRow+1):  # 選択範囲の行インデックスをイテレート。
-			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1):  # 選択範囲の列インデックスをイテレート。
+			for j in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1)[::-1]:  # 選択範囲の列インデックスをイテレート。メモ列はセルを削除するの右のセルから実行する。
 				if i<splittedrow or i in edgerows:  # 固定行より上、または、タイトル行の時。
 					continue
 				elif idcolumn<=j<=datecolumn or sheet[0, j].getPropertyValue("CellBackColor")>0:  # ID列、漢字名列、ｶﾅ名列、入院日列、または、１行目に背景色があるとき、は背景色を消さない。

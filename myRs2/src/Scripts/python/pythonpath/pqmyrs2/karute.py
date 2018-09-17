@@ -269,7 +269,7 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
 		selection.setString("")  # 日付挿入列の文字列をクリア。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumnCreator(xscriptcontext))  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
-		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
+		selection.setPropertyValues(("CharColor", "IsTextWrapped"), (commons.COLORS["white"], False))  # 日付挿入列の文字色を白色にする。文字列の折り返しを無しにする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
 		datetxt = VARS.sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
 		if datetxt:  # 日付文字列が取得出来た時。
@@ -307,7 +307,10 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	return False  # セルを編集モードにしない。
 def callback_phrasecolumnCreator(xscriptcontext):	
 	def callback_phrasecolumn(gridcelltxt):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
-		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		sheet = VARS.sheet
+		doc = xscriptcontext.getDocument()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		r = selection.getCellAddress().Row
 		sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
 		if gridcelltxt.startswith("#"):  # #から始まっている時。
 			sharptxt = "#"
@@ -322,8 +325,16 @@ def callback_phrasecolumnCreator(xscriptcontext):
 			problemtxt, articletxt = gridcelltxt.split(":", 1)
 		else:
 			articletxt = gridcelltxt
-		datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
-		VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
+		if todayvalue: 	
+			datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
+			sheet[r, VARS.datecolumn].setPropertyValue("HoriJustify", LEFT)  # 日付セルのみ左寄せにする。
+		else:
+			datarow = "", sharptxt, problemtxt.strip(), "", articletxt.strip()
+			sheet[r, VARS.datecolumn].setPropertyValue("HoriJustify", RIGHT)  # #のセルのみ右寄せにする。
+		sheet[r, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
+		controller = doc.getCurrentController()
+		controller.select(sheet[r, VARS.articlecolumn])  # 記事セルを選択。
+		commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。			
 	return callback_phrasecolumn
 def callback_insertdatecolumnCreator(xscriptcontext):
 	def callback_insertdatecolumn(datetxt):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
