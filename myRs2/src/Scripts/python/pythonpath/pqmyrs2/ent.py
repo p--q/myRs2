@@ -32,37 +32,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 			if enhancedmouseevent.ClickCount==1:  # 左シングルクリックの時。
 				ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。	
-				systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。	
-				if r<VARS.splittedrow and c>VARS.keikacolumn:  # 経過列より右の時。
-					txt = selection.getString()
-					if txt=="一覧へ":
-						doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
-						controller = doc.getCurrentController()  # コントローラの取得。
-						sheets = doc.getSheets()
-						controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
-					elif txt=="改行削除":
-						ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
-						smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
-						systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
-						clipboardtxt = commons.getClipboardtxt(systemclipboard)
-						if clipboardtxt:
-							outputs = []
-							buffer = []
-							for txt in clipboardtxt.split("\n"):
-								txt = txt.strip()
-								if txt.startswith("****"):
-									continue
-								elif txt.startswith("#"):
-									if buffer and outputs:
-										outputs[-1] = "".join([outputs[-1], *buffer])
-									outputs.append(txt)
-									buffer = []
-								else:
-									buffer.append(txt)	
-							if buffer and outputs:
-								outputs[-1] = "".join([outputs[-1], *buffer])
-							systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。\rはWindowsのメモ帳でも改行するため。		
-				elif r<VARS.emptyrow:		
+				systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。		
+				if r<VARS.emptyrow:		
 					if c==VARS.idcolumn:  # ID列の時。
 						systemclipboard.setContents(commons.TextTransferable(selection.getString()), None)  # クリップボードにIDをコピーする。
 					elif c==VARS.kanacolumn:  # カナ名列の時。
@@ -82,7 +53,36 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 def mousePressedWSectionM(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 	c = selection.getCellAddress().Column
-	if c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
+	if c>VARS.keikacolumn:  # 経過列より右の時。
+		txt = selection.getString()
+		if txt=="一覧へ":  # 固定行の上は最初のクリック
+			doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。 
+			controller = doc.getCurrentController()  # コントローラの取得。
+			sheets = doc.getSheets()
+			controller.setActiveSheet(sheets["一覧"])  # 一覧シートをアクティブにする。
+		elif txt=="改行削除":
+			ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+			smgr = ctx.getServiceManager()  # サービスマネージャーの取得。									
+			systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。			
+			clipboardtxt = commons.getClipboardtxt(systemclipboard)
+			if clipboardtxt:
+				outputs = []
+				buffer = []
+				for txt in clipboardtxt.split("\n"):
+					txt = txt.strip()
+					if txt.startswith("****"):
+						continue
+					elif txt.startswith("#"):
+						if buffer and outputs:
+							outputs[-1] = "".join([outputs[-1], *buffer])
+						outputs.append(txt)
+						buffer = []
+					else:
+						buffer.append(txt)	
+				if buffer and outputs:
+					outputs[-1] = "".join([outputs[-1], *buffer])
+				systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。\rはWindowsのメモ帳でも改行するため。			
+	elif c<VARS.keikacolumn:  # 経過列より左のときはその項目で逆順にする。
 		sortRows(c, reverse=True)  # 逆順にソート。
 	return False  # セル編集モードにしない。		
 def sortRows(c, *, reverse=False):
