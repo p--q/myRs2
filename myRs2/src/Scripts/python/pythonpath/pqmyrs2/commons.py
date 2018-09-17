@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # import pydevd; pydevd.settrace(stdoutToServer=True, stderrToServer=True)
 import os, unohelper
-from . import ichiran, karute, keika, ent, yotei, documentevent  # 相対インポートは不可。
+from pqmyrs2 import ichiran, karute, keika, ent, yotei, documentevent  # Contextメニューで呼ばれる関数では相対インポートは不可。
 from com.sun.star.awt import MessageBoxButtons  # 定数
 from com.sun.star.awt import KeyEvent  # Struct
 from com.sun.star.awt.MessageBoxType import ERRORBOX  # enum
@@ -29,7 +29,7 @@ COLORS = {\
 		"white": 0xFFFFFF,\
 		"gray7": 0x666666}  # 色の16進数。	
 HOLIDAYS = {\
-		2018:[[1,2,3,8],[11,12],[21],[29,30],[3,4,5],[],[16],[11],[17,23,24],[8],[3,23],[23,24,28,29,30,31]],\
+		2018:[[1,2,3,8],[11,12],[21],[29,30],[3,4,5],[],[16],[11],[17,24],[8],[3,23],[23,24,28,29,30,31]],\
 		2019:[[1,2,3,14],[11],[21],[29],[3,4,5,6],[],[15],[11,12],[16,23],[14],[3,4,23],[23,28,29,30,31]],\
 		2020:[[1,2,3,13],[11],[20],[29],[3,4,5,6],[],[23,24],[10],[21,22],[],[3,23],[23,28,29,30,31]],\
 		2021:[[1,2,3,11],[11],[20],[29],[3,4,5],[],[19],[11],[20,23],[11],[3,23],[23,28,29,30,31]],\
