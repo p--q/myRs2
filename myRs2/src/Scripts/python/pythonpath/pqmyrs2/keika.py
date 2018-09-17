@@ -50,11 +50,6 @@ def highlightToday(sheet, xscriptcontext):	# 今日の日付の上のセルを�
 	if splittedcolumn<=c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	
-	
-	
-	
-	
 	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
@@ -491,6 +486,8 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				yoho = sheet[r, VARS.yakucolumn+1].getString()
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
+				elif sheetcell and yoho in ("検査値",):  # 単一セルかつ用法列が検査値の時。
+					addMenuentry("ActionTrigger", {"Text": "未", "CommandURL": baseurl.format("entry27")})
 				else:
 					if sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
 						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
@@ -700,6 +697,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)		
 	elif entrynum==26:  # 他科処方クリア。
 		selection.setPropertyValue("CellBackColor", -1)	
+	elif entrynum==27:  # 未。
+		selection.setString("未")
 def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与えられている時はselectionは選択行だけが意味を持つ。
 	rangeaddress = selection.getRangeAddress()
 	startc = rangeaddress.StartColumn
@@ -743,6 +742,8 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 			if end is not None:
 				endc = nendc if yoho else tendc
 			sheet[i, startc:endc+1].clearContents(511)  # 描く予定のセル範囲をクリア。
+			if yoho in ("検査値",):  # 色を付けない用法。
+				continue	
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。

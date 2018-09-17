@@ -301,10 +301,25 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。	
 	elif c==VARS.historycolumn:  # 履歴列の時。
 		problemtxt = VARS.sheet[r, VARS.problemcolumn].getString()
+		callback = None
 		if not problemtxt:
 			problemtxt = "履歴"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
+		elif problemtxt=="心肺機能低下時":
+			callback=callback_articlehistoryCreator(xscriptcontext)
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn, callback=callback)
 	return False  # セルを編集モードにしない。
+def callback_articlehistoryCreator(xscriptcontext):
+	def articlehistoryCreator(gridcelltxt):
+		sheet = VARS.sheet
+		doc = xscriptcontext.getDocument()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+		r = selection.getCellAddress().Row
+		if gridcelltxt=="説明未":
+			color = commons.COLORS["lime"]
+		else:
+			color = -1
+		sheet[r, VARS.articlecolumn].setPropertyValue("CellBackColor", color)
+	return articlehistoryCreator
 def callback_phrasecolumnCreator(xscriptcontext):	
 	def callback_phrasecolumn(gridcelltxt):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
 		sheet = VARS.sheet

@@ -167,6 +167,10 @@ class TextListener(unohelper.Base, XTextListener):
 						return  # 選択行より前の行の削除は諦める。選択行より上の行を削除するとグリッドコントロール以外マウスに反応しなくなるので。ソートして一番上に持ってきてもダメ。
 				refreshRows(gridcontrol1, datarows)
 			self.history = txt	
+			
+			textlength = len(txt)
+			edit1selection = Selection(Min=textlength, Max=textlength)  # カーソルの位置を最後にする。指定しないと先頭になる。
+			editcontrol1.setSelection(edit1selection)  # テクストボックスコントロールのカーソルの位置を変更。ピア作成後でないと反映されない。			
 	def disposing(self, eventobject):
 		pass
 def fullwidth_halfwidth(xscriptcontext):
@@ -247,7 +251,7 @@ class ActionListener(unohelper.Base, XActionListener):
 					sheet[r, c].setString(txt)  # セルに代入。
 					DATAROWS = datarows			
 					if callback is not None:  # コールバック関数が与えられている時。
-						callback(txt, xscriptcontext)		
+						callback(txt)		
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
