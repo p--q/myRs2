@@ -140,7 +140,8 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 		if len(cellranges)>0:  # ID列のセル範囲が取得出来ている時。
 			checkrange = sheet[VARS.splittedrow:VARS.emptyrow, VARS.checkstartcolumn:VARS.memostartcolumn]  # チェック列範囲を取得。	
 			if datevaluecell.getValue()<todayvalue:  # 更新日が過去日の時。
-				checkrange.clearContents(CellFlags.STRING)  # チェック列の文字列をクリア。
+				for i in (ketuekicol, gazocol, shochicol, echocol, ecgcol):
+					checkrange[:, i].clearContents(CellFlags.STRING)  # チェック列の文字列をクリア。
 				checkrange.setPropertyValue("CharColor", -1)  # チェック列の文字色をクリア。
 				datevaluecell.setValue(todayvalue)  # 更新日時に今日のシリアル値を代入する。
 				datevaluecell.setPropertyValue("CellBackColor", commons.COLORS["black"])  # 更新日記録セルを黒塗りにする。
