@@ -94,6 +94,8 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 									systemclipboard.setContents(commons.TextTransferable("".join((kanatxt, idtxt))), None)  # クリップボードにカナ名+IDをコピーする。	
 						if r<VARS.emptyrow:  # ID列が入力されている時のみ実行するもの。
 							if c==VARS.sumicolumn:  # 済列の時。
+								if not txt:  # まだ空セルの時は未として扱う。
+									txt = "未"								
 								items = [("待", "skyblue"), ("済", "silver"), ("未", "black")]
 								items.append(items[0])  # 最初の要素を最後の要素に追加する。
 								dic = {items[i][0]: items[i+1] for i in range(len(items)-1)}  # 順繰り辞書の作成。				
@@ -112,10 +114,11 @@ def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを�
 				if r==VARS.menurow and c<VARS.checkstartcolumn:  # メニューセルの時。:
 					return wClickMenu(enhancedmouseevent, xscriptcontext)
 				elif r<VARS.splittedrow or r in (VARS.bluerow, VARS.skybluerow, VARS.redrow):  # 分割行より上または区切り行の時。
-					return False # 何もしない。
+					return False # 何もしない。セル編集モードにしない。
 				elif c<VARS.checkstartcolumn:  # チェック列より左の時。
 					return wClickIDCol(enhancedmouseevent, xscriptcontext)
-				return False  # セル編集モードにしない。
+				elif c<VARS.memostartcolumn:  # メモ列より左の時。
+					return False  # セル編集モードにしない。
 	return True  # セル編集モードにする。	
 def wClickMenu(enhancedmouseevent, xscriptcontext):
 	selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
@@ -269,7 +272,7 @@ def sClickCheckCol(enhancedmouseevent, xscriptcontext):
 	dic = {\
 		"病棟": ["", "待", "療", "包", "共", "生"],\
 		"ｴ結": ["", "ｴ", "済"],\
-		"読影": ["", "未", "読", "済"],\
+		"読影": ["", "未", "予", "済", "読"],\
 		"退処": ["", "済", "△", "待"],\
 		"血液": ["", "尿", "○", "済"],\
 		"ECG": ["", "E", "済"],\

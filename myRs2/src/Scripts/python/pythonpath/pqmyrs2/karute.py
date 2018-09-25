@@ -342,7 +342,7 @@ def callback_phrasecolumnCreator(xscriptcontext):
 			articletxt = gridcelltxt
 		if todayvalue: 	
 			datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
-			sheet[r, VARS.datecolumn].setPropertyValue("HoriJustify", LEFT)  # 日付セルのみ左寄せにする。
+			sheet[r, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY-M-D'), LEFT))  # 日付セルのみ左寄せにする。
 		else:
 			datarow = "", sharptxt, problemtxt.strip(), "", articletxt.strip()
 			sheet[r, VARS.datecolumn].setPropertyValue("HoriJustify", RIGHT)  # #のセルのみ右寄せにする。
