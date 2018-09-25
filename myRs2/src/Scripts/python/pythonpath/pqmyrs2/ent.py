@@ -120,14 +120,7 @@ def drowBorders(selection):  # ターゲットを交点とする行列全体の�
 		rangeaddress = selection.getRangeAddress()
 		VARS.sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, :].setPropertyValue("TableBorder2", topbottomtableborder)  # 行の上下に枠線を引く。					
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	if selection[0, 0].getCellAddress().Row<VARS.splittedrow:  # 分割行より上の時はコンテクストメニューを表示しない。
 		return EXECUTE_MODIFIED
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
@@ -135,7 +128,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 	if contextmenuname=="cell":  # セルのとき。セル範囲も含む。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # セルの時。
 			startcolumn = rangeaddress.StartColumn
-			idtxt, dummy, kanatxt = sheet[startrow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]
+			idtxt, dummy, kanatxt = VARS.sheet[startrow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]
 			filename = ""
 			if startcolumn in (VARS.datecolumn,):  # 入院日列の時。
 				filename = "{}{}_*入院.ods"  # カルテシートファイル名。

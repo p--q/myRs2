@@ -458,15 +458,8 @@ def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リス�
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # rangesの要素がないとエラーになる。
 		cellranges.setPropertyValue(propname, propvalue)						
-def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの左上角セルの行と列のインデックスを取得。		
 	if contextmenuname=="cell":  # セルのとき。複数セルも含まれる。	
@@ -483,13 +476,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
 				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")  # 単一セルの時True。
-				yoho = sheet[r, VARS.yakucolumn+1].getString()
+				yoho = VARS.sheet[r, VARS.yakucolumn+1].getString()
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
 				elif sheetcell and yoho in ("検査値",):  # 単一セルかつ用法列が検査値の時。
 					addMenuentry("ActionTrigger", {"Text": "未", "CommandURL": baseurl.format("entry27")})
 				else:
-					if sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
+					if VARS.sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
 						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
 						addMenuentry("ActionTrigger", {"Text": "変", "CommandURL": baseurl.format("entry6")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
@@ -526,7 +519,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 		
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
 				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
@@ -541,9 +534,9 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.cutcopypasteMenuEntries(addMenuentry)
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 				commons.rowMenuEntries(addMenuentry)
-	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(VARS.sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		if c>VARS.splittedcolumn and len(selection[0, :].getColumns())==1:  # 分割列を含まない右列、かつ、選択列数が1つの時。
-			if sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
+			if VARS.sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
 				addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
 			else:
 				addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})

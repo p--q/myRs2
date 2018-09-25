@@ -509,14 +509,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 		VARS.setSheet(selection.getSpreadsheet())			
 		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上隅のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column
 	if contextmenuname=="cell":  # セルのとき
@@ -536,7 +529,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry6")}) 
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			return EXECUTE_MODIFIED  # コンテクストメニューを表示しない。
 		elif r<VARS.bluerow:  # 青行より上の時。

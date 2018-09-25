@@ -160,6 +160,20 @@ def simulateKey(controller, keycode, keychar):
 	toolkit = componentwindow.getToolkit()  # ツールキットを取得。
 	toolkit.keyPress(keyevent)  # キーを押す、をシミュレート。
 	toolkit.keyRelease(keyevent)  # キーを離す、をシミュレート。	
+def contextmenuHelper(sheetvars, contextmenuexecuteevent, xscriptcontext):	
+	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。。
+	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
+	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
+	addMenuentry = menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
+	baseurl = getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
+	del contextmenu[:]  # contextmenu.clear()は不可。
+	ctx = xscriptcontext.getComponentContext()  # コンポーネントコンテクストの取得。
+	smgr = ctx.getServiceManager()  # サービスマネージャーの取得。		
+	dispatcher = smgr.createInstanceWithContext("com.sun.star.frame.DispatchHelper", ctx)		
+	dispatcher.executeDispatch(controller.getFrame(), ".uno:TableDeselectAll", "", 0, ())  # すべてのシートの選択を解除。
+	sheetvars.setSheet(controller.getActiveSheet())  # 変数を取得し直す。
+	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	return contextmenuname, addMenuentry, baseurl, selection
 # 	
 # 	
 # 	

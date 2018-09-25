@@ -435,15 +435,8 @@ def setCellProp(cell):
 			cell.clearContents(511)
 	else:
 		cell.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
-def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
 	if contextmenuname=="cell":  # セルのとき		
@@ -455,11 +448,11 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 				
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		commons.rowMenuEntries(addMenuentry)
-	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(VARS.sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertColumnsBefore"})

@@ -421,14 +421,7 @@ def refreshCounts():  # カウントを更新する。
 	datarows[1][3] = counts[1]
 	sheet[:2, VARS.memostartcolumn:VARS.memostartcolumn+4].setDataArray(datarows)	
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	rangeaddress = selection.getRangeAddress()  # ターゲットのセル範囲アドレスを取得。
 	startrow, startcolumn = rangeaddress.StartRow, rangeaddress.StartColumn  # 選択範囲の左上セルだけで判断する。
 	if startrow<VARS.splittedrow:  # 固定行より上の時。
@@ -451,7 +444,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				smgr = ctx.getServiceManager()  # サービスマネージャーの取得。
 				transliteration = smgr.createInstanceWithContext("com.sun.star.i18n.Transliteration", ctx)  # Transliteration。
 				doc = xscriptcontext.getDocument()  # ドキュメントのモデルを取得。
-				idtxt, dummy, kanatxt = sheet[startrow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]			
+				idtxt, dummy, kanatxt = VARS.sheet[startrow, VARS.idcolumn:VARS.datecolumn].getDataArray()[0]			
 				addMenuentry("ActionTrigger", {"Text": "経過ｼｰﾄをArchiveへ", "CommandURL": baseurl.format("entry2")}) 
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				for i, systempath in enumerate(glob.iglob(commons.createKeikaPathname(doc, transliteration, idtxt, kanatxt, "{}{}経_*開始.ods"), recursive=True)):  # アーカイブフォルダ内の経過ファイルリストを取得する。
@@ -462,7 +455,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 		addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry11")}) 
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if startrow>VARS.emptyrow-1:
 			commons.cutcopypasteMenuEntries(addMenuentry)
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
