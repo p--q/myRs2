@@ -460,7 +460,7 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 			for i in rangeaddresses:
 				sheet.removeRange(i, delete_rows)  # 後ろからでないとすべて削除できない。
 		return len(rowindexes)  # 削除した空行数を返す。
-	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。
+	def _formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。プロブレムリスト用。#で区切って記事列のセルの結合もする。
 		c = 0  # 合計追加行数。	
 		datarangestartrow = datarange.getRangeAddress().StartRow  # datarangeの開始行インデックスを取得。
 		datarows = [[fullwidth_halfwidth(j) for j in i] for i in datarange.getDataArray()]  # 取得した行のタプルを半角にする。floatが混じってくるので結合してから半角にする方法は使えない。
@@ -492,8 +492,61 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 			newrange.clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
 			newrange.setDataArray(newarticlerows)  # 記事列に代入。
 		return c  # 追加した行数を返す。
+	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。セルの結合をしない。処理するのは記事列のみ。
+		newarticlerows = []  # 記事列代入するための行のリスト。
+		for datarow in datarange.getDataArray():
+			if datarow[0]:  # 空セルでない時。
+				articletxt = str(fullwidth_halfwidth(datarow[0]))  # 半角にしてすべて文字列として取得。
+				newarticlerows.extend((articletxt[i:i+stringlength],) for i in range(0, len(articletxt), stringlength))  # 文字列をセルあたりの文字数で分割して取得。
+		if newarticlerows:  # 代入する行があるとき。空行だけのときはエラーになるので。
+			if len(newarticlerows)>VARS.skybluerow-VARS.bluerow-1:
+				sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
+			
+			
+			VARS.sheet[VARS.bluerow+1:VARS.skybluerow, VARS.articlecolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
+	
+		
+		
+		
+		c = 0  # 合計追加行数。	
+		datarangestartrow = datarange.getRangeAddress().StartRow  # datarangeの開始行インデックスを取得。
+		datarows = [[fullwidth_halfwidth(j) for j in i] for i in datarange.getDataArray()]  # 取得した行のタプルを半角にする。floatが混じってくるので結合してから半角にする方法は使えない。
+		datarange.setDataArray(datarows)  # datarangeに代入し直す。
+		
+		
+		
+		
+		
+		cellranges = getCellRanges(xscriptcontext.getDocument(), datarange, datarows)  # #ごとのセル範囲コレクションを取得。
+		sheet = VARS.sheet
+		for cellrange in cellranges:  # #ごとのセル範囲について。
+			rangeaddress = cellrange.getRangeAddress()  # cellrangeのセル範囲アドレスを取得。
+			articletxts = articlecells[rangeaddress.StartRow-datarangestartrow-c:rangeaddress.EndRow-datarangestartrow+1-c]  # セル範囲の記事列のセルの文字列をリストで取得。
+			articletxt = "".join(articletxts)  # cellrangeの記事列を結合。
+			if articletxt:  # 文字列が取得出来た時。
+				newdatarows = [(articletxt[i:i+stringlength],) for i in range(0, len(articletxt), stringlength)]  # 文字列をセルあたりの文字数で分割。
+				diff = len(newdatarows) - len(articletxts)  # 追加行数を取得。
+				if diff>0:  # 追加行がある時。
+					endrowbelow = cellrange.getRangeAddress().EndRow + 1  # #ごとの終了行下の行インデックス。
+					newrangeaddress = sheet[endrowbelow:endrowbelow+diff, :].getRangeAddress()  # 追加する行のセル範囲アドレス。
+					sheet.insertCells(newrangeaddress, insert_rows)  # 空行をプロブレムごとに挿入。	
+					sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。セル範囲アドレスでは行がずれるので不可。
+					c += diff  # 合計追加行数に追加。
+				elif diff<0:  # 行数が減る時。
+					newdatarows.extend([("",)]*-diff)  # 減った分の空行を追加。	
+			else:
+				newdatarows = [("",)]*len(articletxts)  # 文字列が取得できなかった時は空行を追加。
+			newarticlerows.extend(newdatarows)	# 新しい記事列に行を追加。	
+		if newarticlerows:  # 新しい行があるとき。空行だけのときはエラーになるので。
+			newrange = sheet[datarangestartrow:datarangestartrow+len(newarticlerows), VARS.articlecolumn]  # 記事列のセル範囲を取得。
+			newrange.clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
+			newrange.setDataArray(newarticlerows)  # 記事列に代入。
+		return c  # 追加した行数を返す。
+	
+	
+	
 	def formatProblemList(startrow, endrow, title):  # プロブレム欄を整形。
-		c = formatArticleColumn(VARS.sheet[startrow:endrow, VARS.sharpcolumn:VARS.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
+		c = _formatArticleColumn(VARS.sheet[startrow:endrow, VARS.sharpcolumn:VARS.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
 		datarows = VARS.sheet[startrow:endrow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		newdatarows = [(title,)]  # タイトルを取得。	
 		getCopyDataRows(newdatarows, datarows, startrow)  # プロブレム欄の記事列を整形。
