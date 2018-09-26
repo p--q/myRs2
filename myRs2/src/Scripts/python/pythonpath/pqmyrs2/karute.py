@@ -200,10 +200,11 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 			datarange.clearContents(CellFlags.STRING)  # コピー元の文字列をクリア。	
 			problemrange = sheet[VARS.splittedrow:VARS.bluerow, VARS.sharpcolumn:VARS.articlecolumn+1]
 			cellranges = problemrange.queryContentCells(CellFlags.STRING)
-			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow  # 青行おり上の範囲の最下行の下行を取得。
+			emptyrow = max(i.EndRow for i in cellranges.getRangeAddresses()) + 1 if len(cellranges) else VARS.splittedrow  # 青行より上の範囲の最下行の下行を取得。
 			endrowbelow = emptyrow + len(datarows)  # 挿入後の最下行の下行インデックス。	
-			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # 空行を挿入。	
+			sheet.insertCells(sheet[emptyrow:endrowbelow, :].getRangeAddress(), insert_rows)  # 空行を挿入。
 			sheet[emptyrow:endrowbelow, :].setPropertyValues(("CellBackColor", "CharColor"), (-1, -1))  # 追加行の背景色と文字色をクリア。	
+			VARS.setSheet(sheet)  # 行インデックスを再取得。
 			separateDS(doc, functionaccess, fullwidth_halfwidth, datarows, emptyrow)
 	elif txt[:8].isdigit():  # 最初8文字が数値の時。
 		systemclipboard = smgr.createInstanceWithContext("com.sun.star.datatransfer.clipboard.SystemClipboard", ctx)  # SystemClipboard。クリップボードへのコピーに利用。
@@ -268,7 +269,7 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 	elif c==VARS.insertdatecolumn:  # 日付挿入列の時。
 		selection.setString("")  # 日付挿入列の文字列をクリア。
 		datedialog.createDialog(enhancedmouseevent, xscriptcontext, "日付挿入", "YYYY-M-D", callback=callback_insertdatecolumnCreator(xscriptcontext))  # ダイアログの戻り値は取得できず、入力も待たず次のコードにいってしまう。
-		selection.setPropertyValue("CharColor", commons.COLORS["white"])  # 日付挿入列の文字色を白色にする。
+		selection.setPropertyValues(("CharColor", "IsTextWrapped"), (commons.COLORS["white"], False))  # 日付挿入列の文字色を白色にする。文字列の折り返しを無しにする。
 	elif c==VARS.replacedatecolumn:  # 日付入替列の時。
 		datetxt = VARS.sheet[r, VARS.insertdatecolumn].getString()  # 日付挿入列の文字列を取得。
 		if datetxt:  # 日付文字列が取得出来た時。
@@ -300,13 +301,31 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 				commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。	
 	elif c==VARS.historycolumn:  # 履歴列の時。
 		problemtxt = VARS.sheet[r, VARS.problemcolumn].getString()
+		callback = None
 		if not problemtxt:
 			problemtxt = "履歴"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn)
+		elif problemtxt=="心肺機能低下時":
+			callback=callback_articlehistoryCreator(xscriptcontext)
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn, callback=callback)
 	return False  # セルを編集モードにしない。
+def callback_articlehistoryCreator(xscriptcontext):
+	def articlehistoryCreator(gridcelltxt):
+		sheet = VARS.sheet
+		doc = xscriptcontext.getDocument()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。	
+		r = selection.getCellAddress().Row
+		if gridcelltxt=="説明未":
+			color = commons.COLORS["lime"]
+		else:
+			color = -1
+		sheet[r, VARS.articlecolumn].setPropertyValue("CellBackColor", color)
+	return articlehistoryCreator
 def callback_phrasecolumnCreator(xscriptcontext):	
 	def callback_phrasecolumn(gridcelltxt):  # プロブレム列に、#today 心エコー:LV wall function normal、とあるのを処理する。
-		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		sheet = VARS.sheet
+		doc = xscriptcontext.getDocument()
+		selection = doc.getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		r = selection.getCellAddress().Row
 		sharptxt, todayvalue, problemtxt, articletxt = "", "", "", ""
 		if gridcelltxt.startswith("#"):  # #から始まっている時。
 			sharptxt = "#"
@@ -321,8 +340,16 @@ def callback_phrasecolumnCreator(xscriptcontext):
 			problemtxt, articletxt = gridcelltxt.split(":", 1)
 		else:
 			articletxt = gridcelltxt
-		datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
-		VARS.sheet[selection.getCellAddress().Row, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
+		if todayvalue: 	
+			datarow = sharptxt, todayvalue, problemtxt.strip(), "", articletxt.strip()
+			sheet[r, VARS.datecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('YYYY-M-D'), LEFT))  # 日付セルのみ左寄せにする。
+		else:
+			datarow = "", sharptxt, problemtxt.strip(), "", articletxt.strip()
+			sheet[r, VARS.datecolumn].setPropertyValue("HoriJustify", RIGHT)  # #のセルのみ右寄せにする。
+		sheet[r, VARS.sharpcolumn:VARS.articlecolumn+1].setDataArray((datarow,))
+		controller = doc.getCurrentController()
+		controller.select(sheet[r, VARS.articlecolumn])  # 記事セルを選択。
+		commons.simulateKey(controller, Key.F2, 0)  # 選択セルをセル編集モードにする。			
 	return callback_phrasecolumn
 def callback_insertdatecolumnCreator(xscriptcontext):
 	def callback_insertdatecolumn(datetxt):  # 日付挿入列をダブルクリックした時に日付入力ダイアログに渡すコールバック関数。
@@ -482,14 +509,7 @@ def selectionChanged(eventobject, xscriptcontext):  # 矢印キーでセル移�
 		VARS.setSheet(selection.getSpreadsheet())			
 		drowBorders(xscriptcontext, selection)  # 枠線の作成。
 def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):		
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上隅のセルアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column
 	if contextmenuname=="cell":  # セルのとき
@@ -509,7 +529,7 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):
 			addMenuentry("ActionTrigger", {"CommandURL": ".uno:PasteSpecial"})		
 			addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 			addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry6")}) 
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			return EXECUTE_MODIFIED  # コンテクストメニューを表示しない。
 		elif r<VARS.bluerow:  # 青行より上の時。

@@ -50,7 +50,7 @@ def highlightToday(sheet, xscriptcontext):	# 今日の日付の上のセルを�
 	if splittedcolumn<=c<1024:
 		sheet[dayrow-1, c].setPropertyValue("CellBackColor", commons.COLORS["cyan10"])  # 日付行の上のセルの今日の背景色を設定。
 def mousePressed(enhancedmouseevent, xscriptcontext):  # マウスボタンを押した時。controllerにコンテナウィンドウはない。		
-	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
+	if enhancedmouseevent.ClickCount==2 and enhancedmouseevent.Buttons==MouseButton.LEFT:  # 左ダブルクリックの時。まずselectionChanged()が発火している。シングルクリックの時はselectionChanged()メソッドで事足りる。
 		selection = enhancedmouseevent.Target  # ターゲットのセルを取得。
 		if selection.supportsService("com.sun.star.sheet.SheetCell"):  # ターゲットがセルの時。
 			celladdress = selection.getCellAddress()
@@ -458,18 +458,11 @@ def setRangeProp(doc, ranges, propname, propvalue):  # datarangeは問題リス�
 		cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # com.sun.star.sheet.SheetCellRangesをインスタンス化。
 		cellranges.addRangeAddresses([i.getRangeAddress() for i in ranges], False)  # rangesの要素がないとエラーになる。
 		cellranges.setPropertyValue(propname, propvalue)						
-def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。	
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの左上角セルの行と列のインデックスを取得。		
-	if contextmenuname=="cell":  # セルのとき		
+	if contextmenuname=="cell":  # セルのとき。複数セルも含まれる。	
 		if r<VARS.splittedrow:  # 分割行より上の時。
 			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 単一セルの時。
 				if c>VARS.splittedcolumn-1:  # 分割列含む右の時。
@@ -483,11 +476,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 		elif r!=VARS.blackrow:  # 黒行以外の時。
 			if c>VARS.splittedcolumn-1:  # 分割列を含む右列の時。
 				sheetcell = selection.supportsService("com.sun.star.sheet.SheetCell")  # 単一セルの時True。
-				yoho = sheet[r, VARS.yakucolumn+1].getString()
+				yoho = VARS.sheet[r, VARS.yakucolumn+1].getString()
 				if sheetcell and yoho in ("ﾘﾊﾋﾞﾘ", "病棟"):  # 単一セルかつ用法列がリハビリまたは病棟の時。
 					addMenuentry("ActionTrigger", {"Text": "開始", "CommandURL": baseurl.format("entry24")})
+				elif sheetcell and yoho in ("検査値",):  # 単一セルかつ用法列が検査値の時。
+					addMenuentry("ActionTrigger", {"Text": "未", "CommandURL": baseurl.format("entry27")})
 				else:
-					if sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
+					if VARS.sheet[r, c-1].getPropertyValue("CellBackColor")>0 or selection[0, 0].getString() or c==VARS.splittedcolumn:  # 選択セル範囲の左上セルの左のセルに背景色がある、または、左上セルに文字列がある、または、開始列、の時。
 						addMenuentry("ActionTrigger", {"Text": "止", "CommandURL": baseurl.format("entry5")})
 						addMenuentry("ActionTrigger", {"Text": "変", "CommandURL": baseurl.format("entry6")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
@@ -515,10 +510,16 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 				commons.cutcopypasteMenuEntries(addMenuentry)	
 			else:
+				if c==VARS.yakucolumn:  # 薬名列の時。
+					if selection.getPropertyValue("CellBackColor")==-1:
+						addMenuentry("ActionTrigger", {"Text": "他科処方", "CommandURL": baseurl.format("entry13")}) 
+					else:
+						addMenuentry("ActionTrigger", {"Text": "他科処方クリア", "CommandURL": baseurl.format("entry26")}) 
+					addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry4")}) 		
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		if r>VARS.splittedrow-1:
 			if r<VARS.blackrow:
 				addMenuentry("ActionTrigger", {"Text": "黒行下へ", "CommandURL": baseurl.format("entry15")})  # 黒行上から使用中最上行へ
@@ -533,9 +534,9 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.cutcopypasteMenuEntries(addMenuentry)
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 				commons.rowMenuEntries(addMenuentry)
-	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(VARS.sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		if c>VARS.splittedcolumn and len(selection[0, :].getColumns())==1:  # 分割列を含まない右列、かつ、選択列数が1つの時。
-			if sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
+			if VARS.sheet[VARS.blackrow, c].getPropertyValue("CellBackColor")==commons.COLORS["black"]:  # 黒行のセルの背景色が黒の時。
 				addMenuentry("ActionTrigger", {"Text": "退院翌日", "CommandURL": baseurl.format("entry20")}) 
 			else:
 				addMenuentry("ActionTrigger", {"Text": "退院取消", "CommandURL": baseurl.format("entry21")})
@@ -590,6 +591,8 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 	elif entrynum==12:  # 30日観。
 		rangeaddress = selection.getRangeAddress()
 		colorizeSelectionRange(xscriptcontext, sheet[rangeaddress.StartRow:rangeaddress.EndRow+1, rangeaddress.StartColumn:rangeaddress.StartColumn+30])	
+	elif entrynum==13:  # 他科処方。
+		selection.setPropertyValue("CellBackColor", commons.COLORS["cyan10"])		
 	elif entrynum==14:  # 以後消去。selectionは単一セルか複数セル。		
 		msg = "選択セルから右をすべてクリアします。"
 		componentwindow = controller.ComponentWindow
@@ -664,8 +667,6 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			dayu = newdayu  # 1日消費量を更新。
 		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
 		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
-# 	elif entrynum==23:  # 処方。
-# 		selection.setPropertyValue("CellBackColor", commons.COLORS["magenta3"])
 	elif entrynum==24:  # 開始。	
 		celladdress = selection[0, 0].getCellAddress()
 		r, c = celladdress.Row, celladdress.Column
@@ -687,6 +688,10 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			commons.toOtherEntry(sheet, selection.getRangeAddress(), VARS.emptyrow, VARS.blackrow+1)  # 黒行下へ移動。
 	elif entrynum==25:  # 値のみクリア。書式設定とオブジェクト以外を消去。
 		selection.clearContents(CellFlags.VALUE+CellFlags.DATETIME+CellFlags.STRING+CellFlags.ANNOTATION+CellFlags.FORMULA)		
+	elif entrynum==26:  # 他科処方クリア。
+		selection.setPropertyValue("CellBackColor", -1)	
+	elif entrynum==27:  # 未。
+		selection.setString("未")
 def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与えられている時はselectionは選択行だけが意味を持つ。
 	rangeaddress = selection.getRangeAddress()
 	startc = rangeaddress.StartColumn
@@ -730,6 +735,8 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 			if end is not None:
 				endc = nendc if yoho else tendc
 			sheet[i, startc:endc+1].clearContents(511)  # 描く予定のセル範囲をクリア。
+			if yoho in ("検査値",):  # 色を付けない用法。
+				continue	
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。

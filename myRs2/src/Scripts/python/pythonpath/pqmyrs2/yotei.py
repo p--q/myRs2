@@ -287,11 +287,18 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 	starttimevalue = sheet[VARS.datarow, 0].getValue()
 	starttime = time(*[int(functionaccess.callFunction(i, (starttimevalue,))) for i in ("HOUR", "MINUTE")])
 	starttime = datetime.combine(startdate, starttime)  # timeオブジェクトではtimedelta()で加減算できないのでdatetimeオブジェクトに変換する。
-	timegen = (starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow))  # 30分毎に枠を取得。
+	timegen = [starttime+timedelta(minutes=30*i) for i in range(VARS.emptyrow-VARS.datarow)]  # 30分毎に枠を取得。
+	nowdatetime = datetime.now()
+	for startrow, d in enumerate(timegen, start=VARS.datarow):  # 現在時刻のすぐ次の枠の行インデックスを取得。
+		if d>nowdatetime:
+			break
+	else:  # すべての時刻が過ぎている時は最終枠の行インデックスにする。
+		startrow = VARS.emptyrow - 1	
 	times = ["{}:{:0>2}".format(i.hour, i.minute) for i in timegen]
 	outputs = [sheet[VARS.menurow, VARS.templatestartcolumn].getString()]  # 最初の文をセルから取得。
+	scheduleToClip = createScheduleToClip(systemclipboard, times, startdate, outputs, startrow)
 	if txt=="COPY":
-		createScheduleToClip(systemclipboard, times, startdate, outputs)(14)					
+		scheduleToClip(14)					
 	elif txt=="強有効":
 		n = 14
 		searchdescriptor = sheet.createSearchDescriptor()
@@ -311,13 +318,13 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 				outputs.extend(fs)	
 		systemclipboard.setContents(commons.TextTransferable("\n".join(outputs)), None)  # クリップボードにコピーする。	
 	elif txt=="3wCOPY":
-		createScheduleToClip(systemclipboard, times, startdate, outputs)(21)
+		scheduleToClip(21)
 	elif txt=="休日更新":  # 祝日も更新する。
 		msg = "全経過シートの休日も更新します。\n祝日も含みます。"
 		componentwindow = controller.ComponentWindow
 		msgbox = componentwindow.getToolkit().createMessageBox(componentwindow, QUERYBOX, MessageBoxButtons.BUTTONS_OK_CANCEL+MessageBoxButtons.DEFAULT_BUTTON_OK, "myRs", msg)
 		if msgbox.execute()==MessageBoxResults.OK:		
-			datevalues = sheet[VARS.dayrow, VARS.datacolumn:VARS.firstemptycolumn].getDataArray()[0]
+			datevalues = sheet[VARS.dayrow, VARS.datacolumn:VARS.firstemptycolumn].getDataArray()[0]  # 予定シートの日付行を取得。
 			holidaycolumns = keika.getHolidaycolumns(functionaccess, datevalues, VARS.datacolumn)  # 休日の列インデックスを取得。
 			startweekday = int(functionaccess.callFunction("WEEKDAY", (datevalues[0], 3)))  # 開始日の曜日を取得。月=0。
 			offdaycolumns = keika.getOffdaycolumns(doc, datevalues, startweekday, VARS.datacolumn, VARS.firstemptycolumn)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。
@@ -331,55 +338,64 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			keikavars = keika.VARS  # 経過シートの定数を取得。
 			keikadayrow = keikavars.dayrow
 			keikasplittedcolumn = keikavars.splittedcolumn
-			keikaholidayrangeaddresses = []  # 経過シートの祝日のセル範囲アドレスのリスト。	 		
-			keikaoffdayrangeaddresses = []  # 経過シートの休日のセル範囲アドレスのリスト。		
 			todaydatevalue = functionaccess.callFunction("TODAY", ())  # 今日のシリアル値を整数で取得。floatで返る。
-			for keikasheet in doc.getSheets():
+			for keikasheet in doc.getSheets():  # セル範囲コレクションはシートごとにしかプロパティを設定できない。
 				sheetname = keikasheet.getName()
 				if sheetname.startswith("00000000"):  # テンプレートの時は何もしない。
 					continue
 				elif sheetname.endswith("経"):  # シート名が「経」で終わる時は経過シート。
-					cellranges = keikasheet[keikadayrow, keikasplittedcolumn:].queryContentCells(CellFlags.DATETIME)  # 経過シートの日付行の空セルのセル範囲コレクションを取得。
+					cellranges = keikasheet[keikadayrow, keikasplittedcolumn:].queryContentCells(CellFlags.DATETIME)  # 経過シートの日付行の日付セルのセル範囲コレクションを取得。
 					if len(cellranges):
 						keikadayendedge = cellranges.getRangeAddresses()[0].EndColumn + 1 # 日付行の右端の右の列インデックスを取得。
 						keikadatevalues = keikasheet[keikadayrow, keikasplittedcolumn:keikadayendedge].getDataArray()[0]  # 今日以降の日付行のシリアル値をすべて取得。要素はfloat。
-						if todaydatevalue in keikadatevalues:  # 今日の日付がある時のみ。
-							startindex = keikadatevalues.index(todaydatevalue)
-							keikastartcolumn = keikasplittedcolumn + startindex  # 今日の列インデックスを取得。
-							keikaholidaycolumns = keika.getHolidaycolumns(functionaccess, keikadatevalues[startindex:], keikastartcolumn)  # 休日の列インデックスを取得。
-							keikaholidayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaholidaycolumns) # 祝日にするセル範囲アドレスを取得。
-							keikastartweekday = int(functionaccess.callFunction("WEEKDAY", (todaydatevalue, 3)))  # 開始日の曜日を取得。月=0。
-							keikaoffdaycolumns = keika.getOffdaycolumns(doc, keikadatevalues[startindex:], keikastartweekday, keikastartcolumn, keikadayendedge)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。					
-							keikaoffdayrangeaddresses.extend(keikasheet[keikadayrow, i].getRangeAddress() for i in keikaoffdaycolumns) # 休日にするセル範囲アドレスを取得。					
-			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-			cellranges.addRangeAddresses(keikaholidayrangeaddresses, False)  # セル範囲コレクションを取得。集合のまま渡すとエラーになる。
-			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-				cellranges.setPropertyValue("CellBackColor", commons.COLORS["red3"])
-			cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
-			cellranges.addRangeAddresses(keikaoffdayrangeaddresses, False)  # セル範囲コレクションを取得。
-			if len(cellranges):  # sheetcellrangesに要素がないときはsetPropertyValue()でエラーになるので要素の有無を確認する。
-				cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])				
+						startindex = 0
+						if todaydatevalue in keikadatevalues:  # 今日の日付がある時はそれ以降のみ設定する。
+							startindex = keikadatevalues.index(todaydatevalue)  # 要素はfloat。今日のシリアル値の相対列インデックスを取得。
+						elif todaydatevalue>keikadatevalues[-1]:  # 日付がすべて過去のときは何もしない。
+							continue
+						keikastartcolumn = keikasplittedcolumn + startindex  # 今日の列インデックスを取得。
+						keikasheet[keikadayrow, keikastartcolumn:].setPropertyValue("CellBackColor", -1)  # 本日の日付列以降の日付行の背景色をクリア。	
+						keikaholidaycolumns = keika.getHolidaycolumns(functionaccess, keikadatevalues[startindex:], keikastartcolumn)  # 休日の列インデックスを取得。
+						if keikaholidaycolumns:
+							cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+							cellranges.addRangeAddresses([keikasheet[keikadayrow, i].getRangeAddress() for i in keikaholidaycolumns], False)  # セル範囲コレクションを取得。集合のまま渡すとエラーになる。
+							cellranges.setPropertyValue("CellBackColor", commons.COLORS["red3"])
+						keikastartweekday = int(functionaccess.callFunction("WEEKDAY", (keikadatevalues[startindex], 3)))  # 開始日の曜日を取得。月=0。
+						keikaoffdaycolumns = keika.getOffdaycolumns(doc, keikadatevalues[startindex:], keikastartweekday, keikastartcolumn, keikadayendedge)  # 予定シートの休日設定を取得して合致する列インデックスを取得する。					
+						if keikaoffdaycolumns:
+							cellranges = doc.createInstance("com.sun.star.sheet.SheetCellRanges")  # セル範囲コレクション。
+							cellranges.addRangeAddresses([keikasheet[keikadayrow, i].getRangeAddress() for i in keikaoffdaycolumns], False)  # セル範囲コレクションを取得。
+							cellranges.setPropertyValue("CellBackColor", commons.COLORS["silver"])									
 	return False  # セル編集モードにしない。	
-def createScheduleToClip(systemclipboard, times, startdate, outputs):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
+def createScheduleToClip(systemclipboard, times, startdate, outputs, startrow):  # times: 時間枠のリスト、startdate: 開始日のdateオブジェクト、outputs: 出力行のリスト。
 	def scheduleToClip(n):  # n: 取得する日数。
+		sheet = VARS.sheet
+		datarow = VARS.datarow
+		emptyrow = VARS.emptyrow
+		datacolumn = VARS.datacolumn
 		dategene = (startdate+timedelta(days=i) for i in range(n))
 		weekdays = VARS.weekdays
-		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]
-		for i in range(VARS.datacolumn, VARS.datacolumn+n):  # 列インデックスをイテレート。
-			cellranges = VARS.sheet[VARS.datarow:VARS.emptyrow, i].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
-			fs = [" ".join([times[j], "○"]) for i in cellranges.getRangeAddresses() for j in range(i.StartRow-VARS.datarow, i.EndRow+1-VARS.datarow)]
+		dates = ["{}/{}({})".format(i.month, i.day, weekdays[i.weekday()]) for i in dategene]			
+		def _extendOutputs(r, c):  # r: 開始行インデックス、c: 列インデックス。
+			cellranges = sheet[r:emptyrow, c].queryEmptyCells()  # 空セルのセル範囲コレクションを取得。
+			fs = [" ".join([times[j], "○"]) for k in cellranges.getRangeAddresses() for j in range(k.StartRow-datarow, k.EndRow+1-datarow)]
 			if fs:
-				outputs.extend(["", dates[i-VARS.datacolumn]])
-				outputs.extend(fs)	
+				outputs.extend(["", dates[c-datacolumn]])
+				outputs.extend(fs)			
+		_extendOutputs(startrow, datacolumn)  # 開始日の列だけ開始行を指定する。
+		for i in range(datacolumn+1, datacolumn+n):  # 列インデックスをイテレート。
+			_extendOutputs(datarow, i)
 		systemclipboard.setContents(commons.TextTransferable("\r\n".join(outputs)), None)  # クリップボードにコピーする。	\rはWindowsのメモ帳で開業するため。
 	return scheduleToClip
 def wClickCell(enhancedmouseevent, xscriptcontext):
 	defaultrows = "2F", "3F", "強", "新", "閉", "外", "会", "手", "ｸﾘｱ", "x", "/"
-	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "予定", defaultrows, callback=callback_wClickCell)	
+	staticdialog.createDialog(enhancedmouseevent, xscriptcontext, "予定", defaultrows, callback=callback_wClickCellCreator(xscriptcontext))	
 	return False  # セル編集モードにしない。	
-def callback_wClickCell(gridcelltxt, xscriptcontext):	
-	selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
-	setCellProp(selection)
+def callback_wClickCellCreator(xscriptcontext):
+	def callback_wClickCell(gridcelltxt):	
+		selection = xscriptcontext.getDocument().getCurrentSelection()  # シート上で選択しているオブジェクトを取得。
+		setCellProp(selection)
+	return callback_wClickCell
 def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメントが入る。	
 	selection = None
 	for change in changesevent.Changes:
@@ -419,15 +435,8 @@ def setCellProp(cell):
 			cell.clearContents(511)
 	else:
 		cell.setPropertyValues(("CellBackColor", "HoriJustify"), (-1, LEFT))		
-def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。				
-	controller = contextmenuexecuteevent.Selection  # コントローラーは逐一取得しないとgetSelection()が反映されない。
-	sheet = controller.getActiveSheet()  # アクティブシートを取得。
-	contextmenu = contextmenuexecuteevent.ActionTriggerContainer  # コンテクストメニューコンテナの取得。
-	contextmenuname = contextmenu.getName().rsplit("/")[-1]  # コンテクストメニューの名前を取得。
-	addMenuentry = commons.menuentryCreator(contextmenu)  # 引数のActionTriggerContainerにインデックス0から項目を挿入する関数を取得。
-	baseurl = commons.getBaseURL(xscriptcontext)  # ScriptingURLのbaseurlを取得。
-	del contextmenu[:]  # contextmenu.clear()は不可。
-	selection = controller.getSelection()  # 現在選択しているセル範囲を取得。
+def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右クリックメニュー。
+	contextmenuname, addMenuentry, baseurl, selection = commons.contextmenuHelper(VARS, contextmenuexecuteevent, xscriptcontext)
 	celladdress = selection[0, 0].getCellAddress()  # 選択範囲の左上角のセルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column  # selectionの行と列のインデックスを取得。		
 	if contextmenuname=="cell":  # セルのとき		
@@ -439,11 +448,11 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 				commons.cutcopypasteMenuEntries(addMenuentry)					
 				addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。
 				addMenuentry("ActionTrigger", {"Text": "クリア", "CommandURL": baseurl.format("entry1")}) 				
-	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
+	elif contextmenuname=="rowheader" and len(selection[0, :].getColumns())==len(VARS.sheet[0, :].getColumns()):  # 行ヘッダーのとき、かつ、選択範囲の列数がシートの列数が一致している時。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		commons.rowMenuEntries(addMenuentry)
-	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
+	elif contextmenuname=="colheader" and len(selection[:, 0].getRows())==len(VARS.sheet[:, 0].getRows()):  # 列ヘッダーのとき、かつ、選択範囲の行数がシートの行数が一致している時。	
 		commons.cutcopypasteMenuEntries(addMenuentry)
 		addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})
 		addMenuentry("ActionTrigger", {"CommandURL": ".uno:InsertColumnsBefore"})
