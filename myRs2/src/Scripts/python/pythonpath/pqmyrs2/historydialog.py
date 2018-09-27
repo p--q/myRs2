@@ -149,9 +149,16 @@ class TextListener(unohelper.Base, XTextListener):
 		self.history = ""  # 前値を保存する。
 	def textChanged(self, textevent):  # 複数回呼ばれるので前値との比較が必要。
 		editcontrol1 = textevent.Source
-		txt = editcontrol1.getText()
-		if txt!=self.history:  # 前値から変化する時のみ。
-			txt = self.transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+		edit1selection = editcontrol1.getSelection()  # テキストカーソルの位置を取得しておく。
+		oldtxt = editcontrol1.getText()
+		if oldtxt!=self.history:  # 前値から変化する時のみ。
+			
+			
+			txt = self.transliteration.transliterate(oldtxt, 0, len(oldtxt), [])[0]  # 半角に変換
+			if txt!=oldtxt:
+				if " ﾞ" in txt or 
+			
+			
 			editcontrol1.removeTextListener(self)
 			editcontrol1.setText(txt)  # 永久ループになるのでTextListenerを発火しないようにしておかないといけない。
 			editcontrol1.addTextListener(self)
@@ -168,9 +175,12 @@ class TextListener(unohelper.Base, XTextListener):
 				refreshRows(gridcontrol1, datarows)
 			self.history = txt	
 			
-			textlength = len(txt)
-			edit1selection = Selection(Min=textlength, Max=textlength)  # カーソルの位置を最後にする。指定しないと先頭になる。
-			editcontrol1.setSelection(edit1selection)  # テクストボックスコントロールのカーソルの位置を変更。ピア作成後でないと反映されない。			
+# 			textlength = len(txt)
+# 			edit1selection = Selection(Min=textlength, Max=textlength)  # カーソルの位置を最後にする。指定しないと先頭になる。
+			
+			editcontrol1.setSelection(edit1selection)  # テクストボックスコントロールのカーソルの位置を変更。ピア作成後でないと反映されない。		
+			
+				
 	def disposing(self, eventobject):
 		pass
 def fullwidth_halfwidth(xscriptcontext):
