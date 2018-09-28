@@ -146,7 +146,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):  # メニューセル。
 			else:
 				commons.showErrorMessageBox(controller, "IDが取得できませんでした。")		
 	elif txt=="COPY":
-		c = formatArticleColumn(sheet[VARS.bluerow+1:VARS.skybluerow, VARS.sharpcolumn:VARS.articlecolumn+1])  # 本日の記事欄の記事列を整形。追加した行数が返る。
+		c = formatArticleColumn(sheet[VARS.bluerow+1:VARS.skybluerow, VARS.articlecolumn])  # 本日の記事欄の記事列を整形。追加した行数が返る。
 		datarows = sheet[VARS.bluerow:VARS.skybluerow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		copydatarows = [(datarows[0][4],)]  # 本日の記事の日付を取得。
 		deletedrowcount = getCopyDataRows(copydatarows, datarows[1:], VARS.bluerow+1)  # クリップボードに取得する行の取得と空行の削除。削除された行数を返す。
@@ -306,7 +306,7 @@ def wClickCol(enhancedmouseevent, xscriptcontext):  # 列によって変える�
 			problemtxt = "履歴"
 		elif problemtxt=="心肺機能低下時":
 			callback=callback_articlehistoryCreator(xscriptcontext)
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, problemtxt, None, VARS.articlecolumn, callback=callback)
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, "{}_履歴".format(problemtxt), None, VARS.articlecolumn, callback=callback)
 	return False  # セルを編集モードにしない。
 def callback_articlehistoryCreator(xscriptcontext):
 	def articlehistoryCreator(gridcelltxt):
@@ -460,7 +460,7 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 			for i in rangeaddresses:
 				sheet.removeRange(i, delete_rows)  # 後ろからでないとすべて削除できない。
 		return len(rowindexes)  # 削除した空行数を返す。
-	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。
+	def _formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。プロブレムリスト用。#で区切って記事列のセルの結合もする。
 		c = 0  # 合計追加行数。	
 		datarangestartrow = datarange.getRangeAddress().StartRow  # datarangeの開始行インデックスを取得。
 		datarows = [[fullwidth_halfwidth(j) for j in i] for i in datarange.getDataArray()]  # 取得した行のタプルを半角にする。floatが混じってくるので結合してから半角にする方法は使えない。
@@ -492,8 +492,26 @@ def createCopyFuncs(xscriptcontext, functionaccess):  # コピーのための関
 			newrange.clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
 			newrange.setDataArray(newarticlerows)  # 記事列に代入。
 		return c  # 追加した行数を返す。
+	def formatArticleColumn(datarange):  # 記事列の文字列を制限して整形する。セルの結合をしない。処理するのは記事列のみ。
+		diff = 0  # 追加行数。	
+		newarticlerows = []  # 記事列代入するための行のリスト。
+		for datarow in datarange.getDataArray():
+			if datarow[0]:  # 空セルでない時。
+				articletxt = str(fullwidth_halfwidth(datarow[0]))  # 半角にしてすべて文字列として取得。
+				newarticlerows.extend((articletxt[i:i+stringlength],) for i in range(0, len(articletxt), stringlength))  # 文字列をセルあたりの文字数で分割して取得。
+		if newarticlerows:  # 代入する行があるとき。空行だけのときはエラーになる。
+			sheet = VARS.sheet
+			skybluerow = VARS.skybluerow
+			sheet[VARS.bluerow+1:skybluerow, VARS.articlecolumn].clearContents(CellFlags.STRING+CellFlags.VALUE)  # 記事列の文字列と数値をクリア。
+			diff = len(newarticlerows) - (skybluerow - VARS.bluerow - 1)  # 追加行数を取得。
+			if diff>0:  # 代入先の行の方が少ない時。
+				newrangeaddress = sheet[skybluerow:skybluerow+diff, :].getRangeAddress()  # 追加する行のセル範囲アドレス。
+				sheet.insertCells(newrangeaddress, insert_rows)  # 空行を挿入。	
+				sheet.queryIntersection(newrangeaddress).clearContents(511)  # 追加行の内容をクリア。セル範囲アドレスでは行がずれるので不可。
+			sheet[VARS.bluerow+1:VARS.bluerow+1+len(newarticlerows), VARS.articlecolumn].setDataArray(newarticlerows)  # 記事列に代入。
+		return diff  # 追加行数を返す。
 	def formatProblemList(startrow, endrow, title):  # プロブレム欄を整形。
-		c = formatArticleColumn(VARS.sheet[startrow:endrow, VARS.sharpcolumn:VARS.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
+		c = _formatArticleColumn(VARS.sheet[startrow:endrow, VARS.sharpcolumn:VARS.articlecolumn+1])  # プロブレム欄の記事列を整形。追加した行数が返る。
 		datarows = VARS.sheet[startrow:endrow+c, VARS.sharpcolumn:VARS.articlecolumn+1].getDataArray()  # 文字数制限後の行のタプルを取得。
 		newdatarows = [(title,)]  # タイトルを取得。	
 		getCopyDataRows(newdatarows, datarows, startrow)  # プロブレム欄の記事列を整形。

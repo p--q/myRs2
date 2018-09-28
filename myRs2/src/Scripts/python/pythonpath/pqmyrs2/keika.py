@@ -260,7 +260,7 @@ def wClickBottomLeft(enhancedmouseevent, xscriptcontext):
 				"ﾌｪﾉﾊﾞﾙﾋﾞﾀｰﾙ(ﾌｪﾉﾊﾞｰﾙ内服)10-25ug/ml2-3wで定常:検査値"
 		elif headertxt=="その他":
 			defaultrows = "包括ｹｱ:病棟", "廃用:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ", "呼吸器:ﾘﾊﾋﾞﾘ", "運動器:ﾘﾊﾋﾞﾘ"
-		historydialog.createDialog(enhancedmouseevent, xscriptcontext, headertxt, defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))		
+		historydialog.createDialog(enhancedmouseevent, xscriptcontext, "{}_履歴".format(headertxt), defaultrows, VARS.yakucolumn, callback=callback_wClickBottomLeft0Creator(xscriptcontext))		
 	else:
 		r = celladdress.Row
 		defaultrows = []
@@ -697,7 +697,6 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 	startc = rangeaddress.StartColumn
 	endc = rangeaddress.EndColumn
 	sheet = VARS.sheet
-	selection.clearContents(511)  # 範囲をすべてクリアする。
 	celladdress = selection[0, 0].getCellAddress()  # 選択セル左上端セルのアドレスを取得。
 	r, c = celladdress.Row, celladdress.Column		
 	datevalue = int(sheet[VARS.dayrow, c].getValue())
@@ -734,22 +733,23 @@ def colorizeSelectionRange(xscriptcontext, selection, end=None):  # endが与え
 		if yaku and i!=VARS.blackrow:
 			if end is not None:
 				endc = nendc if yoho else tendc
-			sheet[i, startc:endc+1].clearContents(511)  # 描く予定のセル範囲をクリア。
+			sheet[i, startc:endc+1].setPropertyValue("CellBackColor", -1)  # 描く予定のセル範囲の背景色をクリア。
 			if yoho in ("検査値",):  # 色を付けない用法。
 				continue	
 			if gentei:  # 限定条件がある時。
 				gentei = gentei.split("(", 1)[0]  # (から前のみを取得。
 				genteidigit = gentei.translate(table)  # 曜日を数字に変換する。
-				cols = []
+				cols = []  # 背景色する列インデックスのリスト。
 				if genteidigit.isdigit():  # 全て数字に変換できたときは、日月火水木金土しかない時。			
 					cols = [j for j in range(startc, endc+1) if str((weekdayval-1+j-startc)%7+1) in genteidigit]  # 日曜日=1から始まる。
 				elif gentei.endswith("日に1回"):
 					k = int(gentei.replace("日に1回", ""))
 					cols = range(startc, endc+1, k)  # range()はジェネレーターではなくシークエンス型を返す。
 				if yoho in yohos:  # 開始セルだけ点滴と同じ色にする用法。	
-					tentekirangeaddress.append(sheet[i, startc].getRangeAddress())	
-					if len(cols)>1:
-						naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols[1:])	
+					if cols:  # 背景色をつける列インデックスがある時。
+						tentekirangeaddress.append(sheet[i, cols[0]].getRangeAddress())	
+						if len(cols)>1:
+							naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols[1:])	
 				elif yoho:	
 					naifukurangeaddress.extend(sheet[i, j].getRangeAddress() for j in cols)	
 				else:  # 用法列がない時は点滴と考える。

@@ -150,6 +150,7 @@ class TextListener(unohelper.Base, XTextListener):
 	def textChanged(self, textevent):  # 複数回呼ばれるので前値との比較が必要。
 		editcontrol1 = textevent.Source
 		txt = editcontrol1.getText()
+		positionfromback = len(txt) - editcontrol1.getSelection().Max  # テキストカーソルの後ろからの位置を取得しておく。前からの位置は濁点、半濁点の分増えるので。
 		if txt!=self.history:  # 前値から変化する時のみ。
 			txt = self.transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
 			editcontrol1.removeTextListener(self)
@@ -167,10 +168,9 @@ class TextListener(unohelper.Base, XTextListener):
 						return  # 選択行より前の行の削除は諦める。選択行より上の行を削除するとグリッドコントロール以外マウスに反応しなくなるので。ソートして一番上に持ってきてもダメ。
 				refreshRows(gridcontrol1, datarows)
 			self.history = txt	
-			
-			textlength = len(txt)
-			edit1selection = Selection(Min=textlength, Max=textlength)  # カーソルの位置を最後にする。指定しないと先頭になる。
-			editcontrol1.setSelection(edit1selection)  # テクストボックスコントロールのカーソルの位置を変更。ピア作成後でないと反映されない。			
+			position = len(txt) - positionfromback  # 後ろの位置からカーソルの新しい位置を算出。
+			edit1selection = Selection(Min=position, Max=position)  # カーソルの位置を取得。
+			editcontrol1.setSelection(edit1selection)  # テクストボックスコントロールのカーソルの位置を変更。ピア作成後でないと反映されない。		
 	def disposing(self, eventobject):
 		pass
 def fullwidth_halfwidth(xscriptcontext):

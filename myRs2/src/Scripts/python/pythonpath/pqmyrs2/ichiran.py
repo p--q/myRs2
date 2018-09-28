@@ -157,7 +157,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 						continue
 					keikasheet = sheets[sheetname]  # 経過シートを取得。
 					startdatevalue = int(keikasheet[dayrow, splittedcolumn].getValue())  # 日付行の最初のセルから日付のシリアル値の取得。
-					if todayvalue>startdatevalue:  # 経過シートにある日付の時。
+					if todayvalue>=startdatevalue:  # 経過シートにある日付の時。
 						keikadatarows = keikasheet[dayrow+1:dayrow+3, splittedcolumn+todayvalue-startdatevalue].getDataArray()  # 経過シートの今日の日付列のセル範囲の値を取得。
 						if not "済" in datarows[r][ketuekicol]:  # 血液列は済があるときは何もしない。
 							datarows[r][ketuekicol] = keikadatarows[0][0]  # 血液。
