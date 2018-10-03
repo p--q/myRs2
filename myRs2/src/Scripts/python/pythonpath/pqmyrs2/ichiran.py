@@ -203,6 +203,7 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
 			[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
+			[i.getAnnotationShape().setPropertyValue("Visible", False) for i in annotations]  # これをしないとmousePressed()のTargetにAnnotationShapeが入ってしまう。
 	elif txt=="済をﾘｾｯﾄ":
 		msg = "済列をリセットします。"
 		componentwindow = controller.ComponentWindow

@@ -179,6 +179,9 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 		else:  # 枠の時刻が未来になったら終わる。
 			break
 	[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
+	
+	[i.getAnnotationShape().setPropertyValue("Visible", False) for i in annotations]  # これをしないとmousePressed()のTargetにAnnotationShapeが入ってしまう。
+	
 	sheet[VARS.dayrow:VARS.datarow, datacolumn:templatestartcolumn-1].clearContents(CellFlags.HARDATTR)  # 日付行と曜日行の書式をクリア。
 	colors = commons.COLORS
 	sheet[dayrow, datacolumn:endedgecolumn].setPropertyValues(("NumberFormat", "HoriJustify"), (commons.formatkeyCreator(doc)('D'), CENTER))  # 日付行の書式を設定。
@@ -507,6 +510,9 @@ def callback_wClickGrid(xscriptcontext, txt):
 		setCellProp(selection)	
 		celladdress = selection.getCellAddress()
 		annotations.insertNew(celladdress, gridcelltxt)  # gridcelltxtをセル注釈を挿入。
+		
+		[i.getAnnotationShape().setPropertyValue("Visible", False) for i in annotations]  # これをしないとmousePressed()のTargetにAnnotationShapeが入ってしまう。
+		
 		ichiransheet = doc.getSheets()["一覧"]
 		cell = getMendanCell(idtxt, ichiransheet)  # 一覧シートのそのIDの面談列のセルを取得。
 		if cell:	
