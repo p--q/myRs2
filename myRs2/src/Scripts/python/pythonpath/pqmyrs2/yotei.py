@@ -38,8 +38,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	sheet["O1"].setString("3wCOPY")
 	sheet["AM1"].setString("休日更新")
 	VARS.setSheet(sheet)
-	
-	
 	daycount = 31  # シートに表示する日数。
 	monthrow = VARS.monthrow
 	dayrow = VARS.dayrow
@@ -58,7 +56,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 	startdatecell = sheet[dayrow, datacolumn]
 	startdatevalue = int(startdatecell.getValue())  # 先頭の日付のシリアル値を整数で取得。空セルの時は0.0が返る。	
 	if startdatevalue>0:  # シリアル値が取得できた時。	
-		
 		diff = todayvalue - startdatevalue  # 今日の日付と先頭の日付との差を取得。
 		if diff>0:  # 先頭日付が過去の時。
 			todaycolumn = datacolumn + diff # 移動前の今日の日付列インデックスを取得。	
@@ -74,8 +71,6 @@ def activeSpreadsheetChanged(activationevent, xscriptcontext):  # シートが�
 				controller.select(sheet[emptyrow, datacolumn])			
 		elif diff<0:  # 先頭日付が未来の時はここで終わる。
 			return
-		
-		
 	else:
 		sheet[monthrow:emptyrow, datacolumn:endedgecolumn].clearContents(511)  # シートのデータ部分を全部クリア。	
 	todaydate = date.today()  # 今日のdateオブジェクトを取得。
