@@ -646,27 +646,28 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			msg = "開始セルが取得できませんでした。"		
 			commons.showErrorMessageBox(controller, msg)
 			return
-		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
-		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
-		j = 0  # 開始列インデックスを越える前の列インデックス。
+		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 空打ちだけの最大列インデックスまでの範囲で文字列または値のあるセル範囲コレクションを取得。	
+		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列または値のある列インデックスを返すジェネレーター。
+		j = 0  # 開始列インデックスを越える前の列インデックスを入れる変数。
 		for i in unitgene:
-			if i>startindex:  # 開始列より右の時。
+			if i>startindex:  # 開始列より右の時。 開始列インデックスかその前にあるインスリン量の記載のあるセルの列インデックスになる。
 				break
 			j = i
-		if j==0:  # 開始時のインスリン量が取得出来なかった時。
-			msg = "開始時のインスリン量が取得できませんでした。"		
-			commons.showErrorMessageBox(controller, msg)			
-			return
-		startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量。
-		dayu = sum([int(i)+e for i in startunits.split("-") if int(i)>0])  # インスリンの1日消費量を取得。	
-		edgecolumn = startindex + u//dayu  # インスリンがなくなる日の右列インデックスを取得。
-		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーターを再作。
-		for i in (i for i in unitgene if i>startindex):  # 開始時の次のインスリン量について。
-			newdayu = sum([int(i)+e for i in sheet[r, i].getString().split("-") if int(i)>0])  # 新たな1日消費量を取得。
-			edgecolumn = i + dayu*(edgecolumn-i)//newdayu  # 残日数から残インスリン量を取得して新しい1日消費量で残日数を再計算。
-			dayu = newdayu  # 1日消費量を更新。
-		sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
-		sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
+		if j>0:	
+			startunits = sheet[r, j].getString()  # その前の列インデックスにある文字列を取得。これが開始時のインスリン量のはず。4-4-4とか4とかで返ってくるのを-で分割する。
+			dayu = sum([int(i)+e for i in startunits.split("-") if i.isdigit() and int(i)>0])  # インスリンの1日消費量を取得。数字、かつ、0より大きい時、空打ち量を加えて合計する。	
+			if dayu>0:  # 開始時のインスリン量が取得出来た時。
+				edgecolumn = startindex + u//dayu  # インスリンがなくなる日の右列インデックスを取得。
+				unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーターを再作。
+				for i in (i for i in unitgene if i>startindex):  # 開始時の次のインスリン量について。
+					newdayu = sum([int(i)+e for i in sheet[r, i].getString().split("-") if int(i)>0])  # 新たな1日消費量を取得。
+					edgecolumn = i + dayu*(edgecolumn-i)//newdayu  # 残日数から残インスリン量を取得して新しい1日消費量で残日数を再計算。
+					dayu = newdayu  # 1日消費量を更新。
+				sheet[r, edgecolumn:].setPropertyValue("CellBackColor", -1) 
+				sheet[r, startindex+1:edgecolumn].setPropertyValue("CellBackColor", commons.COLORS["lime"]) 	
+				return
+		msg = "開始時のインスリン量が取得できません。"		
+		commons.showErrorMessageBox(controller, msg)
 	elif entrynum==24:  # 開始。	
 		celladdress = selection[0, 0].getCellAddress()
 		r, c = celladdress.Row, celladdress.Column
