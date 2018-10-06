@@ -646,7 +646,7 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			msg = "開始セルが取得できませんでした。"		
 			commons.showErrorMessageBox(controller, msg)
 			return
-		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
+		cellranges = sheet[r, VARS.splittedcolumn:c+u//e].queryContentCells(CellFlags.STRING+CellFlags.VALUE)  # 空打ちだけの最大列インデックスまでの範囲で文字列のあるセル範囲コレクションを取得。	
 		unitgene = (i for rangeaddress in cellranges.getRangeAddresses() for i in range(rangeaddress.StartColumn, rangeaddress.EndColumn+1))  # 文字列のある列インデックスを返すジェネレーター。
 		j = 0  # 開始列インデックスを越える前の列インデックス。
 		for i in unitgene:
