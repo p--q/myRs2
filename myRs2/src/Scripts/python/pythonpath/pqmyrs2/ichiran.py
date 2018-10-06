@@ -410,15 +410,15 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 def refreshCounts():  # カウントを更新する。
 	sheet = VARS.sheet
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
-	datarange = sheet[VARS.splittedrow:VARS.emptyrow, VARS.sumicolumn]
+	datarange = sheet[VARS.bluerow+1:VARS.emptyrow, VARS.sumicolumn]  # 青行から下の済列を取得。
 	searchdescriptor = sheet.createSearchDescriptor()
-	counts = []
-	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できない。
+	counts = []  # 済、待、未、の順に数が入る。
+	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できないので差で求める。
 		searchdescriptor.setSearchString(txt)  # 戻り値はない。
 		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
 		c = len([i for i in cellranges.getCells()]) if cellranges else 0  # セルで数えないといけない。
 		counts.append(c)
-	counts.append(VARS.emptyrow-VARS.splittedrow-3-sum(counts))  # 済、待、未、の順に数が入る。
+	counts.append(VARS.emptyrow-VARS.bluerow-3-sum(counts))  # 未のカウントを取得。
 	datarows[0][1] = sum(counts)
 	datarows[0][3] = counts[0]
 	datarows[1][1] = counts[2]
