@@ -193,12 +193,11 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 							else:  # 経過列に文字列ないときはiを削除する。
 								newtxt = datarows[r][shochicol].replace(i, "").strip()
 								datarows[r][shochicol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。								)	
-						if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
+						if not "済" in datarows[r][ecgcol]:  # ECG列は済があるときは書き換えない。							
 							if "ECG" in s:  # ECG。
-								if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
-									datarows[r][ecgcol] = "E"			
-								else:  # 経過列に文字列ないときはiを削除する。
-									datarows[r][ecgcol] = ""
+								datarows[r][ecgcol] = "E"	
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][ecgcol] = ""
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
