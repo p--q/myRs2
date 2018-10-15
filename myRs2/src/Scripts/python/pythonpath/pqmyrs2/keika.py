@@ -492,7 +492,6 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 						addMenuentry("ActionTrigger", {"Text": "4-4-4", "CommandURL": baseurl.format("entry11")})		
 						addMenuentry("ActionTrigger", {"Text": "インスリン残計算", "CommandURL": baseurl.format("entry22")})					
 					elif sheetcell and yoho=="吸入":  # 単一セルかつ用法列が吸入の時。
-						addMenuentry("ActionTrigger", {"Text": "処方", "CommandURL": baseurl.format("entry23")})
 						addMenuentry("ActionTriggerSeparator", {"SeparatorType": ActionTriggerSeparatorType.LINE})  # セパレーターを挿入。	
 						addMenuentry("ActionTrigger", {"Text": "7日間", "CommandURL": baseurl.format("entry8")})
 						addMenuentry("ActionTrigger", {"Text": "30日間", "CommandURL": baseurl.format("entry12")})
