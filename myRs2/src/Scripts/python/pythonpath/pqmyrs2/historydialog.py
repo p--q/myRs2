@@ -70,8 +70,8 @@ def createDialog(enhancedmouseevent, xscriptcontext, dialogtitle, defaultrows=No
 	checkboxcontrol1 = optionaddControl("CheckBox", checkboxprops1)  
 	itemlistener = ItemListener(controlcontainer)
 	checkboxcontrol2 = optionaddControl("CheckBox", checkboxprops2, {"addItemListener": itemlistener}) 
-	args = xscriptcontext, outputcolumn, callback, controlcontainer
-	actionlistener = ActionListener(args)  # ボタンコントロールにつけるリスナー。
+	args = xscriptcontext, controlcontainer
+	actionlistener = ActionListener(args)  # ボタンコントロールにつけるリスナー。	
 	optionaddControl("Button", buttonprops, {"addActionListener": actionlistener, "setActionCommand": "enter"})  
 	optioncontrolcontainerwindowlistener = OptionControlContainerWindowListener(optioncontrolcontainer)		
 	optioncontrolcontainer.addWindowListener(optioncontrolcontainerwindowlistener)  # コントロールコンテナの大きさを変更するとグリッドコントロールの大きさも変更するようにする。
@@ -219,39 +219,26 @@ class CloseListener(unohelper.Base, XCloseListener):  # ノンモダルダイア
 		pass
 class ActionListener(unohelper.Base, XActionListener):
 	def __init__(self, args):
-		self.args = args
-		self.transliteration = fullwidth_halfwidth(args[0])  # xscriptcontextを渡す。
-		self.callback = None
+		xscriptcontext, self.controlcontainer = args
+		self.transliteration = fullwidth_halfwidth(xscriptcontext)  # xscriptcontextを渡す。
 	def actionPerformed(self, actionevent):  
-		xscriptcontext, outputcolumn, callback, controlcontainer = self.args
 		cmd = actionevent.ActionCommand
 		if cmd=="enter":
-			controller = xscriptcontext.getDocument().getCurrentController()  # 現在のコントローラを取得。			
-			selection = controller.getSelection()
-			sheet = controller.getActiveSheet()
-			if selection.supportsService("com.sun.star.sheet.SheetCell"):  # 選択オブジェクトがセルの時。
-				optioncontrolcontainer = actionevent.Source.getContext()
-				celladdress = selection.getCellAddress()
-				r, c = celladdress.Row, celladdress.Column					
-				edit1 = optioncontrolcontainer.getControl("Edit1")  # テキストボックスコントロールを取得。
-				txt = edit1.getText()  # テキストボックスコントロールの文字列を取得。
-				if txt:  # テキストボックスコントロールに文字列がある時。
-					global DATAROWS
-					txt = self.transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
-					datarows = DATAROWS
-					if datarows:  # すでにグリッドコントロールにデータがある時。
-						lastindex = len(datarows) - 1  # 最終インデックスを取得。
-						[datarows.pop(lastindex-i) for i, datarow in enumerate(datarows[::-1]) if txt in datarow]  # txtがある行は後ろから削除する。
-					datarows.append((txt,))  # txtの行を追加。
-					gridcontrol1 = controlcontainer.getControl("Grid1")
-					refreshRows(gridcontrol1, datarows)
-					scrollDown(gridcontrol1)  # グリッドコントロールを下までスクロール。
-					if outputcolumn is not None:  # 出力する列が指定されている時。
-						c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
-					sheet[r, c].setString(txt)  # セルに代入。
-					DATAROWS = datarows			
-					if callback is not None:  # コールバック関数が与えられている時。
-						callback(txt)		
+			optioncontrolcontainer = actionevent.Source.getContext()			
+			edit1 = optioncontrolcontainer.getControl("Edit1")  # テキストボックスコントロールを取得。
+			txt = edit1.getText()  # テキストボックスコントロールの文字列を取得。
+			if txt:  # テキストボックスコントロールに文字列がある時。
+				global DATAROWS
+				txt = self.transliteration.transliterate(txt, 0, len(txt), [])[0]  # 半角に変換
+				datarows = DATAROWS
+				if datarows:  # すでにグリッドコントロールにデータがある時。
+					lastindex = len(datarows) - 1  # 最終インデックスを取得。
+					[datarows.pop(lastindex-i) for i, datarow in enumerate(datarows[::-1]) if txt in datarow]  # txtがある行は後ろから削除する。
+				datarows.append((txt,))  # txtの行を追加。
+				gridcontrol1 = self.controlcontainer.getControl("Grid1")
+				refreshRows(gridcontrol1, datarows)
+				scrollDown(gridcontrol1)  # グリッドコントロールを下までスクロール。
+				DATAROWS = datarows				
 	def disposing(self, eventobject):
 		pass
 class MouseListener(unohelper.Base, XMouseListener):  
@@ -310,7 +297,16 @@ class MouseListener(unohelper.Base, XMouseListener):
 					c = outputcolumn  # 同じ行の指定された列のセルに入力するようにする。
 				sheet[r, c].setString(rowdata[0])  # セルに代入。
 				if callback is not None:  # コールバック関数が与えられている時。
-					callback(rowdata[0])			
+					callback(rowdata[0])		
+				global DATAROWS
+				datarows = DATAROWS
+				if datarows:  # すでにグリッドコントロールにデータがある時。
+					lastindex = len(datarows) - 1  # 最終インデックスを取得。
+					[datarows.pop(lastindex-i) for i, datarow in enumerate(datarows[::-1]) if rowdata[0] in datarow]  # 同じデータがある行は後ろから削除する。
+				datarows.append((rowdata[0],))  # 最後に追加し直す。
+				refreshRows(gridcontrol, datarows)
+				scrollDown(gridcontrol)  # グリッドコントロールを下までスクロール。
+				DATAROWS = datarows			
 				gridpopupmenu = self.gridpopupmenu	
 				for menuid in range(1, gridpopupmenu.getItemCount()+1):  # ポップアップメニューを走査する。
 					itemtext = gridpopupmenu.getItemText(menuid)  # 文字列にはショートカットキーがついてくる。

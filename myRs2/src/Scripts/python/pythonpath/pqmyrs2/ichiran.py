@@ -193,16 +193,16 @@ def wClickMenu(enhancedmouseevent, xscriptcontext):
 							else:  # 経過列に文字列ないときはiを削除する。
 								newtxt = datarows[r][shochicol].replace(i, "").strip()
 								datarows[r][shochicol] = "" if newtxt=="済" else newtxt  # 済だけになった時は空文字にする。								)	
-						if not "済" in datarows[r][ecgcol]:  # 済があるときは書き換えない。							
+						if not "済" in datarows[r][ecgcol]:  # ECG列は済があるときは書き換えない。							
 							if "ECG" in s:  # ECG。
-								if not "E" in datarows[r][ecgcol]:  # まだ文字列iが追加されていない時。
-									datarows[r][ecgcol] = "E"			
-								else:  # 経過列に文字列ないときはiを削除する。
-									datarows[r][ecgcol] = ""
+								datarows[r][ecgcol] = "E"	
+							else:  # 経過列に文字列ないときはiを削除する。
+								datarows[r][ecgcol] = ""
 			annotations = sheet.getAnnotations()  # コメントコレクションを取得。
 			comments = [(i.getPosition(), i.getString()) for i in annotations]  # setDataArray()でコメントがクリアされるのでここでセルアドレスとコメントの文字列をタプルで取得しておく。					
 			checkrange.setDataArray(datarows)  # シートに書き戻す。
 			[annotations.insertNew(*i) for i in comments]  # コメントを再挿入。
+			[i.getAnnotationShape().setPropertyValue("Visible", False) for i in annotations]  # これをしないとmousePressed()のTargetにAnnotationShapeが入ってしまう。
 	elif txt=="済をﾘｾｯﾄ":
 		msg = "済列をリセットします。"
 		componentwindow = controller.ComponentWindow
@@ -409,15 +409,15 @@ def changesOccurred(changesevent, xscriptcontext):  # Sourceにはドキュメ�
 def refreshCounts():  # カウントを更新する。
 	sheet = VARS.sheet
 	datarows = [["総数", 0, "済", 0], ["未", 0, "待", 0]]
-	datarange = sheet[VARS.splittedrow:VARS.emptyrow, VARS.sumicolumn]
+	datarange = sheet[VARS.bluerow+1:VARS.emptyrow, VARS.sumicolumn]  # 青行から下の済列を取得。
 	searchdescriptor = sheet.createSearchDescriptor()
-	counts = []
-	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できない。
+	counts = []  # 済、待、未、の順に数が入る。
+	for txt in ("済", "待"):  # 未はタイトル行にも入っているので正しく計算できないので差で求める。
 		searchdescriptor.setSearchString(txt)  # 戻り値はない。
 		cellranges = datarange.findAll(searchdescriptor)  # 見つからなかった時はNoneが返る。
 		c = len([i for i in cellranges.getCells()]) if cellranges else 0  # セルで数えないといけない。
 		counts.append(c)
-	counts.append(VARS.emptyrow-VARS.splittedrow-3-sum(counts))  # 済、待、未、の順に数が入る。
+	counts.append(VARS.emptyrow-VARS.bluerow-3-sum(counts))  # 未のカウントを取得。
 	datarows[0][1] = sum(counts)
 	datarows[0][3] = counts[0]
 	datarows[1][1] = counts[2]
@@ -465,13 +465,13 @@ def notifyContextMenuExecute(contextmenuexecuteevent, xscriptcontext):  # 右ク
 			commons.rowMenuEntries(addMenuentry)
 			return EXECUTE_MODIFIED
 		elif startrow<VARS.bluerow:  # 未入院
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry3")})  
+			addMenuentry("ActionTrigger", {"Text": "ToDoへ", "CommandURL": baseurl.format("entry3")})  
 		elif startrow<VARS.skybluerow:  # Stable
 			addMenuentry("ActionTrigger", {"Text": "Unstableへ", "CommandURL": baseurl.format("entry4")})
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry5")})	
+			addMenuentry("ActionTrigger", {"Text": "ToDoへ", "CommandURL": baseurl.format("entry5")})	
 		elif startrow<VARS.redrow:  # Unstable
 			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry6")})
-			addMenuentry("ActionTrigger", {"Text": "新入院へ", "CommandURL": baseurl.format("entry7")}) 		
+			addMenuentry("ActionTrigger", {"Text": "ToDoへ", "CommandURL": baseurl.format("entry7")}) 		
 		else:  # 新入院
 			addMenuentry("ActionTrigger", {"Text": "未入院へ", "CommandURL": baseurl.format("entry8")}) 		
 			addMenuentry("ActionTrigger", {"Text": "Stableへ", "CommandURL": baseurl.format("entry9")})
@@ -564,21 +564,21 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			if i==c:  # インデックスが一致する時。
 				desktop.loadComponentFromURL(unohelper.systemPathToFileUrl(systempath), "_blank", 0, ())  # ドキュメントを開く。
 				break
-	elif entrynum==3:  # 未入院から新入院に移動。
+	elif entrynum==3:  # 未入院からToDoに移動。
 		commons.toNewEntry(sheet, rangeaddress, VARS.bluerow, VARS.emptyrow)
 	elif entrynum==4:  # StableからUnstableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.skybluerow, VARS.redrow)
-	elif entrynum==5:  # Stableから新入院へ移動。 
+	elif entrynum==5:  # StableからToDoへ移動。 
 		commons.toNewEntry(sheet, rangeaddress, VARS.skybluerow, VARS.emptyrow)
 	elif entrynum==6:  # UnstableからStableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.redrow, VARS.skybluerow)
-	elif entrynum==7:  # Unstableから新入院へ移動。
+	elif entrynum==7:  # UnstableからToDoへ移動。
 		commons.toNewEntry(sheet, rangeaddress, VARS.redrow, VARS.emptyrow)
-	elif entrynum==8:  # 新入院から未入院へ移動。
+	elif entrynum==8:  # ToDoから未入院へ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.bluerow)
-	elif entrynum==9:  # 新入院からStableへ移動。
+	elif entrynum==9:  # ToDoからStableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.skybluerow)
-	elif entrynum==10:  # 新入院からUnstableへ移動。
+	elif entrynum==10:  # ToDoからUnstableへ移動。
 		commons.toOtherEntry(sheet, rangeaddress, VARS.emptyrow, VARS.redrow)
 	elif entrynum==11:  # クリア。
 		splittedrow = VARS.splittedrow
@@ -613,8 +613,9 @@ def contextMenuEntries(entrynum, xscriptcontext):  # コンテクストメニュ
 			datarange = sheet[splittedrow:VARS.emptyrow, c]  
 			datarows = list(datarange.getDataArray())  # 選択列の行のタプルをリストにして取得。
 			for i in cellranges.getCells():
-				j = i.getCellAddress().Row - splittedrow  # 病棟列に療が入っているインデックスを取得。				
-				datarows[j] = ("未",)  # 行ごと入れ替える。
+				j = i.getCellAddress().Row - splittedrow  # 病棟列に療が入っているインデックスを取得。		
+				if not "無" in datarows[j]:	 # 無の時は何もしない。
+					datarows[j] = ("未",)  # 行ごと入れ替える。
 			datarange.setDataArray(datarows)  # シートに戻す。				
 def createDetachSheet(desktop, controller, doc, sheets, kanadirpath):
 	def detachSheet(sheetname, newsheetname):
